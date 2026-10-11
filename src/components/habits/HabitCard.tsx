@@ -284,8 +284,24 @@ export const HabitCard: React.FC<HabitCardProps> = ({
 
           {/* MIDDLE: INTERACTIVE ACTION AREA (YES/NO, NUMERIC, MANUAL TIMER, CHECKLIST) */}
           <div className="flex-1 flex items-center justify-start md:justify-center">
-            {/* 1. YES / NO IN LIST VIEW */}
-            {habit.type === 'YES_NO' && (
+            {isExcused || isMissed ? (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-bone border border-hairline text-xs">
+                <Lock size={13} className={clsx(isExcused ? 'text-blue-600' : 'text-red-500', 'shrink-0')} />
+                <span className="font-semibold text-charcoal">
+                  {isExcused ? '🛡️ Protected (Excused)' : '⚠️ Locked (Missed)'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsMissedModalOpen(true)}
+                  className="text-primary hover:underline font-bold text-[11px] ml-1"
+                >
+                  Edit Reason
+                </button>
+              </div>
+            ) : (
+              <>
+                {/* 1. YES / NO IN LIST VIEW */}
+                {habit.type === 'YES_NO' && (
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleToggleYesNo}
@@ -425,6 +441,8 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                   {isChecklistExpanded ? 'Hide' : 'Checklist'}
                 </button>
               </div>
+            )}
+              </>
             )}
           </div>
 
@@ -725,8 +743,40 @@ export const HabitCard: React.FC<HabitCardProps> = ({
 
         {/* INTERACTION AREA (BASED ON 4 TYPES) */}
         <div className="pt-2 border-t border-hairline/60">
-          {/* 1. YES / NO HABIT */}
-          {habit.type === 'YES_NO' && (
+          {isExcused || isMissed ? (
+            <div className="flex items-center justify-between p-3 rounded-2xl bg-surface-bone/90 border border-hairline/80">
+              <div className="flex items-center gap-2.5">
+                <div
+                  className={clsx(
+                    'w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-2xs',
+                    isExcused ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'
+                  )}
+                >
+                  <Lock size={15} />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-ink block">
+                    {isExcused ? '🔒 Task Protected & Excused' : '🔒 Task Locked for Today'}
+                  </span>
+                  <span className="text-[11px] text-charcoal">
+                    {isExcused
+                      ? 'Streak preserved. No checkmark required today.'
+                      : 'Logged as missed. Action locked for today.'}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsMissedModalOpen(true)}
+                className="text-xs font-bold text-primary hover:underline px-2.5 py-1.5 rounded-full bg-surface-card border border-hairline shrink-0"
+              >
+                Edit Reason
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* 1. YES / NO HABIT */}
+              {habit.type === 'YES_NO' && (
             <div className="flex items-center justify-between gap-3">
               <span className="text-xs text-charcoal">
                 {isCompleted
@@ -1014,6 +1064,8 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                 </div>
               )}
             </div>
+          )}
+            </>
           )}
         </div>
       </div>

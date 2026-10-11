@@ -1,17 +1,53 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
+import { Input } from '../ui/Input';
 import { logOut } from '../../services/firebase';
-import { Heart, Zap, Award, LogOut, Shield, User } from 'lucide-react';
+import {
+  Heart,
+  Zap,
+  Award,
+  LogOut,
+  Shield,
+  User,
+  Lock,
+  KeyRound,
+  Trash2,
+  CheckCircle2,
+  AlertTriangle,
+} from 'lucide-react';
+import { SecurityModal } from '../security/SecurityModal';
+import clsx from 'clsx';
 
 interface ProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+const PRESET_QUESTIONS = [
+  'What was the name of your first school?',
+  "What is your mother's maiden name?",
+  'What was the name of your first pet?',
+  'What city were you born in?',
+  'What is your favorite book or movie?',
+  'Custom Question...',
+];
+
 export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
-  const { user, currentUser, habits } = useAppStore();
+  const { user, currentUser, habits, setSecurityQuestion, resetEntireAccount } =
+    useAppStore();
+
+  const [isEditingSecurity, setIsEditingSecurity] = useState(false);
+  const [selectedPreset, setSelectedPreset] = useState(PRESET_QUESTIONS[0]);
+  const [customQuestion, setCustomQuestion] = useState('');
+  const [answerInput, setAnswerInput] = useState('');
+  const [securitySuccessMsg, setSecuritySuccessMsg] = useState('');
+  const [securityError, setSecurityError] = useState('');
+  const [isSavingSecurity, setIsSavingSecurity] = useState(false);
+
+  // Danger Zone Reset State
+  const [isConfirmResetOpen, setIsConfirmResetOpen] = useState(false);
 
   if (!user || !currentUser) return null;
 
@@ -22,105 +58,300 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
     }
   };
 
+  const handleSaveSecurity = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSecurityError('');
+    setSecuritySuccessMsg('');
+
+    const finalQuestion =
+      selectedPreset === 'Custom Question...'
+        ? customQuestion.trim()
+        : selectedPreset;
+
+    if (!finalQuestion) {
+      setSecurityError('Please select or write a security question');
+      return;
+    }
+
+    if (!answerInput.trim() || answerInput.trim().length < 2) {
+      setSecurityError('Answer must be at least 2 characters long');
+      return;
+    }
+
+    setIsSavingSecurity(true);
+    try {
+      await setSecurityQuestion(finalQuestion, answerInput.trim());
+      setSecuritySuccessMsg('Security question saved successfully!');
+      setIsEditingSecurity(false);
+      setAnswerInput('');
+    } catch (err: any) {
+      setSecurityError(err.message || 'Failed to save security question');
+    } finally {
+      setIsSavingSecurity(false);
+    }
+  };
+
+  const handleExecuteReset = async () => {
+    await resetEntireAccount();
+    setIsConfirmResetOpen(false);
+    onClose();
+  };
+
   const hearts = user.gamification?.hearts ?? 5;
   const maxHearts = user.gamification?.maxHearts ?? 5;
   const totalXp = user.gamification?.totalXp ?? 0;
   const levelTitle = user.gamification?.levelTitle ?? 'Discipline Initiate';
+  const existingSecurity = user.security;
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Discipline Profile"
-      subtitle="Your vitality, willpower rank, and account details"
-      maxWidth="sm"
-    >
-      <div className="space-y-5 pt-2">
-        {/* User Card */}
-        <div className="p-4 bg-surface-bone rounded-2xl border border-hairline flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-lg">
-            <User size={24} />
+    <>
+      <Modal
+        isOpen={isOpen}
+        onClose={onClose}
+        title="Discipline Profile & Settings"
+        subtitle="Your vitality, willpower rank, security guard, and account controls"
+        maxWidth="md"
+      >
+        <div className="space-y-5 pt-1">
+          {/* USER CARD */}
+          <div className="p-4 bg-surface-bone rounded-2xl border border-hairline flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-lg">
+              <User size={24} />
+            </div>
+            <div className="truncate flex-1">
+              <h4 className="font-display font-bold text-ink text-base truncate">
+                {user.name || 'Discipline Seeker'}
+              </h4>
+              <p className="text-xs text-charcoal truncate">
+                {currentUser.email || 'Cloud Firestore User'}
+              </p>
+            </div>
           </div>
-          <div className="truncate flex-1">
-            <h4 className="font-display font-bold text-ink text-base truncate">
-              {user.name || 'Discipline Seeker'}
-            </h4>
-            <p className="text-xs text-charcoal truncate">
-              {currentUser.email || 'Cloud Firestore User'}
+
+          {/* VITALITY & WILLPOWER STATS */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* Hearts / Health */}
+            <div className="p-3.5 bg-surface-card rounded-2xl border border-red-200/80 shadow-2xs space-y-1.5">
+              <div className="flex items-center justify-between text-xs font-semibold text-charcoal">
+                <span>Vitality (Hearts)</span>
+                <Heart size={16} className="text-red-500 fill-red-500" />
+              </div>
+              <div className="flex items-baseline gap-1">
+                <span className="font-mono text-2xl font-black text-red-600">{hearts}</span>
+                <span className="text-xs font-medium text-charcoal">/ {maxHearts}</span>
+              </div>
+              <div className="flex gap-1 pt-1">
+                {Array.from({ length: maxHearts }).map((_, i) => (
+                  <Heart
+                    key={i}
+                    size={14}
+                    className={
+                      i < hearts
+                        ? 'text-red-500 fill-red-500'
+                        : 'text-stone/30 fill-stone/10'
+                    }
+                  />
+                ))}
+              </div>
+              <p className="text-[10px] text-charcoal pt-1">
+                100% daily completion heals hearts. Misses lose hearts.
+              </p>
+            </div>
+
+            {/* Willpower XP */}
+            <div className="p-3.5 bg-surface-card rounded-2xl border border-amber-200/80 shadow-2xs space-y-1.5">
+              <div className="flex items-center justify-between text-xs font-semibold text-charcoal">
+                <span>Willpower XP</span>
+                <Zap size={16} className="text-amber-500 fill-amber-500" />
+              </div>
+              <div className="flex items-baseline gap-1">
+                <span className="font-mono text-2xl font-black text-amber-600">{totalXp}</span>
+                <span className="text-xs font-medium text-charcoal">XP</span>
+              </div>
+              <div className="inline-flex items-center gap-1 bg-amber-500/10 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-full mt-1 truncate">
+                <Award size={11} /> {levelTitle}
+              </div>
+              <p className="text-[10px] text-charcoal pt-1">
+                100% Perfect Days award +100 bonus Willpower XP.
+              </p>
+            </div>
+          </div>
+
+          {/* SECURITY QUESTION SETTINGS */}
+          <div className="p-4 bg-surface-card rounded-2xl border border-hairline space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <KeyRound size={17} className="text-primary" />
+                <h4 className="font-display font-bold text-sm text-ink">
+                  Security Guard & Question
+                </h4>
+              </div>
+
+              {existingSecurity ? (
+                <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <CheckCircle2 size={12} /> Active
+                </span>
+              ) : (
+                <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <AlertTriangle size={12} /> Not Configured
+                </span>
+              )}
+            </div>
+
+            <p className="text-xs text-charcoal leading-relaxed">
+              Required to edit tasks, delete habits, and authorize complete application data resets.
             </p>
-          </div>
-        </div>
 
-        {/* Vitality & Willpower Stats */}
-        <div className="grid grid-cols-2 gap-3">
-          {/* Hearts / Health */}
-          <div className="p-4 bg-surface-card rounded-2xl border border-red-200/80 shadow-2xs space-y-1.5">
-            <div className="flex items-center justify-between text-xs font-semibold text-charcoal">
-              <span>Vitality (Hearts)</span>
-              <Heart size={16} className="text-red-500 fill-red-500" />
+            {securitySuccessMsg && (
+              <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center gap-1.5">
+                <CheckCircle2 size={14} /> {securitySuccessMsg}
+              </div>
+            )}
+
+            {!isEditingSecurity ? (
+              <div className="pt-1 flex items-center justify-between gap-2">
+                {existingSecurity ? (
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[11px] text-charcoal block">Current Question:</span>
+                    <p className="text-xs font-bold text-ink truncate">
+                      "{existingSecurity.question}"
+                    </p>
+                  </div>
+                ) : (
+                  <span className="text-xs text-stone italic">No question set yet</span>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setIsEditingSecurity(true);
+                    setSecuritySuccessMsg('');
+                    setSecurityError('');
+                  }}
+                >
+                  {existingSecurity ? 'Change Question' : 'Set Question Now'}
+                </Button>
+              </div>
+            ) : (
+              <form onSubmit={handleSaveSecurity} className="space-y-3 pt-2">
+                {securityError && (
+                  <div className="p-2.5 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl">
+                    {securityError}
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-semibold text-charcoal mb-1">
+                    Select Question:
+                  </label>
+                  <select
+                    value={selectedPreset}
+                    onChange={(e) => setSelectedPreset(e.target.value)}
+                    className="w-full bg-surface-bone text-ink text-xs p-2.5 rounded-xl border border-hairline focus:outline-none"
+                  >
+                    {PRESET_QUESTIONS.map((q) => (
+                      <option key={q} value={q}>
+                        {q}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {selectedPreset === 'Custom Question...' && (
+                  <div>
+                    <Input
+                      label="Your Custom Security Question"
+                      placeholder="e.g. What is my private childhood nickname?"
+                      value={customQuestion}
+                      onChange={(e) => setCustomQuestion(e.target.value)}
+                      required
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <Input
+                    label="Your Secret Answer"
+                    placeholder="Enter answer (case-insensitive)"
+                    value={answerInput}
+                    onChange={(e) => setAnswerInput(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsEditingSecurity(false)}
+                    disabled={isSavingSecurity}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="sm"
+                    disabled={isSavingSecurity}
+                  >
+                    {isSavingSecurity ? 'Saving...' : 'Save Security Question'}
+                  </Button>
+                </div>
+              </form>
+            )}
+          </div>
+
+          {/* DANGER ZONE: FRESH START & FULL RESET */}
+          <div className="p-4 bg-red-50/70 border border-red-200 rounded-2xl space-y-2.5">
+            <div className="flex items-center gap-2 text-red-900">
+              <AlertTriangle size={17} className="text-red-600 shrink-0" />
+              <h4 className="font-display font-bold text-sm">
+                Danger Zone: Fresh Start / Reset Account
+              </h4>
             </div>
-            <div className="flex items-baseline gap-1">
-              <span className="font-mono text-2xl font-black text-red-600">{hearts}</span>
-              <span className="text-xs font-medium text-charcoal">/ {maxHearts}</span>
-            </div>
-            <div className="flex gap-1 pt-1">
-              {Array.from({ length: maxHearts }).map((_, i) => (
-                <Heart
-                  key={i}
-                  size={14}
-                  className={
-                    i < hearts
-                      ? 'text-red-500 fill-red-500'
-                      : 'text-stone/30 fill-stone/10'
-                  }
-                />
-              ))}
-            </div>
-            <p className="text-[10px] text-charcoal pt-1">
-              Complete habits to heal. Unexcused misses cost hearts.
+            <p className="text-xs text-red-800 leading-relaxed">
+              Permanently wipes all habits, history logs, breaks, and categories from Cloud Firestore. Restarts onboarding from scratch for a fresh beginning.
             </p>
+            <Button
+              type="button"
+              variant="danger"
+              size="sm"
+              onClick={() => setIsConfirmResetOpen(true)}
+              className="w-full gap-2 mt-1"
+            >
+              <Trash2 size={14} /> Reset All Data & Start Fresh
+            </Button>
           </div>
 
-          {/* Willpower XP */}
-          <div className="p-4 bg-surface-card rounded-2xl border border-amber-200/80 shadow-2xs space-y-1.5">
-            <div className="flex items-center justify-between text-xs font-semibold text-charcoal">
-              <span>Willpower XP</span>
-              <Zap size={16} className="text-amber-500 fill-amber-500" />
-            </div>
-            <div className="flex items-baseline gap-1">
-              <span className="font-mono text-2xl font-black text-amber-600">{totalXp}</span>
-              <span className="text-xs font-medium text-charcoal">XP</span>
-            </div>
-            <div className="inline-flex items-center gap-1 bg-amber-500/10 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-full mt-1 truncate">
-              <Award size={11} /> {levelTitle}
-            </div>
-            <p className="text-[10px] text-charcoal pt-1">
-              Earn XP with daily streaks and high priority targets.
-            </p>
+          {/* FOOTER ACTIONS */}
+          <div className="pt-2 border-t border-hairline flex items-center justify-between gap-3">
+            <span className="text-xs text-charcoal font-medium flex items-center gap-1.5">
+              <Shield size={14} className="text-primary" /> {habits.length} Active Habits
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleLogout}
+              className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 gap-1.5"
+            >
+              <LogOut size={14} /> Sign Out
+            </Button>
           </div>
         </div>
+      </Modal>
 
-        {/* Quick Summary Pill */}
-        <div className="p-3 bg-surface-card rounded-2xl border border-hairline flex items-center justify-between text-xs">
-          <span className="text-charcoal font-medium flex items-center gap-1.5">
-            <Shield size={14} className="text-primary" /> Active Habits
-          </span>
-          <span className="font-mono font-bold text-ink">{habits.length} habits configured</span>
-        </div>
-
-        {/* Logout Action */}
-        <div className="pt-2 border-t border-hairline">
-          <Button
-            type="button"
-            variant="outline"
-            size="md"
-            onClick={handleLogout}
-            className="w-full text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 gap-2"
-          >
-            <LogOut size={16} /> Sign Out
-          </Button>
-        </div>
-      </div>
-    </Modal>
+      {/* SECURITY VERIFICATION MODAL FOR FULL ACCOUNT RESET */}
+      <SecurityModal
+        isOpen={isConfirmResetOpen}
+        onClose={() => setIsConfirmResetOpen(false)}
+        title="Authorize Complete Account Reset"
+        actionTitle="Permanently wipe all habits, logs, breaks, and restart onboarding from scratch."
+        isDanger={true}
+        onSuccess={handleExecuteReset}
+      />
+    </>
   );
 };

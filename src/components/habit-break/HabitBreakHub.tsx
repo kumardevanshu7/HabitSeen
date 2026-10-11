@@ -23,6 +23,7 @@ import {
 import { format } from 'date-fns';
 import clsx from 'clsx';
 import confetti from 'canvas-confetti';
+import { SecurityModal } from '../security/SecurityModal';
 
 export const HabitBreakHub: React.FC = () => {
   const { habitBreaks, categories, addHabitBreak, relapseHabitBreak, deleteHabitBreak } =
@@ -32,6 +33,7 @@ export const HabitBreakHub: React.FC = () => {
   const [relapseModalBreak, setRelapseModalBreak] = useState<HabitBreak | null>(null);
   const [relapseReason, setRelapseReason] = useState('');
   const [viewingHistoryBreak, setViewingHistoryBreak] = useState<HabitBreak | null>(null);
+  const [breakToDelete, setBreakToDelete] = useState<HabitBreak | null>(null);
 
   // Form State
   const [name, setName] = useState('');
@@ -41,6 +43,7 @@ export const HabitBreakHub: React.FC = () => {
   const [color, setColor] = useState('#FF5C5C');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = React.useRef(false);
 
   // Global ticker for live elapsed timers (updates every 1s)
   const [, setTick] = useState(0);
@@ -51,11 +54,14 @@ export const HabitBreakHub: React.FC = () => {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingRef.current || isSubmitting) return;
+
     if (!name.trim()) {
       setError('Please provide a habit name to quit');
       return;
     }
     setError('');
+    submittingRef.current = true;
     setIsSubmitting(true);
 
     try {
@@ -77,6 +83,7 @@ export const HabitBreakHub: React.FC = () => {
       setError(err.message || 'Failed to start break timer');
     } finally {
       setIsSubmitting(false);
+      submittingRef.current = false;
     }
   };
 
@@ -201,7 +208,7 @@ export const HabitBreakHub: React.FC = () => {
                     </div>
 
                     <button
-                      onClick={() => deleteHabitBreak(b.id)}
+                      onClick={() => setBreakToDelete(b)}
                       className="p-1.5 text-stone hover:text-red-500 rounded-full hover:bg-surface-bone transition-colors"
                       title="Delete break habit"
                     >
@@ -486,6 +493,21 @@ export const HabitBreakHub: React.FC = () => {
           </div>
         </div>
       </Modal>
+
+      {/* SECURITY VERIFICATION MODAL FOR DELETING BREAK TIMER */}
+      <SecurityModal
+        isOpen={Boolean(breakToDelete)}
+        onClose={() => setBreakToDelete(null)}
+        title="Confirm Deletion of Habit Break"
+        actionTitle={`Permanently delete abstinence timer for "${breakToDelete?.name}" and all relapse history`}
+        isDanger={true}
+        onSuccess={async () => {
+          if (breakToDelete) {
+            await deleteHabitBreak(breakToDelete.id);
+            setBreakToDelete(null);
+          }
+        }}
+      />
     </div>
   );
 };

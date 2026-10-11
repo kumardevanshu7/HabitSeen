@@ -133,12 +133,18 @@ export interface HabitBreak {
   createdAt: string;
 }
 
+export interface UserSecurityConfig {
+  question: string;
+  answer: string; // Stored trimmed and in lowercase for case-insensitive verification
+}
+
 export interface UserProfile {
   name: string;
   age: number;
   relationStatus: 'single' | 'in_relationship' | 'married' | 'prefer_not_to_say';
   gender: 'male' | 'female' | 'non_binary' | 'other';
   isOnboarded: boolean;
+  security?: UserSecurityConfig;
   gamification: {
     level: number;
     levelTitle: string;
@@ -146,5 +152,6 @@ export interface UserProfile {
     consistencyScore: number; // 0 - 100%
     hearts: number;           // Default 5 ❤️
     maxHearts: number;        // Default 5
+    perfectDaysCompleted?: string[]; // Dates (YYYY-MM-DD) where 100% perfect day bonus was awarded
   };
 }

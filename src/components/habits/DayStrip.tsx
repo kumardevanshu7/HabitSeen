@@ -10,11 +10,15 @@ import {
 } from 'date-fns';
 import clsx from 'clsx';
 import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { useDragScroll } from '../../hooks/useDragScroll';
 
 export const DayStrip: React.FC = () => {
   const { selectedDate, setSelectedDate } = useAppStore();
   const todayKey = getTodayKey();
   const [anchorDate, setAnchorDate] = useState(() => parseISO(selectedDate));
+
+  const { ref: dayStripRef, isDragging: isStripDragging, events: stripDragEvents } =
+    useDragScroll<HTMLDivElement>();
 
   // Keep anchor centered if selectedDate moves outside current window
   useEffect(() => {
@@ -91,8 +95,15 @@ export const DayStrip: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. CONTINUOUS DATES STRIP (NO CUTOFFS) */}
-      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 px-0.5">
+      {/* 2. CONTINUOUS DATES STRIP (NO CUTOFFS - DRAG TO SCROLL) */}
+      <div
+        ref={dayStripRef}
+        {...stripDragEvents}
+        className={clsx(
+          'flex items-center gap-2 overflow-x-auto no-scrollbar py-1 px-0.5 select-none cursor-grab active:cursor-grabbing',
+          isStripDragging && 'cursor-grabbing'
+        )}
+      >
         {days.map((day) => {
           const key = format(day, 'yyyy-MM-dd');
           const isSelected = key === selectedDate;

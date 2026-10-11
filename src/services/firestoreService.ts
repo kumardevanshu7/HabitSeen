@@ -237,3 +237,62 @@ export const deleteHabitBreakFromDb = async (
   const ref = doc(db, 'users', userId, 'habitBreaks', breakId);
   await deleteDoc(ref);
 };
+
+// 6. Complete User Data Reset (Fresh Start)
+export const resetEntireUserDataInDb = async (userId: string) => {
+  // 1. Delete habits
+  const habitsCol = collection(db, 'users', userId, 'habits');
+  const habitsSnap = await getDocs(habitsCol);
+  if (!habitsSnap.empty) {
+    const batch1 = writeBatch(db);
+    habitsSnap.forEach((d) => batch1.delete(d.ref));
+    await batch1.commit();
+  }
+
+  // 2. Delete logs
+  const logsCol = collection(db, 'users', userId, 'logs');
+  const logsSnap = await getDocs(logsCol);
+  if (!logsSnap.empty) {
+    const batch2 = writeBatch(db);
+    logsSnap.forEach((d) => batch2.delete(d.ref));
+    await batch2.commit();
+  }
+
+  // 3. Delete categories
+  const catsCol = collection(db, 'users', userId, 'categories');
+  const catsSnap = await getDocs(catsCol);
+  if (!catsSnap.empty) {
+    const batch3 = writeBatch(db);
+    catsSnap.forEach((d) => batch3.delete(d.ref));
+    await batch3.commit();
+  }
+
+  // 4. Delete habit breaks
+  const breaksCol = collection(db, 'users', userId, 'habitBreaks');
+  const breaksSnap = await getDocs(breaksCol);
+  if (!breaksSnap.empty) {
+    const batch4 = writeBatch(db);
+    breaksSnap.forEach((d) => batch4.delete(d.ref));
+    await batch4.commit();
+  }
+
+  // 5. Reset user profile to isOnboarded: false
+  const userRef = doc(db, 'users', userId);
+  await setDoc(
+    userRef,
+    {
+      isOnboarded: false,
+      gamification: {
+        level: 1,
+        levelTitle: 'Will Habit Initiate',
+        totalXp: 0,
+        consistencyScore: 0,
+        hearts: 5,
+        maxHearts: 5,
+        perfectDaysCompleted: [],
+      },
+      updatedAt: new Date().toISOString(),
+    },
+    { merge: true }
+  );
+};

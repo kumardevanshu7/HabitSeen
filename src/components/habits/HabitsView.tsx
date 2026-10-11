@@ -9,7 +9,8 @@ import { boostVibrancy, getContrastIconColor } from '../../utils/colorUtils';
 import { CreateCategoryModal } from '../categories/CreateCategoryModal';
 import { Button } from '../ui/Button';
 import { parseISO, format } from 'date-fns';
-import { Plus, CheckCheck, LayoutGrid, List } from 'lucide-react';
+import { useDragScroll } from '../../hooks/useDragScroll';
+import { Plus, CheckCheck, LayoutGrid, List, Sparkles } from 'lucide-react';
 import clsx from 'clsx';
 
 interface HabitsViewProps {
@@ -21,11 +22,14 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
   onOpenCreateHabit,
   onOpenHabitDetails,
 }) => {
-  const { habits, categories, selectedDate, setSelectedDate } = useAppStore();
+  const { habits, categories, logs, selectedDate, setSelectedDate } = useAppStore();
 
   const [selectedCatFilter, setSelectedCatFilter] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+
+  const { ref: categoriesScrollRef, isDragging: isCatDragging, events: catScrollEvents } =
+    useDragScroll<HTMLDivElement>();
 
   const selectedDateTime = parseISO(selectedDate);
 
@@ -53,17 +57,31 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
       return pB - pA; // Higher priority on top!
     });
 
+  const totalDueCount = dueHabits.length;
+  const completedDueCount = dueHabits.filter((h) => {
+    const l = logs[`${h.id}_${selectedDate}`];
+    return l?.status === 'COMPLETED' || l?.status === 'EXCUSED';
+  }).length;
+  const isAllCompletedToday = totalDueCount > 0 && completedDueCount === totalDueCount;
+
   return (
     <div className="space-y-4">
       {/* 1. DATE PICKER STRIP */}
       <DayStrip />
 
-      {/* 2. CATEGORY PILLS FILTER BAR */}
-      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+      {/* 2. CATEGORY PILLS FILTER BAR (SMOOTH DRAG-TO-SCROLL & TOUCH SWIPE) */}
+      <div
+        ref={categoriesScrollRef}
+        {...catScrollEvents}
+        className={clsx(
+          'flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 select-none cursor-grab active:cursor-grabbing',
+          isCatDragging && 'cursor-grabbing'
+        )}
+      >
         <button
           onClick={() => setSelectedCatFilter('all')}
           className={clsx(
-            'px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all border',
+            'px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all border shrink-0',
             effectiveCatFilter === 'all'
               ? 'bg-ink text-white border-ink shadow-xs'
               : 'bg-surface-card text-charcoal border-hairline hover:bg-surface-bone'
@@ -109,11 +127,33 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
 
         <button
           onClick={() => setIsCategoryModalOpen(true)}
-          className="text-xs font-semibold text-primary hover:text-primary-deep bg-surface-card border border-dashed border-primary/40 px-3 py-1.5 rounded-full whitespace-nowrap flex items-center gap-1 transition-colors"
+          className="text-xs font-semibold text-primary hover:text-primary-deep bg-surface-card border border-dashed border-primary/40 px-3 py-1.5 rounded-full whitespace-nowrap flex items-center gap-1 transition-colors shrink-0"
         >
           <Plus size={13} /> New Category
         </button>
       </div>
+
+      {/* 100% PERFECT DAY CELEBRATION BANNER */}
+      {isAllCompletedToday && (
+        <div className="p-3.5 bg-gradient-to-r from-emerald-500/10 via-amber-500/15 to-emerald-500/10 border-2 border-emerald-500/40 rounded-2xl flex items-center justify-between gap-3 shadow-2xs animate-in fade-in duration-300">
+          <div className="flex items-center gap-2.5">
+            <span className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <Sparkles size={18} />
+            </span>
+            <div>
+              <span className="text-xs font-black text-ink block">
+                🎉 100% Perfect Day Completed!
+              </span>
+              <span className="text-[11px] text-charcoal">
+                All {totalDueCount} tasks conquered! Bonus Willpower XP awarded & Heart restored.
+              </span>
+            </div>
+          </div>
+          <span className="text-xs font-mono font-bold bg-white text-emerald-700 px-2.5 py-1 rounded-full border border-emerald-300 shrink-0">
+            100% Done
+          </span>
+        </div>
+      )}
 
       {/* 3. TOOLBAR: HABITS COUNT & VIEW MODE SWITCHER (GRID VS HORIZONTAL LIST) */}
       <div className="flex items-center justify-between gap-2 pt-1 pb-0.5">

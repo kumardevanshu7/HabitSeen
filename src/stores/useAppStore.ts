@@ -13,14 +13,17 @@ import {
   isDateInThisWeek,
   isDateInThisMonth,
   isDateInThisYear,
+  isHabitDueOnDate,
 } from '../utils/dateMath';
+import { parseISO } from 'date-fns';
+import confetti from 'canvas-confetti';
 import {
   computeHabitStreaks,
   evaluateHabitSuccess,
   calculateXpForCompletion,
   getUsedExcusesInMonth,
 } from '../utils/streakEngine';
-import { WILL_HABIT_TIERS, MISS_PENALTIES } from '../constants/gamification';
+import { WILL_HABIT_TIERS, MISS_PENALTIES, levelFromXp } from '../constants/gamification';
 import {
   FirebaseUser,
 } from '../services/firebase';
@@ -35,6 +38,7 @@ import {
   addHabitBreakToDb,
   updateHabitBreakInDb,
   deleteHabitBreakFromDb,
+  resetEntireUserDataInDb,
 } from '../services/firestoreService';
 
 interface AppState {
@@ -111,6 +115,10 @@ interface AppState {
   relapseHabitBreak: (id: string, reason?: string) => Promise<void>;
   deleteHabitBreak: (id: string) => Promise<void>;
 
+  // Security Question & Fresh Account Reset
+  setSecurityQuestion: (question: string, answer: string) => Promise<void>;
+  resetEntireAccount: () => Promise<void>;
+
   // Reset entire store state on sign out
   resetStore: () => void;
 }
@@ -168,13 +176,49 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   habits: [],
-  setHabits: (habits) => set({ habits }),
+  setHabits: (incoming) => {
+    // 1. Deduplicate by unique ID
+    const byId = Array.from(new Map(incoming.map((h) => [h.id, h])).values());
+    // 2. Remove accidental double-write duplicates (same name, categoryId, created within 3s)
+    const cleaned: Habit[] = [];
+    for (const habit of byId) {
+      const isDupe = cleaned.some(
+        (existing) =>
+          existing.name.trim().toLowerCase() === habit.name.trim().toLowerCase() &&
+          existing.categoryId === habit.categoryId &&
+          Math.abs(new Date(existing.createdAt).getTime() - new Date(habit.createdAt).getTime()) < 3000 &&
+          existing.id !== habit.id
+      );
+      if (!isDupe) {
+        cleaned.push(habit);
+      }
+    }
+    set({ habits: cleaned });
+  },
 
   logs: {},
   setLogs: (logs) => set({ logs }),
 
   habitBreaks: [],
-  setHabitBreaks: (habitBreaks) => set({ habitBreaks }),
+  setHabitBreaks: (incoming) => {
+    // 1. Deduplicate by unique ID
+    const byId = Array.from(new Map(incoming.map((b) => [b.id, b])).values());
+    // 2. Remove accidental double-write duplicates (same name, categoryId, created within 3s)
+    const cleaned: HabitBreak[] = [];
+    for (const brk of byId) {
+      const isDupe = cleaned.some(
+        (existing) =>
+          existing.name.trim().toLowerCase() === brk.name.trim().toLowerCase() &&
+          existing.categoryId === brk.categoryId &&
+          Math.abs(new Date(existing.createdAt).getTime() - new Date(brk.createdAt).getTime()) < 3000 &&
+          existing.id !== brk.id
+      );
+      if (!isDupe) {
+        cleaned.push(brk);
+      }
+    }
+    set({ habitBreaks: cleaned });
+  },
 
   completeOnboarding: async (data) => {
     const { currentUser, user } = get();
@@ -260,7 +304,22 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   addHabit: async (habitData) => {
-    const { currentUser } = get();
+    const { currentUser, habits } = get();
+    // Guard against rapid duplicate submissions
+    const isRecentDuplicate = habits.some(
+      (h) =>
+        h.name.trim().toLowerCase() === habitData.name.trim().toLowerCase() &&
+        h.categoryId === habitData.categoryId &&
+        Date.now() - new Date(h.createdAt).getTime() < 3000
+    );
+    if (isRecentDuplicate) {
+      return habits.find(
+        (h) =>
+          h.name.trim().toLowerCase() === habitData.name.trim().toLowerCase() &&
+          h.categoryId === habitData.categoryId
+      )!;
+    }
+
     const newHabit: Habit = {
       ...habitData,
       id: `hbt-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -281,7 +340,9 @@ export const useAppStore = create<AppState>()((set, get) => ({
     if (currentUser) {
       await addHabitToDb(currentUser.uid, newHabit);
     }
-    set((s) => ({ habits: [...s.habits, newHabit] }));
+    set((s) => ({
+      habits: s.habits.some((h) => h.id === newHabit.id) ? s.habits : [...s.habits, newHabit],
+    }));
     return newHabit;
   },
 
@@ -399,26 +460,66 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
     await updateHabitInDb(state.currentUser.uid, updatedHabit);
 
-    // Update user XP in Firestore if changed
-    if (state.user && xpDelta !== 0) {
-      const newTotalXp = Math.max(0, state.user.gamification.totalXp + xpDelta);
-      let newLevel = state.user.gamification.level;
-      let newLevelTitle = state.user.gamification.levelTitle;
+    // 100% PERFECT DAY BONUS ALGORITHM
+    let perfectDayBonusAwarded = false;
+    let perfectDaysList = state.user?.gamification?.perfectDaysCompleted || [];
+    let extraBonusXp = 0;
+    let bonusHeartHealed = 0;
 
-      for (const tier of WILL_HABIT_TIERS) {
-        if (newTotalXp >= tier.minXp) {
-          newLevel = tier.level;
-          newLevelTitle = tier.title;
+    if (status === 'COMPLETED' && state.user) {
+      try {
+        const parsedDate = parseISO(dateKey);
+        const dueHabits = state.habits.filter(
+          (h) => !h.isArchived && isHabitDueOnDate(h, parsedDate)
+        );
+
+        if (dueHabits.length > 0) {
+          const allCompleted = dueHabits.every((h) => {
+            const hLogKey = `${h.id}_${dateKey}`;
+            const logEntry = h.id === habitId ? newLog : updatedLogs[hLogKey];
+            return logEntry?.status === 'COMPLETED' || logEntry?.status === 'EXCUSED';
+          });
+
+          if (allCompleted && !perfectDaysList.includes(dateKey)) {
+            perfectDayBonusAwarded = true;
+            extraBonusXp = 100; // +100 Perfect Day Willpower XP Bonus!
+            perfectDaysList = [...perfectDaysList, dateKey];
+            if ((state.user.gamification.hearts ?? 5) < (state.user.gamification.maxHearts ?? 5)) {
+              bonusHeartHealed = 1;
+            }
+
+            // Confetti celebration
+            confetti({
+              particleCount: 100,
+              spread: 80,
+              origin: { y: 0.5 },
+              colors: ['#10B981', '#F59E0B', '#3B82F6', '#EC4899'],
+            });
+          }
         }
+      } catch (e) {
+        console.error('Error computing perfect day bonus:', e);
       }
+    }
+
+    // Update user XP & vitality in Firestore if changed
+    const totalXpDelta = xpDelta + extraBonusXp;
+    if (state.user && (totalXpDelta !== 0 || bonusHeartHealed > 0 || perfectDayBonusAwarded)) {
+      const newTotalXp = Math.max(0, state.user.gamification.totalXp + totalXpDelta);
+      const lvlInfo = levelFromXp(newTotalXp);
+      const currentHearts = state.user.gamification.hearts ?? 5;
+      const maxHearts = state.user.gamification.maxHearts ?? 5;
+      const newHearts = Math.min(maxHearts, currentHearts + bonusHeartHealed);
 
       const updatedUser: UserProfile = {
         ...state.user,
         gamification: {
           ...state.user.gamification,
           totalXp: newTotalXp,
-          level: newLevel,
-          levelTitle: newLevelTitle,
+          level: lvlInfo.level,
+          levelTitle: lvlInfo.title,
+          hearts: newHearts,
+          perfectDaysCompleted: perfectDaysList,
         },
       };
 
@@ -662,7 +763,22 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   addHabitBreak: async (data) => {
-    const { currentUser } = get();
+    const { currentUser, habitBreaks } = get();
+    // Guard against rapid duplicate submissions
+    const isRecentDuplicate = habitBreaks.some(
+      (b) =>
+        b.name.trim().toLowerCase() === data.name.trim().toLowerCase() &&
+        b.categoryId === data.categoryId &&
+        Date.now() - new Date(b.createdAt).getTime() < 3000
+    );
+    if (isRecentDuplicate) {
+      return habitBreaks.find(
+        (b) =>
+          b.name.trim().toLowerCase() === data.name.trim().toLowerCase() &&
+          b.categoryId === data.categoryId
+      )!;
+    }
+
     const newBreak: HabitBreak = {
       id: `brk-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       name: data.name,
@@ -680,7 +796,9 @@ export const useAppStore = create<AppState>()((set, get) => ({
     if (currentUser) {
       await addHabitBreakToDb(currentUser.uid, newBreak);
     }
-    set((s) => ({ habitBreaks: [...s.habitBreaks, newBreak] }));
+    set((s) => ({
+      habitBreaks: s.habitBreaks.some((b) => b.id === newBreak.id) ? s.habitBreaks : [...s.habitBreaks, newBreak],
+    }));
     return newBreak;
   },
 
@@ -724,6 +842,48 @@ export const useAppStore = create<AppState>()((set, get) => ({
     set((s) => ({
       habitBreaks: s.habitBreaks.filter((b) => b.id !== id),
     }));
+  },
+
+  setSecurityQuestion: async (question, answer) => {
+    const { currentUser, user } = get();
+    if (!currentUser || !user) return;
+    const normalizedAnswer = answer.trim().toLowerCase();
+    const updatedUser: UserProfile = {
+      ...user,
+      security: {
+        question: question.trim(),
+        answer: normalizedAnswer,
+      },
+    };
+    await saveUserProfileToDb(currentUser.uid, updatedUser);
+    set({ user: updatedUser });
+  },
+
+  resetEntireAccount: async () => {
+    const { currentUser, user } = get();
+    if (!currentUser) return;
+    await resetEntireUserDataInDb(currentUser.uid);
+    set({
+      habits: [],
+      logs: {},
+      categories: [DEFAULT_CATEGORY],
+      habitBreaks: [],
+      user: user
+        ? {
+            ...user,
+            isOnboarded: false,
+            gamification: {
+              level: 1,
+              levelTitle: 'Will Habit Initiate',
+              totalXp: 0,
+              consistencyScore: 0,
+              hearts: 5,
+              maxHearts: 5,
+              perfectDaysCompleted: [],
+            },
+          }
+        : null,
+    });
   },
 
   resetStore: () =>

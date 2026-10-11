@@ -28,6 +28,7 @@ import clsx from 'clsx';
 
 import { computeHabitStreaks } from '../../utils/streakEngine';
 import { isDateInThisWeek } from '../../utils/dateMath';
+import { SecurityModal } from '../security/SecurityModal';
 
 interface HabitDetailsModalProps {
   habit: Habit | null;
@@ -73,15 +74,39 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
   const monthEnd = endOfMonth(currentCalendarMonth);
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
-  const handleDelete = async () => {
-    if (window.confirm(`Are you sure you want to delete "${habit.name}"?`)) {
+  const [pendingSecurityAction, setPendingSecurityAction] = useState<{
+    type: 'edit' | 'delete';
+    title: string;
+  } | null>(null);
+
+  const handleRequestEdit = () => {
+    setPendingSecurityAction({
+      type: 'edit',
+      title: `Authorize editing habit: "${habit.name}"`,
+    });
+  };
+
+  const handleRequestDelete = () => {
+    setPendingSecurityAction({
+      type: 'delete',
+      title: `Permanently delete habit: "${habit.name}" and all historical stats`,
+    });
+  };
+
+  const handleExecuteSecurityAction = async () => {
+    if (!pendingSecurityAction) return;
+    if (pendingSecurityAction.type === 'edit') {
+      onEdit?.(habit);
+    } else if (pendingSecurityAction.type === 'delete') {
       await deleteHabit(habit.id);
       onClose();
     }
+    setPendingSecurityAction(null);
   };
 
   return (
-    <Modal
+    <>
+      <Modal
       isOpen={isOpen}
       onClose={onClose}
       title={habit.name}
@@ -119,7 +144,7 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => onEdit(habit)}
+                onClick={handleRequestEdit}
                 className="gap-1.5"
               >
                 <Edit2 size={14} /> Edit
@@ -128,7 +153,7 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
             <Button
               variant="danger"
               size="sm"
-              onClick={handleDelete}
+              onClick={handleRequestDelete}
               className="gap-1.5"
             >
               <Trash2 size={14} /> Delete
@@ -362,5 +387,20 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
         </div>
       </div>
     </Modal>
+
+    {/* SECURITY VERIFICATION MODAL FOR EDIT / DELETE */}
+    <SecurityModal
+      isOpen={Boolean(pendingSecurityAction)}
+      onClose={() => setPendingSecurityAction(null)}
+      title={
+        pendingSecurityAction?.type === 'delete'
+          ? 'Confirm Habit Deletion'
+          : 'Authorize Habit Editing'
+      }
+      actionTitle={pendingSecurityAction?.title || ''}
+      isDanger={pendingSecurityAction?.type === 'delete'}
+      onSuccess={handleExecuteSecurityAction}
+    />
+  </>
   );
 };

@@ -106,6 +106,7 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
   // Error validation & loading
   const [nameError, setNameError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = React.useRef(false);
 
   // Sync state whenever habitToEdit changes or modal is opened
   useEffect(() => {
@@ -244,12 +245,14 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (submittingRef.current || isSubmitting) return;
     if (!name.trim()) {
       setWizardStep(2);
       setNameError('Please enter a habit name');
       return;
     }
     setNameError('');
+    submittingRef.current = true;
     setIsSubmitting(true);
 
     try {
@@ -338,6 +341,7 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
       setNameError(err.message || 'Failed to save habit');
     } finally {
       setIsSubmitting(false);
+      submittingRef.current = false;
     }
   };
 

@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
 import { Habit, MissedReasonType } from '../../types/habit';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
-import { ShieldCheck, AlertTriangle, XCircle, Heart, Zap, ShieldAlert, Lock } from 'lucide-react';
+import { ShieldCheck, AlertTriangle, XCircle, Heart, Zap, ShieldAlert, Lock, Unlock } from 'lucide-react';
 import clsx from 'clsx';
 import confetti from 'canvas-confetti';
 import { getUsedExcusesInMonth } from '../../utils/streakEngine';
@@ -22,20 +22,58 @@ export const LogMissedModal: React.FC<LogMissedModalProps> = ({
   habit,
   dateKey,
 }) => {
-  const { logMissedHabit, logs } = useAppStore();
+  const { logMissedHabit, logHabit, logs } = useAppStore();
+
+  const logKey = `${habit.id}_${dateKey}`;
+  const existingLog = logs[logKey];
 
   const monthKey = dateKey.substring(0, 7);
   const usedExcuses = getUsedExcusesInMonth(habit.id, monthKey, logs);
   const maxExcuses = MISS_PENALTIES.GENUINE_REASON.maxPerMonth;
   const excusesRemaining = Math.max(0, maxExcuses - usedExcuses);
-  const isCapReached = excusesRemaining <= 0;
+  const isCapReached = excusesRemaining <= 0 && existingLog?.missedReasonType !== 'GENUINE_REASON';
 
-  const [selectedReason, setSelectedReason] = useState<MissedReasonType>(() =>
-    isCapReached ? 'FORGOT_ACCIDENTAL' : 'GENUINE_REASON'
+  const [selectedReason, setSelectedReason] = useState<MissedReasonType>(() => {
+    if (existingLog?.missedReasonType) return existingLog.missedReasonType;
+    if (existingLog?.status === 'EXCUSED') return 'GENUINE_REASON';
+    if (existingLog?.status === 'FAILED') return 'INTENTIONAL_MISS';
+    return isCapReached ? 'FORGOT_ACCIDENTAL' : 'GENUINE_REASON';
+  });
+  const [reasonText, setReasonText] = useState(
+    () => existingLog?.missedReasonText || existingLog?.notes || ''
   );
-  const [reasonText, setReasonText] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (existingLog?.missedReasonType) {
+        setSelectedReason(existingLog.missedReasonType);
+      } else if (existingLog?.status === 'EXCUSED') {
+        setSelectedReason('GENUINE_REASON');
+      } else if (existingLog?.status === 'FAILED') {
+        setSelectedReason('INTENTIONAL_MISS');
+      }
+      setReasonText(existingLog?.missedReasonText || existingLog?.notes || '');
+      setError('');
+    }
+  }, [isOpen, existingLog]);
+
+  const handleUnlockAndReset = async () => {
+    setIsSubmitting(true);
+    try {
+      await logHabit(habit.id, dateKey, {
+        valueYesNo: false,
+        valueNumeric: 0,
+        valueTimerSeconds: 0,
+      });
+      onClose();
+    } catch (err: any) {
+      setError(err.message || 'Failed to unlock habit');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -273,29 +311,50 @@ export const LogMissedModal: React.FC<LogMissedModalProps> = ({
         )}
 
         {/* ACTIONS */}
-        <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-hairline">
-          <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            variant={selectedReason === 'GENUINE_REASON' ? 'primary' : 'danger'}
-            size="md"
-            disabled={isSubmitting}
-            className="gap-2"
-          >
-            {isSubmitting ? (
-              'Recording...'
-            ) : selectedReason === 'GENUINE_REASON' ? (
-              <>
-                <ShieldCheck size={16} /> Save Reason & Keep Streak
-              </>
-            ) : (
-              <>
-                <ShieldAlert size={16} /> Confirm Missed Habit
-              </>
-            )}
-          </Button>
+        <div className="flex items-center justify-between gap-2.5 pt-2 border-t border-hairline">
+          {existingLog &&
+          (existingLog.status === 'EXCUSED' ||
+            existingLog.status === 'MISSED' ||
+            existingLog.status === 'FAILED') ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleUnlockAndReset}
+              disabled={isSubmitting}
+              className="text-primary hover:text-primary-deep gap-1.5"
+              title="Remove missed/excused status and unlock task"
+            >
+              <Unlock size={14} /> Unlock Task
+            </Button>
+          ) : (
+            <div />
+          )}
+
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant={selectedReason === 'GENUINE_REASON' ? 'primary' : 'danger'}
+              size="md"
+              disabled={isSubmitting}
+              className="gap-2"
+            >
+              {isSubmitting ? (
+                'Recording...'
+              ) : selectedReason === 'GENUINE_REASON' ? (
+                <>
+                  <ShieldCheck size={16} /> Save Reason & Keep Streak
+                </>
+              ) : (
+                <>
+                  <ShieldAlert size={16} /> Confirm Missed Habit
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </form>
     </Modal>
