@@ -473,7 +473,7 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
 
               {/* Category Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                {categories.map((cat) => {
+                {Array.from(new Map(categories.map((c) => [c.name.trim().toLowerCase(), c])).values()).map((cat) => {
                   const Icon =
                     CATEGORY_ICONS.find((i) => i.id === cat.icon)?.icon ||
                     CATEGORY_ICONS[0].icon;

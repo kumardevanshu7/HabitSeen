@@ -92,7 +92,9 @@ export interface Habit {
   updatedAt: string;
 }
 
-export type HabitLogStatus = 'COMPLETED' | 'PARTIAL' | 'SKIPPED' | 'FAILED';
+export type HabitLogStatus = 'COMPLETED' | 'PARTIAL' | 'SKIPPED' | 'FAILED' | 'EXCUSED' | 'MISSED';
+
+export type MissedReasonType = 'GENUINE_REASON' | 'FORGOT_ACCIDENTAL' | 'INTENTIONAL_MISS';
 
 export interface HabitLog {
   date: string; // YYYY-MM-DD
@@ -103,6 +105,8 @@ export interface HabitLog {
   valueTimerSeconds?: number;
   valueChecklistCompletedItemIds?: string[];
   notes?: string;
+  missedReasonType?: MissedReasonType;
+  missedReasonText?: string;
   xpEarned: number;
   loggedAt: string;
 }
@@ -140,5 +144,7 @@ export interface UserProfile {
     levelTitle: string;
     totalXp: number;
     consistencyScore: number; // 0 - 100%
+    hearts: number;           // Default 5 ❤️
+    maxHearts: number;        // Default 5
   };
 }

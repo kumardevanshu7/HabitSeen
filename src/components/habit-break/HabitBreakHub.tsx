@@ -320,11 +320,16 @@ export const HabitBreakHub: React.FC = () => {
 
           {/* Icon Selector */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-charcoal mb-2 ml-1">
-              Select Protective Badge Icon
-            </label>
-            <div className="grid grid-cols-6 sm:grid-cols-10 gap-2 max-h-36 overflow-y-auto p-2.5 bg-surface-card rounded-2xl border border-hairline">
-              {CATEGORY_ICONS.slice(0, 20).map((opt) => {
+            <div className="flex items-center justify-between mb-2 ml-1">
+              <label className="text-xs font-semibold uppercase tracking-wider text-charcoal">
+                Select Protective Badge Icon
+              </label>
+              <span className="text-[11px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md">
+                {CATEGORY_ICONS.find((i) => i.id === icon)?.label || 'Selected'}
+              </span>
+            </div>
+            <div className="grid grid-cols-6 sm:grid-cols-9 gap-2 max-h-48 overflow-y-auto p-2.5 bg-surface-card rounded-2xl border border-hairline">
+              {CATEGORY_ICONS.map((opt) => {
                 const Icon = opt.icon;
                 const isSelected = icon === opt.id;
                 return (
@@ -332,10 +337,11 @@ export const HabitBreakHub: React.FC = () => {
                     type="button"
                     key={opt.id}
                     onClick={() => setIcon(opt.id)}
+                    title={opt.label}
                     className={clsx(
-                      'p-2 rounded-xl transition-all aspect-square flex items-center justify-center',
+                      'p-2.5 rounded-xl transition-all aspect-square flex items-center justify-center',
                       isSelected
-                        ? 'bg-ink text-white ring-2 ring-primary scale-105'
+                        ? 'bg-primary text-white shadow-sm ring-2 ring-primary scale-105'
                         : 'hover:bg-surface-bone text-charcoal'
                     )}
                   >

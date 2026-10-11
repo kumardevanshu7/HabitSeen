@@ -17,9 +17,13 @@ import {
   Unlock,
   Clock,
   Sparkles,
+  ShieldCheck,
+  AlertTriangle,
+  ShieldAlert,
 } from 'lucide-react';
 import clsx from 'clsx';
 import confetti from 'canvas-confetti';
+import { LogMissedModal } from './LogMissedModal';
 
 interface HabitCardProps {
   habit: Habit;
@@ -47,6 +51,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
   const dayLog = logs[logKey];
   const isCompleted = dayLog?.status === 'COMPLETED';
   const isSkipped = dayLog?.status === 'SKIPPED';
+  const isExcused = dayLog?.status === 'EXCUSED';
+  const isMissed = dayLog?.status === 'MISSED' || dayLog?.status === 'FAILED';
+
+  const [isMissedModalOpen, setIsMissedModalOpen] = useState(false);
 
   // State for Numeric Value
   const [currentNum, setCurrentNum] = useState<number>(dayLog?.valueNumeric ?? 0);
@@ -159,6 +167,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
 
   // UNLOCK ACTION
   const handleUnlock = () => {
+    if (isExcused || isMissed) {
+      logHabit(habit.id, dateKey, { valueYesNo: false, valueNumeric: 0, valueTimerSeconds: 0 });
+      return;
+    }
     if (habit.type === 'YES_NO') {
       logHabit(habit.id, dateKey, { valueYesNo: false });
     } else if (habit.type === 'NUMERIC') {
@@ -194,6 +206,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
           'group relative rounded-2xl border transition-all duration-200 overflow-hidden shadow-2xs',
           isCompleted
             ? 'bg-stone/10 border-stone/30 opacity-65 grayscale-[35%]'
+            : isExcused
+            ? 'bg-blue-50/40 border-blue-200 opacity-85'
+            : isMissed
+            ? 'bg-red-50/30 border-red-200 opacity-75'
             : isSkipped
             ? 'bg-red-50/20 border-red-200 opacity-75'
             : 'bg-surface-card border-hairline hover:border-hairline-strong hover:shadow-xs'
@@ -407,15 +423,44 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                   (Unlock)
                 </button>
               </div>
-            ) : (
-              !isSkipped && (
+            ) : isExcused ? (
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-bold border border-blue-200">
+                <ShieldCheck size={13} className="text-blue-600" />
+                <span className="truncate max-w-[120px]" title={dayLog?.missedReasonText || 'Excused'}>
+                  {dayLog?.missedReasonText || 'Excused'}
+                </span>
                 <button
-                  onClick={() => skipHabit(habit.id, dateKey)}
-                  className="text-xs text-stone hover:text-red-500 px-2 py-1 rounded-full transition-colors"
+                  type="button"
+                  onClick={handleUnlock}
+                  className="text-[10px] text-blue-700 hover:underline font-semibold"
+                  title="Clear to re-log"
                 >
-                  Skip
+                  (Edit)
                 </button>
-              )
+              </div>
+            ) : isMissed ? (
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-100 text-red-800 text-xs font-bold border border-red-200">
+                <AlertTriangle size={13} className="text-red-600" />
+                <span>{dayLog?.status === 'FAILED' ? 'Skipped (-25 XP)' : 'Missed (-10 XP)'}</span>
+                <button
+                  type="button"
+                  onClick={handleUnlock}
+                  className="text-[10px] text-red-700 hover:underline font-semibold"
+                  title="Clear to re-log"
+                >
+                  (Edit)
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsMissedModalOpen(true)}
+                className="text-xs font-semibold text-charcoal hover:text-red-600 bg-surface-bone hover:bg-red-50 border border-hairline px-2.5 py-1 rounded-full flex items-center gap-1 transition-colors"
+                title="Log missed habit with reason"
+              >
+                <ShieldAlert size={13} className="text-charcoal" />
+                <span>Missed</span>
+              </button>
             )}
 
             <button
@@ -461,6 +506,13 @@ export const HabitCard: React.FC<HabitCardProps> = ({
             })}
           </div>
         )}
+
+        <LogMissedModal
+          isOpen={isMissedModalOpen}
+          onClose={() => setIsMissedModalOpen(false)}
+          habit={habit}
+          dateKey={dateKey}
+        />
       </div>
     );
   }
@@ -474,6 +526,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
         'group relative rounded-2xl border transition-all duration-200 overflow-hidden shadow-xs hover:shadow-md',
         isCompleted
           ? 'bg-stone/10 border-stone/30 opacity-65 grayscale-[35%]'
+          : isExcused
+          ? 'bg-blue-50/40 border-blue-200 opacity-85'
+          : isMissed
+          ? 'bg-red-50/30 border-red-200 opacity-75'
           : isSkipped
           ? 'bg-red-50/20 border-red-200 opacity-75'
           : 'bg-surface-card border-hairline hover:border-hairline-strong'
@@ -521,6 +577,32 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                   (Unlock)
                 </button>
               </div>
+            ) : isExcused ? (
+              <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[11px] font-bold border border-blue-200">
+                <ShieldCheck size={12} className="text-blue-600" />
+                <span>Shielded</span>
+                <button
+                  type="button"
+                  onClick={handleUnlock}
+                  className="text-[10px] text-blue-700 hover:underline font-semibold"
+                  title="Clear to edit"
+                >
+                  (Edit)
+                </button>
+              </div>
+            ) : isMissed ? (
+              <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-red-100 text-red-800 text-[11px] font-bold border border-red-200">
+                <AlertTriangle size={12} className="text-red-600" />
+                <span>{dayLog?.status === 'FAILED' ? 'Skipped' : 'Missed'}</span>
+                <button
+                  type="button"
+                  onClick={handleUnlock}
+                  className="text-[10px] text-red-700 hover:underline font-semibold"
+                  title="Clear to edit"
+                >
+                  (Edit)
+                </button>
+              </div>
             ) : (
               habit.stats.currentStreak > 0 && (
                 <span className="inline-flex items-center gap-1 text-xs font-mono font-bold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full border border-primary/20">
@@ -558,6 +640,56 @@ export const HabitCard: React.FC<HabitCardProps> = ({
           )}
         </div>
 
+        {/* EXCUSED BANNER */}
+        {isExcused && (
+          <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-2xl flex items-center justify-between gap-2 shadow-2xs">
+            <div className="flex items-center gap-2.5">
+              <span className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0">
+                <ShieldCheck size={18} />
+              </span>
+              <div>
+                <span className="text-xs font-bold text-blue-900 block">
+                  🛡️ Streak Preserved (Excused)
+                </span>
+                <span className="text-[11px] text-blue-700 italic line-clamp-1">
+                  "{dayLog?.missedReasonText || dayLog?.notes || 'Genuine reason'}"
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={() => setIsMissedModalOpen(true)}
+              className="text-xs font-bold text-blue-700 hover:underline px-2 py-1"
+            >
+              Edit
+            </button>
+          </div>
+        )}
+
+        {/* MISSED BANNER */}
+        {isMissed && (
+          <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-2xl flex items-center justify-between gap-2 shadow-2xs">
+            <div className="flex items-center gap-2.5">
+              <span className="w-8 h-8 rounded-full bg-red-600 text-white flex items-center justify-center shrink-0">
+                <AlertTriangle size={18} />
+              </span>
+              <div>
+                <span className="text-xs font-bold text-red-900 block">
+                  {dayLog?.status === 'FAILED' ? '❌ Intentional Skip (-25 XP)' : '⚠️ Missed Habit (-10 XP)'}
+                </span>
+                <span className="text-[11px] text-red-700">
+                  {dayLog?.status === 'FAILED' ? '-2 Hearts Lost' : '-1 Heart Lost'}
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={() => setIsMissedModalOpen(true)}
+              className="text-xs font-bold text-red-700 hover:underline px-2 py-1"
+            >
+              Edit
+            </button>
+          </div>
+        )}
+
         {/* INTERACTION AREA (BASED ON 4 TYPES) */}
         <div className="pt-2 border-t border-hairline/60">
           {/* 1. YES / NO HABIT */}
@@ -571,13 +703,15 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                   : 'Tap circle to mark complete:'}
               </span>
               <div className="flex items-center gap-2">
-                {!isCompleted && !isSkipped && (
+                {!isCompleted && !isSkipped && !isExcused && !isMissed && (
                   <button
-                    onClick={() => skipHabit(habit.id, dateKey)}
-                    className="text-xs text-stone hover:text-red-500 px-2 py-1 rounded-full transition-colors"
-                    title="Skip this habit"
+                    type="button"
+                    onClick={() => setIsMissedModalOpen(true)}
+                    className="text-xs font-semibold text-charcoal hover:text-red-600 bg-surface-bone hover:bg-red-50 border border-hairline px-2.5 py-1.5 rounded-full flex items-center gap-1 transition-colors"
+                    title="Log missed habit with reason"
                   >
-                    Skip
+                    <ShieldAlert size={13} className="text-charcoal" />
+                    <span>Missed</span>
                   </button>
                 )}
                 {/* RED CIRCLE -> GREEN TICK TOGGLE */}
@@ -614,8 +748,17 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                 )}
               </div>
 
-              {!isCompleted ? (
+              {!isCompleted && !isExcused && !isMissed ? (
                 <div className="flex items-center gap-2 self-end sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => setIsMissedModalOpen(true)}
+                    className="text-xs font-semibold text-charcoal hover:text-red-600 bg-surface-bone hover:bg-red-50 border border-hairline px-2.5 py-1.5 rounded-full flex items-center gap-1 transition-colors"
+                    title="Log missed habit with reason"
+                  >
+                    <ShieldAlert size={13} className="text-charcoal" />
+                    <span>Missed</span>
+                  </button>
                   <button
                     onClick={() => adjustNumeric(-1)}
                     className="w-9 h-9 rounded-full bg-surface-bone hover:bg-stone/20 flex items-center justify-center text-ink border border-hairline transition-all active:scale-90"
@@ -636,7 +779,9 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                   </button>
                 </div>
               ) : (
-                <span className="text-xs font-bold text-charcoal">Locked</span>
+                <span className="text-xs font-bold text-charcoal">
+                  {isCompleted ? 'Locked' : isExcused ? 'Excused' : 'Missed'}
+                </span>
               )}
             </div>
           )}
@@ -729,6 +874,18 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                         className="w-full text-center font-mono font-bold text-base bg-transparent text-ink focus:outline-none"
                       />
                     </div>
+
+                    {!isCompleted && !isExcused && !isMissed && (
+                      <button
+                        type="button"
+                        onClick={() => setIsMissedModalOpen(true)}
+                        className="h-12 px-3 rounded-2xl bg-surface-bone hover:bg-red-50 border border-hairline text-charcoal hover:text-red-600 flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0"
+                        title="Log missed habit with reason"
+                      >
+                        <ShieldAlert size={15} />
+                        <span>Missed</span>
+                      </button>
+                    )}
 
                     {/* RED CIRCLE COMPLETE BUTTON */}
                     <button
@@ -827,6 +984,13 @@ export const HabitCard: React.FC<HabitCardProps> = ({
           )}
         </div>
       </div>
+
+      <LogMissedModal
+        isOpen={isMissedModalOpen}
+        onClose={() => setIsMissedModalOpen(false)}
+        habit={habit}
+        dateKey={dateKey}
+      />
     </div>
   );
 };

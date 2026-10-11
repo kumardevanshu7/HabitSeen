@@ -3,12 +3,12 @@ import { useAppStore } from '../../stores/useAppStore';
 import { HabitCard } from './HabitCard';
 import { DayStrip } from './DayStrip';
 import { Habit } from '../../types/habit';
-import { isHabitDueOnDate } from '../../utils/dateMath';
+import { isHabitDueOnDate, getTodayKey } from '../../utils/dateMath';
 import { CATEGORY_ICONS } from '../../constants/iconsAndColors';
 import { boostVibrancy, getContrastIconColor } from '../../utils/colorUtils';
 import { CreateCategoryModal } from '../categories/CreateCategoryModal';
 import { Button } from '../ui/Button';
-import { parseISO } from 'date-fns';
+import { parseISO, format } from 'date-fns';
 import { Plus, CheckCheck, LayoutGrid, List } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -21,7 +21,7 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
   onOpenCreateHabit,
   onOpenHabitDetails,
 }) => {
-  const { habits, categories, selectedDate } = useAppStore();
+  const { habits, categories, selectedDate, setSelectedDate } = useAppStore();
 
   const [selectedCatFilter, setSelectedCatFilter] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -72,7 +72,7 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
           All Habits ({activeHabits.length})
         </button>
 
-        {categories.map((cat) => {
+        {Array.from(new Map(categories.map((c) => [c.name.trim().toLowerCase(), c])).values()).map((cat) => {
           const isSelected = selectedCatFilter === cat.id;
           const Icon =
             CATEGORY_ICONS.find((i) => i.id === cat.icon)?.icon ||
@@ -162,24 +162,34 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
             <CheckCheck size={28} />
           </div>
           <h3 className="font-display font-bold text-lg text-ink">
-            {habits.length === 0
+            {activeHabits.length === 0
               ? 'No Habits Created Yet'
-              : 'All clear for this date!'}
+              : `No habits scheduled for ${format(selectedDateTime, 'EEEE, dd MMMM yyyy')}`}
           </h3>
-          <p className="text-charcoal text-xs sm:text-sm mt-1 max-w-sm mx-auto">
-            {habits.length === 0
+          <p className="text-charcoal text-xs sm:text-sm mt-1 max-w-md mx-auto">
+            {activeHabits.length === 0
               ? 'Start small. Click the button below to configure your first daily habit target.'
-              : 'None of your habits are scheduled for this day, or a category filter was applied.'}
+              : `You have ${activeHabits.length} active habit(s) in your system. Switch to "All Habits" or jump to Today to view them.`}
           </p>
 
-          <div className="flex items-center justify-center gap-3 mt-5 flex-wrap">
-            {selectedCatFilter !== 'all' && (
+          <div className="flex items-center justify-center gap-2.5 mt-5 flex-wrap">
+            {effectiveCatFilter !== 'all' && (
               <Button
                 variant="outline"
                 size="md"
                 onClick={() => setSelectedCatFilter('all')}
               >
-                Clear Filter (Show All {habits.length} Habits)
+                Clear Category Filter ({activeHabits.length})
+              </Button>
+            )}
+
+            {selectedDate !== getTodayKey() && (
+              <Button
+                variant="outline"
+                size="md"
+                onClick={() => setSelectedDate(getTodayKey())}
+              >
+                Jump to Today
               </Button>
             )}
 

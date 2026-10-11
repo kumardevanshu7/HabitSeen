@@ -1,6 +1,6 @@
 import { Habit, HabitLog } from '../types/habit';
 import { STREAK_CHALLENGES } from '../constants/gamification';
-import { differenceInCalendarDays, parseISO, addDays } from 'date-fns';
+import { differenceInCalendarDays, parseISO, addDays, format } from 'date-fns';
 import { isHabitDueOnDate, getTodayKey } from './dateMath';
 
 export function evaluateHabitSuccess(
@@ -94,13 +94,23 @@ export function evaluateHabitSuccess(
 
 /**
  * Checks whether any date strictly between fromDate and toDate was a due date
- * that was not completed.
+ * that was not completed or excused.
  */
-function hasMissedDueDay(habit: Habit, fromDate: Date, toDate: Date): boolean {
+function hasMissedDueDay(
+  habit: Habit,
+  fromDate: Date,
+  toDate: Date,
+  allLogs: Record<string, HabitLog>
+): boolean {
   let check = addDays(fromDate, 1);
   while (differenceInCalendarDays(toDate, check) > 0) {
     if (isHabitDueOnDate(habit, check)) {
-      return true;
+      const checkKey = getTodayKey().length === 10 ? format(check, 'yyyy-MM-dd') : '';
+      const log = allLogs[`${habit.id}_${checkKey}`];
+      // If no log exists or it was marked MISSED/FAILED, then it was truly a missed due date!
+      if (!log || (log.status !== 'COMPLETED' && log.status !== 'EXCUSED')) {
+        return true;
+      }
     }
     check = addDays(check, 1);
   }
@@ -115,16 +125,20 @@ export function computeHabitStreaks(
   bestStreak: number;
   unlockedChallenges: number[];
 } {
-  // Extract completed log dates sorted in ascending order (deduplicated)
-  const completedDates = Array.from(
+  // Extract streak dates (COMPLETED or EXCUSED) sorted in ascending order (deduplicated)
+  const streakDates = Array.from(
     new Set(
       Object.values(allLogs)
-        .filter((l) => l.habitId === habit.id && l.status === 'COMPLETED')
+        .filter(
+          (l) =>
+            l.habitId === habit.id &&
+            (l.status === 'COMPLETED' || l.status === 'EXCUSED')
+        )
         .map((l) => l.date)
     )
   ).sort();
 
-  if (completedDates.length === 0) {
+  if (streakDates.length === 0) {
     return { currentStreak: 0, bestStreak: 0, unlockedChallenges: [] };
   }
 
@@ -132,11 +146,11 @@ export function computeHabitStreaks(
   let bestStreak = 1;
   let tempStreak = 1;
 
-  for (let i = 1; i < completedDates.length; i++) {
-    const prev = parseISO(completedDates[i - 1]);
-    const curr = parseISO(completedDates[i]);
+  for (let i = 1; i < streakDates.length; i++) {
+    const prev = parseISO(streakDates[i - 1]);
+    const curr = parseISO(streakDates[i]);
 
-    if (!hasMissedDueDay(habit, prev, curr)) {
+    if (!hasMissedDueDay(habit, prev, curr, allLogs)) {
       tempStreak++;
       if (tempStreak > bestStreak) bestStreak = tempStreak;
     } else {
@@ -149,7 +163,7 @@ export function computeHabitStreaks(
   const today = parseISO(todayKey);
 
   // Guard future-dated logs: only consider logs on or before today
-  const validDates = completedDates.filter((d) => d <= todayKey);
+  const validDates = streakDates.filter((d) => d <= todayKey);
 
   let currentStreak = 0;
 
@@ -157,13 +171,13 @@ export function computeHabitStreaks(
     const latestDateStr = validDates[validDates.length - 1];
     const latestDate = parseISO(latestDateStr);
 
-    // If no due date was missed between latest completion and today, streak is alive
-    if (!hasMissedDueDay(habit, latestDate, today)) {
+    // If no due date was missed between latest completion/excuse and today, streak is alive
+    if (!hasMissedDueDay(habit, latestDate, today, allLogs)) {
       currentStreak = 1;
       for (let i = validDates.length - 1; i > 0; i--) {
         const curr = parseISO(validDates[i]);
         const prev = parseISO(validDates[i - 1]);
-        if (!hasMissedDueDay(habit, prev, curr)) {
+        if (!hasMissedDueDay(habit, prev, curr, allLogs)) {
           currentStreak++;
         } else {
           break;

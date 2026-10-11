@@ -20,7 +20,7 @@ export const CreateCategoryModal: React.FC<CreateCategoryModalProps> = ({
   onClose,
   onCategoryCreated,
 }) => {
-  const { addCategory } = useAppStore();
+  const { categories, addCategory } = useAppStore();
 
   const [name, setName] = useState('');
   const [selectedIcon, setSelectedIcon] = useState('flame');
@@ -32,10 +32,20 @@ export const CreateCategoryModal: React.FC<CreateCategoryModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) {
+    const trimmed = name.trim();
+    if (!trimmed) {
       setError('Please provide a category name');
       return;
     }
+
+    const alreadyExists = categories.some(
+      (c) => c.name.trim().toLowerCase() === trimmed.toLowerCase()
+    );
+    if (alreadyExists) {
+      setError(`A category named "${trimmed}" already exists.`);
+      return;
+    }
+
     setError('');
     setIsSubmitting(true);
 

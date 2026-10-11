@@ -5,6 +5,7 @@ import {
   HabitBreak,
   HabitLog,
   HabitLogStatus,
+  MissedReasonType,
   UserProfile,
 } from '../types/habit';
 import {
@@ -87,6 +88,12 @@ interface AppState {
     }
   ) => Promise<void>;
   skipHabit: (habitId: string, dateKey: string, notes?: string) => Promise<void>;
+  logMissedHabit: (
+    habitId: string,
+    dateKey: string,
+    reasonType: MissedReasonType,
+    reasonText?: string
+  ) => Promise<void>;
 
   // Timer Habit Break
   habitBreaks: HabitBreak[];
@@ -122,7 +129,17 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
   user: null,
   profileLoading: true,
-  setUser: (profile) => set({ user: profile, profileLoading: false }),
+  setUser: (profile) => {
+    if (profile && profile.gamification) {
+      if (typeof profile.gamification.hearts !== 'number') {
+        profile.gamification.hearts = 5;
+      }
+      if (typeof profile.gamification.maxHearts !== 'number') {
+        profile.gamification.maxHearts = 5;
+      }
+    }
+    set({ user: profile, profileLoading: false });
+  },
   setProfileLoading: (loading) => set({ profileLoading: loading }),
 
   selectedDate: getTodayKey(),
@@ -130,12 +147,19 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
   categories: [DEFAULT_CATEGORY],
   setCategories: (categories) => {
-    // Ensure default "Others" exists
-    if (!categories.some((c) => c.isDefault || c.id === 'cat-others')) {
-      set({ categories: [DEFAULT_CATEGORY, ...categories] });
-    } else {
-      set({ categories });
+    // Deduplicate by normalized name and ensure default "Others" exists
+    const uniqueMap = new Map<string, Category>();
+    
+    // Always include default category
+    uniqueMap.set('others', DEFAULT_CATEGORY);
+
+    for (const cat of categories) {
+      const norm = cat.name.trim().toLowerCase();
+      if (!uniqueMap.has(norm)) {
+        uniqueMap.set(norm, cat);
+      }
     }
+    set({ categories: Array.from(uniqueMap.values()) });
   },
 
   habits: [],
@@ -165,6 +189,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
         levelTitle: tier.title,
         totalXp: 150, // Welcome XP
         consistencyScore: 100,
+        hearts: 5,
+        maxHearts: 5,
       },
     };
 
@@ -177,7 +203,13 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   addCategory: async (catData) => {
-    const { currentUser } = get();
+    const { currentUser, categories } = get();
+    const norm = catData.name.trim().toLowerCase();
+    const existing = categories.find((c) => c.name.trim().toLowerCase() === norm);
+    if (existing) {
+      return existing; // Return existing category, prevent duplicates!
+    }
+
     const newCat: Category = {
       ...catData,
       id: `cat-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -491,6 +523,132 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
       await saveUserProfileToDb(state.currentUser.uid, updatedUser);
       set((s) => ({ user: updatedUser }));
+    }
+
+    set((s) => ({
+      logs: {
+        ...s.logs,
+        [logKey]: newLog,
+      },
+      habits: s.habits.map((h) => (h.id === habitId ? updatedHabit : h)),
+    }));
+  },
+
+  logMissedHabit: async (habitId, dateKey, reasonType, reasonText) => {
+    const state = get();
+    const habit = state.habits.find((h) => h.id === habitId);
+    if (!state.currentUser || !habit) return;
+
+    const logKey = `${habitId}_${dateKey}`;
+    const existingLog = state.logs[logKey];
+    const oldXp = existingLog?.xpEarned || 0;
+
+    let status: HabitLogStatus = 'EXCUSED';
+    let xpEarned = 0;
+    let heartLoss = 0;
+
+    if (reasonType === 'GENUINE_REASON') {
+      status = 'EXCUSED';
+      xpEarned = 0; // 0 XP penalty, constant
+      heartLoss = 0; // 0 Hearts lost, streak preserved!
+    } else if (reasonType === 'FORGOT_ACCIDENTAL') {
+      status = 'MISSED';
+      xpEarned = -10; // -10 XP penalty
+      heartLoss = 1;  // -1 Heart lost
+    } else { // 'INTENTIONAL_MISS'
+      status = 'FAILED';
+      xpEarned = -25; // -25 XP penalty
+      heartLoss = 2;  // -2 Hearts lost
+    }
+
+    const xpDelta = xpEarned - oldXp;
+
+    const newLog: HabitLog = {
+      date: dateKey,
+      habitId,
+      status,
+      missedReasonType: reasonType,
+      missedReasonText: reasonText,
+      notes: reasonText,
+      xpEarned,
+      loggedAt: new Date().toISOString(),
+    };
+
+    await saveLogToDb(state.currentUser.uid, logKey, newLog);
+
+    const updatedLogs = {
+      ...state.logs,
+      [logKey]: newLog,
+    };
+
+    const { currentStreak, bestStreak, unlockedChallenges } = computeHabitStreaks(
+      habit,
+      updatedLogs
+    );
+
+    const allCompletedLogs = Object.values(updatedLogs).filter(
+      (l) => l.habitId === habitId && l.status === 'COMPLETED'
+    );
+
+    const timesCompletedThisWeek = allCompletedLogs.filter((l) =>
+      isDateInThisWeek(l.date)
+    ).length;
+    const timesCompletedThisMonth = allCompletedLogs.filter((l) =>
+      isDateInThisMonth(l.date)
+    ).length;
+    const timesCompletedThisYear = allCompletedLogs.filter((l) =>
+      isDateInThisYear(l.date)
+    ).length;
+    const timesCompletedAllTime = allCompletedLogs.length;
+
+    const updatedHabit: Habit = {
+      ...habit,
+      stats: {
+        ...habit.stats,
+        currentStreak,
+        bestStreak,
+        unlockedChallenges,
+        timesCompletedAllTime,
+        timesCompletedThisYear,
+        timesCompletedThisMonth,
+        timesCompletedThisWeek,
+        totalTrackedDays: Object.values(updatedLogs).filter(
+          (l) => l.habitId === habitId
+        ).length,
+      },
+      updatedAt: new Date().toISOString(),
+    };
+
+    await updateHabitInDb(state.currentUser.uid, updatedHabit);
+
+    if (state.user) {
+      const currentHearts = state.user.gamification.hearts ?? 5;
+      const newHearts = Math.max(0, currentHearts - heartLoss);
+      const newTotalXp = Math.max(0, state.user.gamification.totalXp + xpDelta);
+
+      let newLevel = state.user.gamification.level;
+      let newLevelTitle = state.user.gamification.levelTitle;
+      for (const tier of WILL_HABIT_TIERS) {
+        if (newTotalXp >= tier.minXp) {
+          newLevel = tier.level;
+          newLevelTitle = tier.title;
+        }
+      }
+
+      const updatedUser: UserProfile = {
+        ...state.user,
+        gamification: {
+          ...state.user.gamification,
+          hearts: newHearts,
+          maxHearts: state.user.gamification.maxHearts ?? 5,
+          totalXp: newTotalXp,
+          level: newLevel,
+          levelTitle: newLevelTitle,
+        },
+      };
+
+      await saveUserProfileToDb(state.currentUser.uid, updatedUser);
+      set({ user: updatedUser });
     }
 
     set((s) => ({

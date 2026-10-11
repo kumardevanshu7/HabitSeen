@@ -30,6 +30,26 @@ import {
   Compass,
   Crosshair,
   LayoutGrid,
+  Gamepad2,
+  ShoppingBag,
+  Package,
+  Cigarette,
+  Wine,
+  Beer,
+  Smartphone,
+  Tv,
+  Pizza,
+  Cookie,
+  Pill,
+  Coins,
+  BedDouble,
+  ShieldAlert,
+  Skull,
+  HeartCrack,
+  AlertOctagon,
+  Scale,
+  Scissors,
+  Eye,
 } from 'lucide-react';
 
 export interface IconOption {
@@ -43,36 +63,65 @@ export interface IconOption {
 }
 
 export const CATEGORY_ICONS: IconOption[] = [
-  { id: 'flame', label: 'Consistency', icon: Flame },
-  { id: 'dumbbell', label: 'Workout', icon: Dumbbell },
-  { id: 'book-open', label: 'Reading', icon: BookOpen },
+  // Gaming, Digital & Screen vices
+  { id: 'gamepad-2', label: 'Games & Gaming', icon: Gamepad2 },
+  { id: 'smartphone', label: 'Screen & Social Media', icon: Smartphone },
+  { id: 'tv', label: 'Binge Watching & TV', icon: Tv },
+  
+  // Beauty, Skincare & Grooming
+  { id: 'sparkles', label: 'Skincare & Glow', icon: Sparkles },
+  { id: 'scissors', label: 'Grooming & Haircare', icon: Scissors },
+  { id: 'smile', label: 'Mood & Face', icon: Smile },
+
+  // Products, Shopping & Finances
+  { id: 'shopping-bag', label: 'Shopping & Clothes', icon: ShoppingBag },
+  { id: 'package', label: 'Product Deliveries', icon: Package },
+  { id: 'wallet', label: 'Finances & Budget', icon: Wallet },
+  { id: 'coins', label: 'Spending & Gambling', icon: Coins },
+
+  // Health, Diet, Food & Supplements
+  { id: 'pill', label: 'Supplements & Meds', icon: Pill },
+  { id: 'apple', label: 'Clean Diet', icon: Apple },
+  { id: 'pizza', label: 'Junk Food', icon: Pizza },
+  { id: 'cookie', label: 'Sugar & Sweets', icon: Cookie },
   { id: 'droplets', label: 'Hydration', icon: Droplets },
-  { id: 'heart-pulse', label: 'Health', icon: HeartPulse },
-  { id: 'moon', label: 'Sleep', icon: Moon },
-  { id: 'sun', label: 'Morning', icon: Sun },
-  { id: 'brain', label: 'Mindset', icon: Brain },
-  { id: 'apple', label: 'Diet', icon: Apple },
-  { id: 'coffee', label: 'Moderation', icon: Coffee },
-  { id: 'pen-tool', label: 'Writing', icon: PenTool },
-  { id: 'code', label: 'Coding', icon: Code },
-  { id: 'wallet', label: 'Finances', icon: Wallet },
-  { id: 'music', label: 'Music', icon: Music },
-  { id: 'footprints', label: 'Steps', icon: Footprints },
-  { id: 'target', label: 'Focus', icon: Target },
-  { id: 'sparkles', label: 'Self Care', icon: Sparkles },
+  { id: 'coffee', label: 'Caffeine & Coffee', icon: Coffee },
+
+  // Abstinence, Vices & Harm Reduction
+  { id: 'cigarette', label: 'Smoking & Vaping', icon: Cigarette },
+  { id: 'wine', label: 'Alcohol & Wine', icon: Wine },
+  { id: 'beer', label: 'Beer & Drinking', icon: Beer },
+  { id: 'skull', label: 'Toxic Habits', icon: Skull },
+  { id: 'heart-crack', label: 'Overthinking & Heartbreak', icon: HeartCrack },
+  { id: 'alert-octagon', label: 'Impulses & Triggers', icon: AlertOctagon },
+  { id: 'shield-alert', label: 'Strict Abstinence', icon: ShieldAlert },
   { id: 'shield-check', label: 'Discipline', icon: ShieldCheck },
-  { id: 'zap', label: 'Energy', icon: Zap },
-  { id: 'smile', label: 'Mood', icon: Smile },
+
+  // Fitness, Body & Sleep
+  { id: 'dumbbell', label: 'Workout & Gym', icon: Dumbbell },
+  { id: 'heart-pulse', label: 'Cardio & Heart', icon: HeartPulse },
+  { id: 'footprints', label: 'Daily Steps', icon: Footprints },
+  { id: 'bed-double', label: 'Sleep & Night Routine', icon: BedDouble },
+  { id: 'moon', label: 'Rest & Deep Sleep', icon: Moon },
+  { id: 'sun', label: 'Morning Routine', icon: Sun },
+
+  // Productivity, Learning & Mind
+  { id: 'brain', label: 'Mindset & Meditation', icon: Brain },
+  { id: 'book-open', label: 'Reading Books', icon: BookOpen },
+  { id: 'code', label: 'Coding & Dev', icon: Code },
+  { id: 'pen-tool', label: 'Writing & Journaling', icon: PenTool },
+  { id: 'target', label: 'Deep Focus', icon: Target },
+  { id: 'eye', label: 'Screen Awareness', icon: Eye },
+  { id: 'briefcase', label: 'Career & Work', icon: Briefcase },
+  { id: 'flame', label: 'Consistency & Fire', icon: Flame },
+  { id: 'trophy', label: 'Milestones & Wins', icon: Trophy },
+  { id: 'scale', label: 'Life Balance', icon: Scale },
   { id: 'clock', label: 'Punctuality', icon: Clock },
-  { id: 'leaf', label: 'Nature', icon: Leaf },
-  { id: 'briefcase', label: 'Career', icon: Briefcase },
-  { id: 'users', label: 'Family', icon: Users },
-  { id: 'palette', label: 'Creativity', icon: Palette },
-  { id: 'bed', label: 'Rest', icon: Bed },
-  { id: 'trophy', label: 'Goals', icon: Trophy },
-  { id: 'compass', label: 'Reflection', icon: Compass },
-  { id: 'crosshair', label: 'Precision', icon: Crosshair },
-  { id: 'layout-grid', label: 'Others', icon: LayoutGrid },
+  { id: 'leaf', label: 'Nature & Calm', icon: Leaf },
+  { id: 'music', label: 'Music & Audio', icon: Music },
+  { id: 'palette', label: 'Art & Creativity', icon: Palette },
+  { id: 'users', label: 'Relationships & Social', icon: Users },
+  { id: 'layout-grid', label: 'General / Others', icon: LayoutGrid },
 ];
 
 // Rich, ultra-vibrant, bright colors that pop clearly on screen
