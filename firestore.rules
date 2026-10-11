@@ -1,0 +1,60 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper: Verify if user is signed in
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper: Verify user owns the document path
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Root user document (Profile & Gamification stats)
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+
+      // User custom categories
+      match /categories/{categoryId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // User habits collection
+      match /habits/{habitId} {
+        allow read, write: if isOwner(userId);
+
+        // Nested logs under habit (if needed)
+        match /logs/{logId} {
+          allow read, write: if isOwner(userId);
+        }
+      }
+
+      // Daily execution logs subcollection (/users/{userId}/logs/{logKey})
+      match /logs/{logKey} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // "Timer Habit Break" (Quit habit chronometers & relapses)
+      match /habitBreaks/{breakId} {
+        allow read, write: if isOwner(userId);
+
+        match /relapses/{relapseId} {
+          allow read, write: if isOwner(userId);
+        }
+      }
+
+      // Gamification history / XP logs
+      match /gamification/{docId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // Explicit fallback: Deny all unauthenticated or stray collection access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
