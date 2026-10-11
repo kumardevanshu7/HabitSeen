@@ -2,9 +2,24 @@ import React, { useState } from 'react';
 import confetti from 'canvas-confetti';
 import { useAppStore } from '../../stores/useAppStore';
 import { Button } from '../ui/Button';
-import { Input, Select } from '../ui/Input';
+import { Input } from '../ui/Input';
+import { CustomSelect, SelectOption } from '../ui/CustomSelect';
 import { ShieldCheck, Sparkles, Award, ArrowRight } from 'lucide-react';
 import { UserProfile } from '../../types/habit';
+
+const GENDER_OPTIONS: SelectOption<UserProfile['gender']>[] = [
+  { value: 'male', label: 'Male' },
+  { value: 'female', label: 'Female' },
+  { value: 'non_binary', label: 'Non-binary' },
+  { value: 'other', label: 'Other / Self-describe' },
+];
+
+const RELATION_OPTIONS: SelectOption<UserProfile['relationStatus']>[] = [
+  { value: 'single', label: 'Single' },
+  { value: 'in_relationship', label: 'In a Relationship' },
+  { value: 'married', label: 'Married' },
+  { value: 'prefer_not_to_say', label: 'Prefer not to say' },
+];
 
 export const OnboardingModal: React.FC = () => {
   const { user, currentUser, profileLoading, completeOnboarding } = useAppStore();
@@ -105,28 +120,20 @@ export const OnboardingModal: React.FC = () => {
                   required
                 />
 
-                <Select
+                <CustomSelect
                   label="Gender"
                   value={gender}
-                  onChange={(e) => setGender(e.target.value as any)}
-                >
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="non_binary">Non-binary</option>
-                  <option value="other">Other / Self-describe</option>
-                </Select>
+                  options={GENDER_OPTIONS}
+                  onChange={(val) => setGender(val)}
+                />
               </div>
 
-              <Select
+              <CustomSelect
                 label="Relationship Status"
                 value={relationStatus}
-                onChange={(e) => setRelationStatus(e.target.value as any)}
-              >
-                <option value="single">Single</option>
-                <option value="in_relationship">In a Relationship</option>
-                <option value="married">Married</option>
-                <option value="prefer_not_to_say">Prefer not to say</option>
-              </Select>
+                options={RELATION_OPTIONS}
+                onChange={(val) => setRelationStatus(val)}
+              />
 
               <div className="pt-4">
                 <Button type="submit" variant="primary" className="w-full text-base">

@@ -1,4 +1,5 @@
 import React, { useEffect, useId } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -8,7 +9,7 @@ interface ModalProps {
   title?: string;
   subtitle?: string;
   children: React.ReactNode;
-  maxWidth?: 'sm' | 'md' | 'lg' | 'xl';
+  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '4xl';
 }
 
 // Global modal counter to prevent multiple modals from clobbering body overflow
@@ -66,9 +67,11 @@ export const Modal: React.FC<ModalProps> = ({
     md: 'sm:max-w-lg',
     lg: 'sm:max-w-2xl',
     xl: 'sm:max-w-3xl',
+    '2xl': 'sm:max-w-4xl',
+    '4xl': 'sm:max-w-6xl',
   };
 
-  return (
+  const modalContent = (
     <div
       role="dialog"
       aria-modal="true"
@@ -77,22 +80,22 @@ export const Modal: React.FC<ModalProps> = ({
     >
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-ink/40 backdrop-blur-sm transition-opacity"
+        className="fixed inset-0 bg-ink/50 backdrop-blur-sm transition-opacity"
         onClick={onClose}
         aria-hidden="true"
       />
 
-      {/* Modal Surface */}
+      {/* Modal Surface - Opaque solid background */}
       <div
         className={clsx(
-          'relative w-full bg-canvas border border-hairline rounded-t-3xl sm:rounded-2xl shadow-2xl z-10',
+          'relative w-full bg-[#f9f7f3] border border-hairline rounded-t-3xl sm:rounded-2xl shadow-2xl z-10 opacity-100',
           'max-h-[92dvh] sm:max-h-[90vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200',
           maxW[maxWidth]
         )}
       >
         {/* Header */}
         {(title || subtitle) && (
-          <div className="px-6 pt-6 pb-4 border-b border-hairline flex items-center justify-between bg-canvas shrink-0">
+          <div className="px-6 pt-6 pb-4 border-b border-hairline flex items-center justify-between bg-[#f9f7f3] shrink-0">
             <div>
               {title && (
                 <h3
@@ -124,4 +127,6 @@ export const Modal: React.FC<ModalProps> = ({
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : modalContent;
 };

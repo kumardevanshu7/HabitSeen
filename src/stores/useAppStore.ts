@@ -23,7 +23,7 @@ import {
   calculateXpForCompletion,
   getUsedExcusesInMonth,
 } from '../utils/streakEngine';
-import { WILL_HABIT_TIERS, MISS_PENALTIES, levelFromXp } from '../constants/gamification';
+import { WILL_HABIT_TIERS, MISS_PENALTIES, levelFromXp, calculateMaxHearts } from '../constants/gamification';
 import {
   FirebaseUser,
 } from '../services/firebase';
@@ -143,11 +143,12 @@ export const useAppStore = create<AppState>()((set, get) => ({
   syncError: null,
   setUser: (profile) => {
     if (profile && profile.gamification) {
+      const calculatedMax = calculateMaxHearts(profile.gamification.totalXp ?? 0);
+      profile.gamification.maxHearts = calculatedMax;
       if (typeof profile.gamification.hearts !== 'number') {
-        profile.gamification.hearts = 5;
-      }
-      if (typeof profile.gamification.maxHearts !== 'number') {
-        profile.gamification.maxHearts = 5;
+        profile.gamification.hearts = calculatedMax;
+      } else {
+        profile.gamification.hearts = Math.min(calculatedMax, Math.max(0, profile.gamification.hearts));
       }
     }
     set({ user: profile, profileLoading: false, syncError: null });
@@ -392,7 +393,18 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const isSuccess = status === 'COMPLETED';
 
     // XP calculation: calculate delta to prevent duplicate or missing XP on re-complete/edit
-    const newXp = isSuccess ? calculateXpForCompletion(habit, habit.stats.currentStreak) : 0;
+    let newXp = 0;
+    if (isSuccess) {
+      const fullXp = calculateXpForCompletion(habit, habit.stats.currentStreak);
+      if (habit.type === 'CHECKLIST') {
+        const totalItems = habit.config.checklist?.items?.length || 1;
+        const completedCount = mergedCandidate.valueChecklistCompletedItemIds?.length || 0;
+        const ratio = totalItems > 0 ? Math.min(1, Math.max(0, completedCount / totalItems)) : 1;
+        newXp = Math.round(fullXp * ratio);
+      } else {
+        newXp = fullXp;
+      }
+    }
     const oldXp = existingLog.xpEarned || 0;
     const xpDelta = newXp - oldXp;
 
@@ -507,9 +519,11 @@ export const useAppStore = create<AppState>()((set, get) => ({
     if (state.user && (totalXpDelta !== 0 || bonusHeartHealed > 0 || perfectDayBonusAwarded)) {
       const newTotalXp = Math.max(0, state.user.gamification.totalXp + totalXpDelta);
       const lvlInfo = levelFromXp(newTotalXp);
+      const oldMaxHearts = state.user.gamification.maxHearts ?? 5;
+      const newMaxHearts = calculateMaxHearts(newTotalXp);
+      const heartCapacityGain = Math.max(0, newMaxHearts - oldMaxHearts);
       const currentHearts = state.user.gamification.hearts ?? 5;
-      const maxHearts = state.user.gamification.maxHearts ?? 5;
-      const newHearts = Math.min(maxHearts, currentHearts + bonusHeartHealed);
+      const newHearts = Math.min(newMaxHearts, currentHearts + heartCapacityGain + bonusHeartHealed);
 
       const updatedUser: UserProfile = {
         ...state.user,
@@ -519,6 +533,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
           level: lvlInfo.level,
           levelTitle: lvlInfo.title,
           hearts: newHearts,
+          maxHearts: newMaxHearts,
           perfectDaysCompleted: perfectDaysList,
         },
       };
@@ -617,6 +632,10 @@ export const useAppStore = create<AppState>()((set, get) => ({
         }
       }
 
+      const newMaxHearts = calculateMaxHearts(newTotalXp);
+      const currentHearts = state.user.gamification.hearts ?? 5;
+      const newHearts = Math.min(newMaxHearts, currentHearts);
+
       const updatedUser: UserProfile = {
         ...state.user,
         gamification: {
@@ -624,6 +643,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
           totalXp: newTotalXp,
           level: newLevel,
           levelTitle: newLevelTitle,
+          hearts: newHearts,
+          maxHearts: newMaxHearts,
         },
       };
 
@@ -737,12 +758,14 @@ export const useAppStore = create<AppState>()((set, get) => ({
         }
       }
 
+      const newMaxHearts = calculateMaxHearts(newTotalXp);
+
       const updatedUser: UserProfile = {
         ...state.user,
         gamification: {
           ...state.user.gamification,
           hearts: newHearts,
-          maxHearts: state.user.gamification.maxHearts ?? 5,
+          maxHearts: newMaxHearts,
           totalXp: newTotalXp,
           level: newLevel,
           levelTitle: newLevelTitle,

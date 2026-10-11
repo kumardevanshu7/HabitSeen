@@ -21,6 +21,10 @@ import {
 } from './services/firestoreService';
 import { InstallPromptBanner } from './components/pwa/InstallPromptBanner';
 import { ProfileModal } from './components/profile/ProfileModal';
+import { ZeroVitalityPurgeModal } from './components/gamification/ZeroVitalityPurgeModal';
+import { DashboardFooter } from './components/navigation/DashboardFooter';
+import { AchievementsModal } from './components/achievements/AchievementsModal';
+import { BrandLegalModal, BrandLegalTab } from './components/brand/BrandLegalModal';
 import { Button } from './components/ui/Button';
 import { AlertCircle, RefreshCw, WifiOff } from 'lucide-react';
 
@@ -48,6 +52,9 @@ export const App: React.FC = () => {
   const [inspectedHabit, setInspectedHabit] = useState<Habit | null>(null);
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isAchievementsOpen, setIsAchievementsOpen] = useState(false);
+  const [isBrandLegalOpen, setIsBrandLegalOpen] = useState(false);
+  const [brandLegalTab, setBrandLegalTab] = useState<BrandLegalTab>('explore');
   const [splashTimedOut, setSplashTimedOut] = useState(false);
 
   // Splash screen safety timer: if cloud connection exceeds 8s, surface offline/retry controls
@@ -207,6 +214,9 @@ export const App: React.FC = () => {
       {/* ONBOARDING MODAL (Pops if user has not completed onboarding in Firestore) */}
       <OnboardingModal />
 
+      {/* SUDDEN DEATH 0-LIVES 10S COUNTDOWN PURGE MODAL */}
+      <ZeroVitalityPurgeModal />
+
       {/* TOP DESKTOP & MOBILE NAVBAR */}
       <Navbar
         activeTab={activeTab}
@@ -235,6 +245,15 @@ export const App: React.FC = () => {
         {activeTab === 'analytics' && <OverallAnalyticsView />}
       </main>
 
+      {/* DASHBOARD AUTHENTICATED FOOTER: 100 ACHIEVEMENTS & ARIGATO LABS BRANDING */}
+      <DashboardFooter
+        onOpenAchievements={() => setIsAchievementsOpen(true)}
+        onOpenBrandLegal={(tab) => {
+          setBrandLegalTab(tab);
+          setIsBrandLegalOpen(true);
+        }}
+      />
+
       {/* MOBILE BOTTOM NAVIGATION BAR */}
       <BottomNav
         activeTab={activeTab}
@@ -250,6 +269,24 @@ export const App: React.FC = () => {
       <ProfileModal
         isOpen={isProfileOpen}
         onClose={() => setIsProfileOpen(false)}
+        onOpenAchievements={() => setIsAchievementsOpen(true)}
+        onOpenBrandLegal={(tab) => {
+          setBrandLegalTab(tab);
+          setIsBrandLegalOpen(true);
+        }}
+      />
+
+      {/* 100 HARDCORE ACHIEVEMENTS MODAL */}
+      <AchievementsModal
+        isOpen={isAchievementsOpen}
+        onClose={() => setIsAchievementsOpen(false)}
+      />
+
+      {/* ARIGATO LABS COMPANY & LEGAL MODAL */}
+      <BrandLegalModal
+        isOpen={isBrandLegalOpen}
+        initialTab={brandLegalTab}
+        onClose={() => setIsBrandLegalOpen(false)}
       />
 
       {/* CREATE & EDIT HABIT WIZARD MODAL */}

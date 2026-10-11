@@ -3,6 +3,7 @@ import { useAppStore } from '../../stores/useAppStore';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { CustomSelect } from '../ui/CustomSelect';
 import { logOut } from '../../services/firebase';
 import {
   Heart,
@@ -16,13 +17,19 @@ import {
   Trash2,
   CheckCircle2,
   AlertTriangle,
+  Skull,
 } from 'lucide-react';
 import { SecurityModal } from '../security/SecurityModal';
+import { getNextHeartsUpgrade } from '../../constants/gamification';
 import clsx from 'clsx';
+
+import { Trophy, ChevronRight } from 'lucide-react';
 
 interface ProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpenAchievements?: () => void;
+  onOpenBrandLegal?: (tab: 'explore' | 'about' | 'privacy' | 'terms' | 'disclaimer' | 'contact') => void;
 }
 
 const PRESET_QUESTIONS = [
@@ -34,7 +41,12 @@ const PRESET_QUESTIONS = [
   'Custom Question...',
 ];
 
-export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
+export const ProfileModal: React.FC<ProfileModalProps> = ({
+  isOpen,
+  onClose,
+  onOpenAchievements,
+  onOpenBrandLegal,
+}) => {
   const { user, currentUser, habits, setSecurityQuestion, resetEntireAccount } =
     useAppStore();
 
@@ -100,6 +112,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
   const hearts = user.gamification?.hearts ?? 5;
   const maxHearts = user.gamification?.maxHearts ?? 5;
   const totalXp = user.gamification?.totalXp ?? 0;
+  const heartsUpgrade = getNextHeartsUpgrade(totalXp);
   const levelTitle = user.gamification?.levelTitle ?? 'Discipline Initiate';
   const existingSecurity = user.security;
 
@@ -128,23 +141,97 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
             </div>
           </div>
 
+          {/* QUICK LINKS: ACHIEVEMENTS & EXPLORE ARIGATO LABS */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {onOpenAchievements && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenAchievements();
+                }}
+                className="flex items-center justify-between p-3 bg-amber-500/10 hover:bg-amber-500/15 border border-amber-300/70 rounded-xl transition-all text-left group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <Trophy size={16} />
+                  </div>
+                  <div>
+                    <span className="font-display font-bold text-xs text-ink block">
+                      100 Achievements
+                    </span>
+                    <span className="text-[10px] text-amber-800 font-medium">
+                      Trophy Hall & Progress
+                    </span>
+                  </div>
+                </div>
+                <ChevronRight size={16} className="text-amber-700 group-hover:translate-x-0.5 transition-transform" />
+              </button>
+            )}
+
+            {onOpenBrandLegal && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenBrandLegal('explore');
+                }}
+                className="flex items-center justify-between p-3 bg-surface-card hover:bg-surface-bone border border-hairline rounded-xl transition-all text-left group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-surface-bone border border-hairline flex items-center justify-center shrink-0">
+                    <img
+                      src="/arigato-single-logo.png"
+                      alt="Arigato Labs"
+                      className="w-4 h-4 object-contain"
+                    />
+                  </div>
+                  <div>
+                    <span className="font-display font-bold text-xs text-ink block">
+                      Arigato Labs
+                    </span>
+                    <span className="text-[10px] text-stone font-medium">
+                      Explore Company & Legal
+                    </span>
+                  </div>
+                </div>
+                <ChevronRight size={16} className="text-stone group-hover:translate-x-0.5 transition-transform" />
+              </button>
+            )}
+          </div>
+
           {/* VITALITY & WILLPOWER STATS */}
           <div className="grid grid-cols-2 gap-3">
             {/* Hearts / Health */}
-            <div className="p-3.5 bg-surface-card rounded-2xl border border-red-200/80 shadow-2xs space-y-1.5">
+            <div className="p-3.5 bg-surface-card rounded-2xl border border-red-200/80 shadow-2xs space-y-2">
               <div className="flex items-center justify-between text-xs font-semibold text-charcoal">
                 <span>Vitality (Hearts)</span>
                 <Heart size={16} className="text-red-500 fill-red-500" />
               </div>
-              <div className="flex items-baseline gap-1">
-                <span className="font-mono text-2xl font-black text-red-600">{hearts}</span>
-                <span className="text-xs font-medium text-charcoal">/ {maxHearts}</span>
+              <div className="flex items-baseline justify-between gap-1">
+                <div className="flex items-baseline gap-1">
+                  <span className="font-mono text-2xl font-black text-red-600">{hearts}</span>
+                  <span className="text-xs font-medium text-charcoal">/ {maxHearts}</span>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200">
+                  {Math.round((hearts / Math.max(1, maxHearts)) * 100)}%
+                </span>
               </div>
-              <div className="flex gap-1 pt-1">
+
+              {/* Health Bar */}
+              <div className="w-full bg-red-100 rounded-full h-1.5 overflow-hidden">
+                <div
+                  className="bg-gradient-to-r from-red-500 to-rose-600 h-full rounded-full transition-all duration-300"
+                  style={{ width: `${Math.min(100, Math.max(0, (hearts / Math.max(1, maxHearts)) * 100))}%` }}
+                />
+              </div>
+
+              {/* Heart Icons (Supports up to 50 lives cleanly) */}
+              <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto no-scrollbar py-0.5">
                 {Array.from({ length: maxHearts }).map((_, i) => (
                   <Heart
                     key={i}
-                    size={14}
+                    size={13}
                     className={
                       i < hearts
                         ? 'text-red-500 fill-red-500'
@@ -153,9 +240,21 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
                   />
                 ))}
               </div>
-              <p className="text-[10px] text-charcoal pt-1">
-                100% daily completion heals hearts. Misses lose hearts.
-              </p>
+
+              {/* Next Milestone info */}
+              <div className="pt-1 border-t border-hairline/60 text-[10px] space-y-1">
+                {heartsUpgrade.nextThreshold ? (
+                  <p className="text-red-700 font-semibold flex items-center justify-between">
+                    <span>Next: +5 Lives</span>
+                    <span className="font-mono font-bold">{heartsUpgrade.xpNeeded} XP to {heartsUpgrade.nextThreshold} XP</span>
+                  </p>
+                ) : (
+                  <p className="text-emerald-700 font-bold">Max 50 Lives Unlocked! 🛡️</p>
+                )}
+                <p className="text-charcoal leading-tight">
+                  <span className="text-red-600 font-bold">⚠️ Sudden Death:</span> 0 lives triggers a 10s countdown to full fresh start wipe.
+                </p>
+              </div>
             </div>
 
             {/* Willpower XP */}
@@ -241,22 +340,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
                   </div>
                 )}
 
-                <div>
-                  <label className="block text-xs font-semibold text-charcoal mb-1">
-                    Select Question:
-                  </label>
-                  <select
-                    value={selectedPreset}
-                    onChange={(e) => setSelectedPreset(e.target.value)}
-                    className="w-full bg-surface-bone text-ink text-xs p-2.5 rounded-xl border border-hairline focus:outline-none"
-                  >
-                    {PRESET_QUESTIONS.map((q) => (
-                      <option key={q} value={q}>
-                        {q}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <CustomSelect
+                  label="Select Question:"
+                  value={selectedPreset}
+                  options={PRESET_QUESTIONS.map((q) => ({ value: q, label: q }))}
+                  onChange={(val) => setSelectedPreset(val)}
+                />
 
                 {selectedPreset === 'Custom Question...' && (
                   <div>

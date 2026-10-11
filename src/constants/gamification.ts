@@ -93,3 +93,39 @@ export function levelFromXp(totalXp: number): {
 
   return { level: L, title, currentLevelXp, nextLevelXp, progress };
 }
+
+/**
+ * Dynamic Vitality (Hearts / Lives) Progression:
+ * - Starting Base (0 - 499 XP): 5 Lives
+ * - 500 XP: 10 Lives
+ * - 750 XP: 15 Lives
+ * - 1000 XP: 20 Lives
+ * - Every +250 XP awards +5 Lives up to a hard cap of 50 Lives (at 2500 XP).
+ */
+export function calculateMaxHearts(totalXp: number): number {
+  if (totalXp < 500) return 5;
+  const extraTiers = Math.floor((totalXp - 500) / 250);
+  const calculated = 10 + extraTiers * 5;
+  return Math.min(50, Math.max(5, calculated));
+}
+
+export function getNextHeartsUpgrade(totalXp: number): {
+  currentMax: number;
+  nextThreshold: number | null;
+  xpNeeded: number;
+} {
+  const currentMax = calculateMaxHearts(totalXp);
+  if (currentMax >= 50) {
+    return { currentMax: 50, nextThreshold: null, xpNeeded: 0 };
+  }
+  let nextThreshold = 500;
+  if (totalXp >= 500) {
+    const tier = Math.floor((totalXp - 500) / 250);
+    nextThreshold = 500 + (tier + 1) * 250;
+  }
+  return {
+    currentMax,
+    nextThreshold,
+    xpNeeded: Math.max(0, nextThreshold - totalXp),
+  };
+}

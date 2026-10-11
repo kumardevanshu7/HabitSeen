@@ -247,18 +247,22 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
         <div
           className={clsx(
             viewMode === 'grid'
-              ? 'grid grid-cols-1 md:grid-cols-2 gap-3.5'
+              ? 'columns-1 md:columns-2 gap-3.5'
               : 'flex flex-col gap-2.5'
           )}
         >
           {dueHabits.map((habit) => (
-            <HabitCard
+            <div
               key={habit.id}
-              habit={habit}
-              dateKey={selectedDate}
-              variant={viewMode}
-              onOpenDetails={onOpenHabitDetails}
-            />
+              className={clsx(viewMode === 'grid' && 'break-inside-avoid mb-3.5')}
+            >
+              <HabitCard
+                habit={habit}
+                dateKey={selectedDate}
+                variant={viewMode}
+                onOpenDetails={onOpenHabitDetails}
+              />
+            </div>
           ))}
         </div>
       )}

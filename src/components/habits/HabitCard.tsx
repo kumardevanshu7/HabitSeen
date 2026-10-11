@@ -171,6 +171,21 @@ export const HabitCard: React.FC<HabitCardProps> = ({
     logHabit(habit.id, dateKey, { valueChecklistCompletedItemIds: updated });
   };
 
+  const handleToggleChecklistComplete = () => {
+    if (isCompleted) {
+      logHabit(habit.id, dateKey, {
+        valueChecklistCompletedItemIds: completedItems,
+        forceStatus: 'PARTIAL',
+      });
+      return;
+    }
+    confetti({ particleCount: 45, spread: 60, origin: { y: 0.7 } });
+    logHabit(habit.id, dateKey, {
+      valueChecklistCompletedItemIds: completedItems,
+      forceStatus: 'COMPLETED',
+    });
+  };
+
   // UNLOCK ACTION
   const handleUnlock = () => {
     if (isExcused || isMissed) {
@@ -192,9 +207,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
       setInputSecs(hms.seconds);
       logHabit(habit.id, dateKey, { valueTimerSeconds: lower });
     } else if (habit.type === 'CHECKLIST') {
-      const oneLess = completedItems.slice(0, Math.max(0, completedItems.length - 1));
-      setCompletedItems(oneLess);
-      logHabit(habit.id, dateKey, { valueChecklistCompletedItemIds: oneLess });
+      logHabit(habit.id, dateKey, {
+        valueChecklistCompletedItemIds: completedItems,
+        forceStatus: 'PARTIAL',
+      });
     }
   };
 
@@ -290,13 +306,6 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                 <span className="font-semibold text-charcoal">
                   {isExcused ? '🛡️ Protected (Excused)' : '⚠️ Locked (Missed)'}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setIsMissedModalOpen(true)}
-                  className="text-primary hover:underline font-bold text-[11px] ml-1"
-                >
-                  Edit Reason
-                </button>
               </div>
             ) : (
               <>
@@ -430,7 +439,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
 
             {/* 4. CHECKLIST IN LIST VIEW */}
             {habit.type === 'CHECKLIST' && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-mono font-bold text-charcoal">
                   {completedItems.length} / {habit.config.checklist?.items.length || 0} tasks done
                 </span>
@@ -439,6 +448,37 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                   className="text-xs text-primary font-bold hover:underline"
                 >
                   {isChecklistExpanded ? 'Hide' : 'Checklist'}
+                </button>
+
+                {!isCompleted && !isExcused && !isMissed && (
+                  <button
+                    type="button"
+                    onClick={() => setIsMissedModalOpen(true)}
+                    className="text-xs font-semibold text-charcoal hover:text-red-600 bg-surface-bone hover:bg-red-50 border border-hairline px-2 py-1 rounded-full flex items-center gap-1 transition-colors"
+                    title="Log missed habit with reason"
+                  >
+                    <ShieldAlert size={12} className="text-charcoal" />
+                    <span>Missed</span>
+                  </button>
+                )}
+
+                {/* RED CIRCLE -> GREEN TICK TOGGLE FOR CHECKLIST */}
+                <button
+                  type="button"
+                  onClick={handleToggleChecklistComplete}
+                  className={clsx(
+                    'w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-xs active:scale-90 cursor-pointer shrink-0',
+                    isCompleted
+                      ? 'bg-badge-success border-2 border-badge-success text-white'
+                      : 'border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500'
+                  )}
+                  title={
+                    isCompleted
+                      ? 'Completed! Tap to unlock'
+                      : 'Tap to mark complete for today with checked tasks'
+                  }
+                >
+                  <Check size={16} className={clsx(isCompleted ? 'stroke-[3]' : 'stroke-[2.5]')} />
                 </button>
               </div>
             )}
@@ -467,27 +507,11 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                 <span className="truncate max-w-[120px]" title={dayLog?.missedReasonText || 'Excused'}>
                   {dayLog?.missedReasonText || 'Excused'}
                 </span>
-                <button
-                  type="button"
-                  onClick={handleUnlock}
-                  className="text-[10px] text-blue-700 hover:underline font-semibold"
-                  title="Clear to re-log"
-                >
-                  (Edit)
-                </button>
               </div>
             ) : isMissed ? (
               <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-100 text-red-800 text-xs font-bold border border-red-200">
                 <AlertTriangle size={13} className="text-red-600" />
                 <span>{dayLog?.status === 'FAILED' ? 'Skipped (-25 XP)' : 'Missed (-10 XP)'}</span>
-                <button
-                  type="button"
-                  onClick={handleUnlock}
-                  className="text-[10px] text-red-700 hover:underline font-semibold"
-                  title="Clear to re-log"
-                >
-                  (Edit)
-                </button>
               </div>
             ) : (
               <button
@@ -561,7 +585,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
   return (
     <div
       className={clsx(
-        'group relative rounded-2xl border transition-all duration-200 overflow-hidden shadow-xs hover:shadow-md',
+        'group relative rounded-2xl border transition-all duration-200 overflow-hidden shadow-xs hover:shadow-md h-fit w-full',
         isCompleted
           ? 'bg-stone/10 border-stone/30 opacity-65 grayscale-[35%]'
           : isExcused
@@ -577,7 +601,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
         borderLeftColor: vibrantColor,
       }}
     >
-      <div className="p-4 sm:p-5">
+      <div className="p-3.5 sm:p-4">
         {/* TOP ROW: CATEGORY + STREAK + STATUS BADGE + DETAILS BUTTON */}
         <div className="flex items-center justify-between gap-2 mb-2">
           <div className="flex items-center gap-2">
@@ -619,27 +643,11 @@ export const HabitCard: React.FC<HabitCardProps> = ({
               <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[11px] font-bold border border-blue-200">
                 <ShieldCheck size={12} className="text-blue-600" />
                 <span>Shielded</span>
-                <button
-                  type="button"
-                  onClick={handleUnlock}
-                  className="text-[10px] text-blue-700 hover:underline font-semibold"
-                  title="Clear to edit"
-                >
-                  (Edit)
-                </button>
               </div>
             ) : isMissed ? (
               <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-red-100 text-red-800 text-[11px] font-bold border border-red-200">
                 <AlertTriangle size={12} className="text-red-600" />
                 <span>{dayLog?.status === 'FAILED' ? 'Skipped' : 'Missed'}</span>
-                <button
-                  type="button"
-                  onClick={handleUnlock}
-                  className="text-[10px] text-red-700 hover:underline font-semibold"
-                  title="Clear to edit"
-                >
-                  (Edit)
-                </button>
               </div>
             ) : (
               currentStreak > 0 && (
@@ -707,12 +715,6 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                 </span>
               </div>
             </div>
-            <button
-              onClick={() => setIsMissedModalOpen(true)}
-              className="text-xs font-bold text-blue-700 hover:underline px-2 py-1"
-            >
-              Edit
-            </button>
           </div>
         )}
 
@@ -732,12 +734,6 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                 </span>
               </div>
             </div>
-            <button
-              onClick={() => setIsMissedModalOpen(true)}
-              className="text-xs font-bold text-red-700 hover:underline px-2 py-1"
-            >
-              Edit
-            </button>
           </div>
         )}
 
@@ -765,13 +761,6 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                   </span>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsMissedModalOpen(true)}
-                className="text-xs font-bold text-primary hover:underline px-2.5 py-1.5 rounded-full bg-surface-card border border-hairline shrink-0"
-              >
-                Edit Reason
-              </button>
             </div>
           ) : (
             <>
@@ -890,24 +879,24 @@ export const HabitCard: React.FC<HabitCardProps> = ({
               </div>
 
               {!isCompleted ? (
-                <div className="p-3 bg-surface-bone/80 rounded-2xl border border-hairline space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-charcoal uppercase">
-                      Enter Time Spent (00:00:00):
+                <div className="p-2.5 bg-surface-bone/80 rounded-2xl border border-hairline space-y-2">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="font-bold text-charcoal uppercase">
+                      Time Spent:
                     </span>
                     <button
                       type="button"
                       onClick={handleMatchTargetTimer}
-                      className="text-[11px] font-bold text-primary hover:underline"
+                      className="font-bold text-primary hover:underline"
                     >
                       Fill Target Time
                     </button>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     {/* Hours */}
-                    <div className="flex-1 text-center bg-surface-card rounded-xl p-1.5 border border-hairline">
-                      <span className="text-[9px] text-charcoal uppercase font-bold block">Hours</span>
+                    <div className="flex-1 text-center bg-surface-card rounded-xl py-1 px-1 border border-hairline">
+                      <span className="text-[8px] text-charcoal uppercase font-bold block leading-none mb-0.5">Hours</span>
                       <input
                         type="number"
                         min={0}
@@ -916,15 +905,15 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                         onChange={(e) =>
                           setInputHours(Math.max(0, parseInt(e.target.value, 10) || 0))
                         }
-                        className="w-full text-center font-mono font-bold text-base bg-transparent text-ink focus:outline-none"
+                        className="w-full text-center font-mono font-bold text-sm bg-transparent text-ink focus:outline-none"
                       />
                     </div>
 
                     <span className="font-mono font-bold text-stone">:</span>
 
                     {/* Minutes */}
-                    <div className="flex-1 text-center bg-surface-card rounded-xl p-1.5 border border-hairline">
-                      <span className="text-[9px] text-charcoal uppercase font-bold block">Mins</span>
+                    <div className="flex-1 text-center bg-surface-card rounded-xl py-1 px-1 border border-hairline">
+                      <span className="text-[8px] text-charcoal uppercase font-bold block leading-none mb-0.5">Mins</span>
                       <input
                         type="number"
                         min={0}
@@ -935,15 +924,15 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                             Math.max(0, Math.min(59, parseInt(e.target.value, 10) || 0))
                           )
                         }
-                        className="w-full text-center font-mono font-bold text-base bg-transparent text-ink focus:outline-none"
+                        className="w-full text-center font-mono font-bold text-sm bg-transparent text-ink focus:outline-none"
                       />
                     </div>
 
                     <span className="font-mono font-bold text-stone">:</span>
 
                     {/* Seconds */}
-                    <div className="flex-1 text-center bg-surface-card rounded-xl p-1.5 border border-hairline">
-                      <span className="text-[9px] text-charcoal uppercase font-bold block">Secs</span>
+                    <div className="flex-1 text-center bg-surface-card rounded-xl py-1 px-1 border border-hairline">
+                      <span className="text-[8px] text-charcoal uppercase font-bold block leading-none mb-0.5">Secs</span>
                       <input
                         type="number"
                         min={0}
@@ -954,7 +943,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                             Math.max(0, Math.min(59, parseInt(e.target.value, 10) || 0))
                           )
                         }
-                        className="w-full text-center font-mono font-bold text-base bg-transparent text-ink focus:outline-none"
+                        className="w-full text-center font-mono font-bold text-sm bg-transparent text-ink focus:outline-none"
                       />
                     </div>
 
@@ -962,10 +951,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                       <button
                         type="button"
                         onClick={() => setIsMissedModalOpen(true)}
-                        className="h-12 px-3 rounded-2xl bg-surface-bone hover:bg-red-50 border border-hairline text-charcoal hover:text-red-600 flex items-center gap-1.5 text-xs font-semibold transition-all shrink-0"
+                        className="h-10 px-2.5 rounded-xl bg-surface-bone hover:bg-red-50 border border-hairline text-charcoal hover:text-red-600 flex items-center gap-1 text-xs font-semibold transition-all shrink-0"
                         title="Log missed habit with reason"
                       >
-                        <ShieldAlert size={15} />
+                        <ShieldAlert size={13} />
                         <span>Missed</span>
                       </button>
                     )}
@@ -974,10 +963,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                     <button
                       type="button"
                       onClick={() => handleSaveTimer(undefined, true)}
-                      className="w-12 h-12 rounded-full border-2 border-red-500 bg-red-50 hover:bg-red-100 flex items-center justify-center text-red-500 shadow-xs hover:shadow-sm transition-all duration-200 active:scale-90 cursor-pointer shrink-0"
+                      className="w-10 h-10 rounded-full border-2 border-red-500 bg-red-50 hover:bg-red-100 flex items-center justify-center text-red-500 shadow-xs hover:shadow-sm transition-all duration-200 active:scale-90 cursor-pointer shrink-0"
                       title="Tap to mark complete"
                     >
-                      <Check size={22} className="stroke-[2.5]" />
+                      <Check size={20} className="stroke-[2.5]" />
                     </button>
                   </div>
                 </div>
@@ -1017,18 +1006,63 @@ export const HabitCard: React.FC<HabitCardProps> = ({
           {/* 4. CHECKLIST HABIT */}
           {habit.type === 'CHECKLIST' && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-charcoal">
-                  Progress: {completedItems.length} /{' '}
-                  {habit.config.checklist?.items.length || 0} tasks
-                </span>
-                <button
-                  onClick={() => setIsChecklistExpanded(!isChecklistExpanded)}
-                  className="text-xs text-primary font-semibold flex items-center gap-1 hover:underline"
-                >
-                  {isChecklistExpanded ? 'Hide tasks' : 'View tasks'}
-                  {isChecklistExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                </button>
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <span className="text-xs font-semibold text-charcoal block">
+                    Progress: <span className="font-mono font-bold text-ink">{completedItems.length}</span> /{' '}
+                    {habit.config.checklist?.items.length || 0} tasks
+                  </span>
+                  {isCompleted && (
+                    <span className="text-[11px] font-bold text-badge-success">
+                      ✓ Completed for today ({completedItems.length}/{habit.config.checklist?.items.length || 0})
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsChecklistExpanded(!isChecklistExpanded)}
+                    className="text-xs text-primary font-semibold flex items-center gap-1 hover:underline mr-1"
+                  >
+                    {isChecklistExpanded ? 'Hide tasks' : 'View tasks'}
+                    {isChecklistExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  </button>
+
+                  {!isCompleted && !isExcused && !isMissed && (
+                    <button
+                      type="button"
+                      onClick={() => setIsMissedModalOpen(true)}
+                      className="text-xs font-semibold text-charcoal hover:text-red-600 bg-surface-bone hover:bg-red-50 border border-hairline px-2.5 py-1.5 rounded-full flex items-center gap-1 transition-colors"
+                      title="Log missed habit with reason"
+                    >
+                      <ShieldAlert size={13} className="text-charcoal" />
+                      <span>Missed</span>
+                    </button>
+                  )}
+
+                  {/* RED CIRCLE -> GREEN TICK TOGGLE */}
+                  <button
+                    type="button"
+                    onClick={handleToggleChecklistComplete}
+                    className={clsx(
+                      'w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-xs active:scale-90 cursor-pointer shrink-0',
+                      isCompleted
+                        ? 'bg-badge-success border-2 border-badge-success text-white shadow-md'
+                        : 'border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500'
+                    )}
+                    title={
+                      isCompleted
+                        ? 'Completed! Click to unmark'
+                        : 'Tap to mark done for today with checked tasks'
+                    }
+                  >
+                    <Check
+                      size={20}
+                      className={clsx(isCompleted ? 'stroke-[3]' : 'stroke-[2.5]')}
+                    />
+                  </button>
+                </div>
               </div>
 
               {isChecklistExpanded && (
