@@ -18,8 +18,9 @@ import {
   computeHabitStreaks,
   evaluateHabitSuccess,
   calculateXpForCompletion,
+  getUsedExcusesInMonth,
 } from '../utils/streakEngine';
-import { WILL_HABIT_TIERS } from '../constants/gamification';
+import { WILL_HABIT_TIERS, MISS_PENALTIES } from '../constants/gamification';
 import {
   FirebaseUser,
 } from '../services/firebase';
@@ -46,8 +47,10 @@ interface AppState {
   // User Profile
   user: UserProfile | null;
   profileLoading: boolean;
+  syncError: string | null;
   setUser: (profile: UserProfile | null) => void;
   setProfileLoading: (loading: boolean) => void;
+  setSyncError: (error: string | null) => void;
   completeOnboarding: (data: {
     name: string;
     age: number;
@@ -129,6 +132,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
   user: null,
   profileLoading: true,
+  syncError: null,
   setUser: (profile) => {
     if (profile && profile.gamification) {
       if (typeof profile.gamification.hearts !== 'number') {
@@ -138,9 +142,10 @@ export const useAppStore = create<AppState>()((set, get) => ({
         profile.gamification.maxHearts = 5;
       }
     }
-    set({ user: profile, profileLoading: false });
+    set({ user: profile, profileLoading: false, syncError: null });
   },
   setProfileLoading: (loading) => set({ profileLoading: loading }),
+  setSyncError: (syncError) => set({ syncError }),
 
   selectedDate: getTodayKey(),
   setSelectedDate: (dateKey) => set({ selectedDate: dateKey }),
@@ -543,23 +548,19 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const existingLog = state.logs[logKey];
     const oldXp = existingLog?.xpEarned || 0;
 
-    let status: HabitLogStatus = 'EXCUSED';
-    let xpEarned = 0;
-    let heartLoss = 0;
-
+    // Monthly cap check for genuine excuses (max 3 per month per habit)
+    const monthKey = dateKey.substring(0, 7);
     if (reasonType === 'GENUINE_REASON') {
-      status = 'EXCUSED';
-      xpEarned = 0; // 0 XP penalty, constant
-      heartLoss = 0; // 0 Hearts lost, streak preserved!
-    } else if (reasonType === 'FORGOT_ACCIDENTAL') {
-      status = 'MISSED';
-      xpEarned = -10; // -10 XP penalty
-      heartLoss = 1;  // -1 Heart lost
-    } else { // 'INTENTIONAL_MISS'
-      status = 'FAILED';
-      xpEarned = -25; // -25 XP penalty
-      heartLoss = 2;  // -2 Hearts lost
+      const usedExcusesThisMonth = getUsedExcusesInMonth(habitId, monthKey, state.logs);
+      if (usedExcusesThisMonth >= MISS_PENALTIES.GENUINE_REASON.maxPerMonth) {
+        throw new Error('Monthly excuse limit of 3 reached for this habit. Please choose another option.');
+      }
     }
+
+    const penaltyConfig = MISS_PENALTIES[reasonType];
+    const status: HabitLogStatus = reasonType === 'GENUINE_REASON' ? 'EXCUSED' : reasonType === 'FORGOT_ACCIDENTAL' ? 'MISSED' : 'FAILED';
+    const xpEarned = -penaltyConfig.xpPenalty;
+    const heartLoss = penaltyConfig.heartsLost;
 
     const xpDelta = xpEarned - oldXp;
 
@@ -731,6 +732,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
       authLoading: false,
       user: null,
       profileLoading: false,
+      syncError: null,
       categories: [DEFAULT_CATEGORY],
       habits: [],
       logs: {},

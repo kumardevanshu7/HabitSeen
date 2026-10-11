@@ -26,6 +26,9 @@ import {
 } from 'date-fns';
 import clsx from 'clsx';
 
+import { computeHabitStreaks } from '../../utils/streakEngine';
+import { isDateInThisWeek } from '../../utils/dateMath';
+
 interface HabitDetailsModalProps {
   habit: Habit | null;
   isOpen: boolean;
@@ -48,11 +51,19 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
   const CategoryIcon =
     CATEGORY_ICONS.find((i) => i.id === category?.icon)?.icon || CATEGORY_ICONS[0].icon;
 
-  // Filter logs for this habit
+  // Filter logs for this habit and derive live stats dynamically
   const habitLogs = Object.values(logs).filter((l) => l.habitId === habit.id);
   const completedLogs = habitLogs.filter((l) => l.status === 'COMPLETED');
+  const excusedLogs = habitLogs.filter((l) => l.status === 'EXCUSED');
+  const missedLogs = habitLogs.filter((l) => l.status === 'MISSED' || l.status === 'FAILED');
   const skippedLogs = habitLogs.filter((l) => l.status === 'SKIPPED');
   const totalTracked = habitLogs.length;
+
+  const streakInfo = computeHabitStreaks(habit, logs);
+  const currentStreak = streakInfo.currentStreak;
+  const bestStreak = Math.max(streakInfo.bestStreak, habit.stats?.bestStreak || 0);
+  const timesCompletedThisWeek = habitLogs.filter((l) => l.status === 'COMPLETED' && isDateInThisWeek(l.date)).length;
+  const timesCompletedAllTime = completedLogs.length;
 
   const successRate =
     totalTracked > 0 ? Math.round((completedLogs.length / totalTracked) * 100) : 0;
@@ -136,7 +147,7 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
                 <Flame size={14} className="text-primary" /> Current Streak
               </span>
               <p className="font-mono text-2xl font-bold text-primary mt-1">
-                {habit.stats.currentStreak}{' '}
+                {currentStreak}{' '}
                 <span className="text-xs font-sans text-charcoal">days</span>
               </p>
             </div>
@@ -146,7 +157,7 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
                 <Trophy size={14} className="text-amber-500" /> Best Streak
               </span>
               <p className="font-mono text-2xl font-bold text-ink mt-1">
-                {habit.stats.bestStreak}{' '}
+                {bestStreak}{' '}
                 <span className="text-xs font-sans text-charcoal">days</span>
               </p>
             </div>
@@ -154,14 +165,14 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
             <div className="p-3.5 bg-surface-card border border-hairline rounded-2xl text-center">
               <span className="text-xs text-charcoal">This Week</span>
               <p className="font-mono text-2xl font-bold text-ink mt-1">
-                {habit.stats.timesCompletedThisWeek}
+                {timesCompletedThisWeek}
               </p>
             </div>
 
             <div className="p-3.5 bg-surface-card border border-hairline rounded-2xl text-center">
               <span className="text-xs text-charcoal">All-Time Completed</span>
               <p className="font-mono text-2xl font-bold text-badge-success mt-1">
-                {habit.stats.timesCompletedAllTime}
+                {timesCompletedAllTime}
               </p>
             </div>
           </div>
@@ -171,7 +182,7 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
         <div className="p-4 bg-surface-card border border-hairline rounded-2xl">
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-xs font-semibold uppercase tracking-wider text-charcoal ml-1">
-              Success vs Failure Ratio
+              Consistency & Breakdown
             </h4>
             <span className="text-xs font-mono font-bold text-ink bg-surface-bone px-2.5 py-1 rounded-full border border-hairline">
               {successRate}% Success Rate
@@ -181,27 +192,36 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
           <div className="w-full bg-surface-bone h-3 rounded-full overflow-hidden flex">
             <div
               className="bg-badge-success transition-all duration-500"
-              style={{ width: `${successRate}%` }}
-              title={`Success: ${completedLogs.length}`}
+              style={{ width: `${totalTracked > 0 ? (completedLogs.length / totalTracked) * 100 : 0}%` }}
+              title={`Completed: ${completedLogs.length}`}
+            />
+            <div
+              className="bg-blue-400 transition-all duration-500"
+              style={{ width: `${totalTracked > 0 ? (excusedLogs.length / totalTracked) * 100 : 0}%` }}
+              title={`Excused: ${excusedLogs.length}`}
             />
             <div
               className="bg-red-400 transition-all duration-500"
-              style={{ width: `${100 - successRate}%` }}
-              title={`Failed/Skipped: ${skippedLogs.length}`}
+              style={{ width: `${totalTracked > 0 ? ((missedLogs.length + skippedLogs.length) / totalTracked) * 100 : 0}%` }}
+              title={`Missed/Skipped: ${missedLogs.length + skippedLogs.length}`}
             />
           </div>
 
-          <div className="flex items-center justify-around mt-3 text-xs text-charcoal">
+          <div className="flex items-center justify-around mt-3 text-xs text-charcoal flex-wrap gap-2">
             <span className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-badge-success" />
               Completed ({completedLogs.length})
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-red-400" />
-              Skipped/Missed ({skippedLogs.length})
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-400" />
+              Excused ({excusedLogs.length})
             </span>
             <span className="flex items-center gap-1.5">
-              Total Logged: {totalTracked} days
+              <span className="w-2.5 h-2.5 rounded-full bg-red-400" />
+              Missed ({missedLogs.length + skippedLogs.length})
+            </span>
+            <span className="flex items-center gap-1.5 font-semibold text-ink">
+              Total Logged: {totalTracked}
             </span>
           </div>
         </div>
@@ -295,6 +315,8 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
               const logKey = `${habit.id}_${dateKey}`;
               const dayLog = logs[logKey];
               const isCompleted = dayLog?.status === 'COMPLETED';
+              const isExcused = dayLog?.status === 'EXCUSED';
+              const isMissed = dayLog?.status === 'MISSED' || dayLog?.status === 'FAILED';
               const isSkipped = dayLog?.status === 'SKIPPED';
               const isToday = isSameDay(day, new Date());
 
@@ -303,15 +325,29 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
                   key={dateKey}
                   className={clsx(
                     'h-9 rounded-xl flex flex-col items-center justify-center text-xs font-mono transition-all border',
-                    isCompleted && 'bg-badge-success text-white border-badge-success font-bold',
+                    isCompleted && 'bg-badge-success text-white border-badge-success font-bold shadow-2xs',
+                    isExcused && 'bg-blue-100 text-blue-700 border-blue-300 font-bold',
+                    isMissed && 'bg-amber-100 text-amber-800 border-amber-300 font-semibold',
                     isSkipped && 'bg-red-100 text-red-600 border-red-200',
-                    !isCompleted && !isSkipped && 'bg-surface-bone text-charcoal border-hairline/60',
+                    !dayLog && 'bg-surface-bone text-charcoal border-hairline/60',
                     isToday && 'ring-2 ring-primary ring-offset-1 font-bold'
                   )}
-                  title={`${dateKey}: ${isCompleted ? 'Completed' : isSkipped ? 'Skipped' : 'No record'}`}
+                  title={`${dateKey}: ${
+                    isCompleted
+                      ? 'Completed'
+                      : isExcused
+                      ? `Excused: ${dayLog?.missedReasonText || 'Protected'}`
+                      : isMissed
+                      ? `Missed: ${dayLog?.missedReasonText || 'Uncompleted'}`
+                      : isSkipped
+                      ? 'Skipped'
+                      : 'No record'
+                  }`}
                 >
                   <span>{format(day, 'd')}</span>
                   {isCompleted && <span className="text-[8px] leading-none">✓</span>}
+                  {isExcused && <span className="text-[8px] leading-none">🛡️</span>}
+                  {isMissed && <span className="text-[8px] leading-none">!</span>}
                 </div>
               );
             })}

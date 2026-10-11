@@ -9,6 +9,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 export const Button: React.FC<ButtonProps> = ({
   variant = 'primary',
   size = 'md',
+  type = 'button',
   className,
   children,
   ...props
@@ -30,14 +31,15 @@ export const Button: React.FC<ButtonProps> = ({
   };
 
   const sizes = {
-    sm: 'text-xs px-3 py-1.5 h-8 rounded-full',
-    md: 'text-sm px-5 py-2.5 h-11 rounded-full',
-    lg: 'text-base px-6 py-3 h-12 rounded-full font-semibold',
-    icon: 'p-2.5 h-10 w-10 rounded-full',
+    sm: 'text-xs px-3 py-1.5 h-8 min-h-[36px] rounded-full',
+    md: 'text-sm px-5 py-2.5 h-11 min-h-[44px] rounded-full',
+    lg: 'text-base px-6 py-3 h-12 min-h-[48px] rounded-full font-semibold',
+    icon: 'p-2.5 h-10 w-10 min-h-[40px] rounded-full',
   };
 
   return (
     <button
+      type={type}
       className={clsx(base, variants[variant], sizes[size], className)}
       {...props}
     >

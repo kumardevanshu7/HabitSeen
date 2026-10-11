@@ -7,14 +7,24 @@ interface BottomNavProps {
   activeTab: 'habits' | 'breaks' | 'analytics';
   onSelectTab: (tab: 'habits' | 'breaks' | 'analytics') => void;
   onOpenCreateHabit: () => void;
+  onOpenProfile?: () => void;
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({
   activeTab,
   onSelectTab,
   onOpenCreateHabit,
+  onOpenProfile,
 }) => {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+
+  const handleOpenProfile = () => {
+    if (onOpenProfile) {
+      onOpenProfile();
+    } else {
+      setIsProfileModalOpen(true);
+    }
+  };
 
   return (
     <>
@@ -69,7 +79,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
 
         {/* 5. Profile & Willpower */}
         <button
-          onClick={() => setIsProfileModalOpen(true)}
+          onClick={handleOpenProfile}
           className="flex flex-col items-center justify-center gap-1 py-1 rounded-xl transition-colors text-stone hover:text-ink"
         >
           <User size={20} />

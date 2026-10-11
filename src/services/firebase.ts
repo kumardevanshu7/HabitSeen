@@ -11,6 +11,8 @@ import {
 } from 'firebase/auth';
 import {
   initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   getFirestore,
   Firestore,
 } from 'firebase/firestore';
@@ -29,10 +31,13 @@ export const firebaseConfig = {
 export const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 
-// Auto-detect long polling allows Firestore to recover if ad blockers or network proxies intercept WebChannels
+// Enable persistent multi-tab offline cache with long-polling fallback for ad-blockers / firewalls
 let firestoreInstance: Firestore;
 try {
   firestoreInstance = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager(),
+    }),
     experimentalAutoDetectLongPolling: true,
   });
 } catch {

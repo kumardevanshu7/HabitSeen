@@ -3,9 +3,11 @@ import { useAppStore } from '../../stores/useAppStore';
 import { Habit, MissedReasonType } from '../../types/habit';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
-import { ShieldCheck, AlertTriangle, XCircle, Heart, Zap, ShieldAlert } from 'lucide-react';
+import { ShieldCheck, AlertTriangle, XCircle, Heart, Zap, ShieldAlert, Lock } from 'lucide-react';
 import clsx from 'clsx';
 import confetti from 'canvas-confetti';
+import { getUsedExcusesInMonth } from '../../utils/streakEngine';
+import { MISS_PENALTIES } from '../../constants/gamification';
 
 interface LogMissedModalProps {
   isOpen: boolean;
@@ -20,9 +22,17 @@ export const LogMissedModal: React.FC<LogMissedModalProps> = ({
   habit,
   dateKey,
 }) => {
-  const { logMissedHabit } = useAppStore();
+  const { logMissedHabit, logs } = useAppStore();
 
-  const [selectedReason, setSelectedReason] = useState<MissedReasonType>('GENUINE_REASON');
+  const monthKey = dateKey.substring(0, 7);
+  const usedExcuses = getUsedExcusesInMonth(habit.id, monthKey, logs);
+  const maxExcuses = MISS_PENALTIES.GENUINE_REASON.maxPerMonth;
+  const excusesRemaining = Math.max(0, maxExcuses - usedExcuses);
+  const isCapReached = excusesRemaining <= 0;
+
+  const [selectedReason, setSelectedReason] = useState<MissedReasonType>(() =>
+    isCapReached ? 'FORGOT_ACCIDENTAL' : 'GENUINE_REASON'
+  );
   const [reasonText, setReasonText] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -31,9 +41,15 @@ export const LogMissedModal: React.FC<LogMissedModalProps> = ({
     e.preventDefault();
     setError('');
 
-    if (selectedReason === 'GENUINE_REASON' && !reasonText.trim()) {
-      setError('Please write down your genuine reason so your streak can be safely preserved.');
-      return;
+    if (selectedReason === 'GENUINE_REASON') {
+      if (isCapReached) {
+        setError('Monthly excuse cap reached (3 of 3 used). Please choose another option.');
+        return;
+      }
+      if (reasonText.trim().length < 5) {
+        setError('Please write at least 5 characters explaining your reason to preserve streak.');
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -84,13 +100,17 @@ export const LogMissedModal: React.FC<LogMissedModalProps> = ({
           {/* OPTION 1: GENUINE REASON (PRESERVE STREAK) */}
           <button
             type="button"
+            disabled={isCapReached}
             onClick={() => {
+              if (isCapReached) return;
               setSelectedReason('GENUINE_REASON');
               setError('');
             }}
             className={clsx(
               'w-full p-4 rounded-2xl border-2 text-left transition-all flex items-start gap-3.5 shadow-2xs',
-              selectedReason === 'GENUINE_REASON'
+              isCapReached
+                ? 'border-hairline bg-surface-bone/50 opacity-60 cursor-not-allowed'
+                : selectedReason === 'GENUINE_REASON'
                 ? 'border-blue-500 bg-blue-50/50 ring-2 ring-blue-500/20'
                 : 'border-hairline bg-surface-card hover:bg-surface-bone'
             )}
@@ -98,22 +118,33 @@ export const LogMissedModal: React.FC<LogMissedModalProps> = ({
             <div
               className={clsx(
                 'w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-xs',
-                selectedReason === 'GENUINE_REASON'
+                isCapReached
+                  ? 'bg-stone/30 text-charcoal'
+                  : selectedReason === 'GENUINE_REASON'
                   ? 'bg-blue-600 text-white'
                   : 'bg-surface-bone text-charcoal'
               )}
             >
-              <ShieldCheck size={22} />
+              {isCapReached ? <Lock size={20} /> : <ShieldCheck size={22} />}
             </div>
             <div className="flex-1">
               <div className="flex items-center justify-between gap-2">
                 <h4 className="text-sm font-bold text-ink">Genuine Reason (Life Happened)</h4>
-                <span className="text-[10px] font-extrabold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full border border-blue-200 shrink-0">
-                  🛡️ Streak Preserved
+                <span
+                  className={clsx(
+                    'text-[10px] font-extrabold px-2 py-0.5 rounded-full border shrink-0',
+                    isCapReached
+                      ? 'text-charcoal bg-stone/20 border-stone/30'
+                      : 'text-blue-700 bg-blue-100 border-blue-200'
+                  )}
+                >
+                  {isCapReached
+                    ? '🔒 Cap Reached (3/3 Used)'
+                    : `🛡️ ${excusesRemaining} of ${maxExcuses} Left`}
                 </span>
               </div>
               <p className="text-xs text-charcoal mt-1 leading-relaxed">
-                Traveling, unwell, doctor appointment, or unavoidable circumstance.
+                Traveling, unwell, doctor appointment, or emergency.
               </p>
               <div className="flex items-center gap-3 text-[11px] font-semibold text-blue-600 mt-2">
                 <span className="flex items-center gap-1">

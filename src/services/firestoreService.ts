@@ -22,7 +22,8 @@ import { cleanFirestoreData } from '../utils/firestoreCleaner';
 // 1. User Profile Sync
 export const subscribeUserProfile = (
   userId: string,
-  onUpdate: (profile: UserProfile | null) => void
+  onUpdate: (profile: UserProfile | null) => void,
+  onError?: (error: Error) => void
 ) => {
   const ref = doc(db, 'users', userId);
   return onSnapshot(
@@ -30,12 +31,14 @@ export const subscribeUserProfile = (
     (snap) => {
       if (snap.exists()) {
         onUpdate(snap.data() as UserProfile);
-      } else {
+      } else if (!snap.metadata.fromCache) {
+        // Document genuinely doesn't exist on server (not an initial offline cache miss)
         onUpdate(null);
       }
     },
     (error) => {
       console.error('subscribeUserProfile error:', error);
+      onError?.(error);
     }
   );
 };
@@ -55,7 +58,8 @@ export const saveUserProfileToDb = async (
 // 2. Categories Sync
 export const subscribeCategories = (
   userId: string,
-  onUpdate: (categories: Category[]) => void
+  onUpdate: (categories: Category[]) => void,
+  onError?: (error: Error) => void
 ) => {
   const colRef = collection(db, 'users', userId, 'categories');
   return onSnapshot(
@@ -69,6 +73,7 @@ export const subscribeCategories = (
     },
     (error) => {
       console.error('subscribeCategories error:', error);
+      onError?.(error);
     }
   );
 };
@@ -86,7 +91,8 @@ export const deleteCategoryFromDb = async (userId: string, categoryId: string) =
 // 3. Habits Sync
 export const subscribeHabits = (
   userId: string,
-  onUpdate: (habits: Habit[]) => void
+  onUpdate: (habits: Habit[]) => void,
+  onError?: (error: Error) => void
 ) => {
   const colRef = collection(db, 'users', userId, 'habits');
   return onSnapshot(
@@ -100,6 +106,7 @@ export const subscribeHabits = (
     },
     (error) => {
       console.error('subscribeHabits error:', error);
+      onError?.(error);
     }
   );
 };
@@ -125,14 +132,21 @@ export const deleteHabitLogsFromDb = async (userId: string, habitId: string) => 
     const q = query(colRef, where('habitId', '==', habitId));
     const snap = await getDocs(q);
     if (!snap.empty) {
-      const batch = writeBatch(db);
-      snap.forEach((docSnap) => {
-        batch.delete(docSnap.ref);
-      });
-      await batch.commit();
+      // Chunk in batches of 400 to respect Firestore's 500-operation writeBatch limit
+      const docs = snap.docs;
+      const CHUNK_SIZE = 400;
+      for (let i = 0; i < docs.length; i += CHUNK_SIZE) {
+        const chunk = docs.slice(i, i + CHUNK_SIZE);
+        const batch = writeBatch(db);
+        chunk.forEach((docSnap) => {
+          batch.delete(docSnap.ref);
+        });
+        await batch.commit();
+      }
     }
   } catch (err) {
     console.error('deleteHabitLogsFromDb error:', err);
+    throw err;
   }
 };
 
@@ -145,7 +159,8 @@ export const deleteHabitFromDb = async (userId: string, habitId: string) => {
 // 4. Daily Logs Sync
 export const subscribeLogs = (
   userId: string,
-  onUpdate: (logs: Record<string, HabitLog>) => void
+  onUpdate: (logs: Record<string, HabitLog>) => void,
+  onError?: (error: Error) => void
 ) => {
   const colRef = collection(db, 'users', userId, 'logs');
   return onSnapshot(
@@ -159,6 +174,7 @@ export const subscribeLogs = (
     },
     (error) => {
       console.error('subscribeLogs error:', error);
+      onError?.(error);
     }
   );
 };
@@ -176,7 +192,8 @@ export const saveLogToDb = async (
 // 5. Timer Habit Break Sync (Sobriety Chronometers)
 export const subscribeHabitBreaks = (
   userId: string,
-  onUpdate: (breaks: HabitBreak[]) => void
+  onUpdate: (breaks: HabitBreak[]) => void,
+  onError?: (error: Error) => void
 ) => {
   const colRef = collection(db, 'users', userId, 'habitBreaks');
   return onSnapshot(
@@ -190,6 +207,7 @@ export const subscribeHabitBreaks = (
     },
     (error) => {
       console.error('subscribeHabitBreaks error:', error);
+      onError?.(error);
     }
   );
 };

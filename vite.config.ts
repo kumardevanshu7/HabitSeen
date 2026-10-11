@@ -90,6 +90,18 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'zustand'],
+          firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore'],
+          icons: ['lucide-react'],
+        },
+      },
+    },
+  },
   server: {
     watch: {
       ignored: ['**/*.md', '**/dist/**', '**/.git/**'],

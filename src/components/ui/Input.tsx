@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import clsx from 'clsx';
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
@@ -7,7 +7,9 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const Input: React.FC<InputProps> = ({ label, error, className, id, ...props }) => {
-  const inputId = id || props.name || Math.random().toString(36).substring(7);
+  const generatedId = useId();
+  const inputId = id || props.name || generatedId;
+  const errorId = `${inputId}-error`;
 
   return (
     <div className="w-full">
@@ -21,6 +23,8 @@ export const Input: React.FC<InputProps> = ({ label, error, className, id, ...pr
       )}
       <input
         id={inputId}
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? errorId : undefined}
         className={clsx(
           'w-full bg-surface-card text-ink text-sm px-4 py-2.5 h-11 rounded-full border border-hairline',
           'focus:outline-none focus:border-hairline-strong focus:ring-2 focus:ring-primary/20 transition-all',
@@ -30,7 +34,11 @@ export const Input: React.FC<InputProps> = ({ label, error, className, id, ...pr
         )}
         {...props}
       />
-      {error && <p className="text-xs text-red-500 mt-1 ml-2">{error}</p>}
+      {error && (
+        <p id={errorId} className="text-xs text-red-500 mt-1 ml-2">
+          {error}
+        </p>
+      )}
     </div>
   );
 };
@@ -40,7 +48,8 @@ interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
 }
 
 export const Select: React.FC<SelectProps> = ({ label, className, id, children, ...props }) => {
-  const selectId = id || props.name || Math.random().toString(36).substring(7);
+  const generatedId = useId();
+  const selectId = id || props.name || generatedId;
 
   return (
     <div className="w-full">

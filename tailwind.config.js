@@ -42,6 +42,17 @@ export default {
         display: ["rb-freigeist-neue", "Bricolage Grotesque", "Inter", "sans-serif"],
         mono: ["JetBrains Mono", "monospace"],
       },
+      boxShadow: {
+        '2xs': '0 1px 2px 0 rgba(0, 0, 0, 0.03)',
+        'xs': '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+      },
+      scale: {
+        '98': '0.98',
+        '102': '1.02',
+      },
+      ringWidth: {
+        '3': '3px',
+      },
     },
   },
   plugins: [],

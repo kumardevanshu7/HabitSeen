@@ -9,12 +9,14 @@ interface NavbarProps {
   activeTab: 'habits' | 'breaks' | 'analytics';
   onSelectTab: (tab: 'habits' | 'breaks' | 'analytics') => void;
   onOpenCreateHabit: () => void;
+  onOpenProfile?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   onSelectTab,
   onOpenCreateHabit,
+  onOpenProfile,
 }) => {
   const { user, currentUser } = useAppStore();
 
@@ -87,26 +89,30 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="flex items-center gap-2 shrink-0">
           {/* 1. Vitality Hearts Badge */}
           {user && (
-            <div
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-red-50 text-red-600 rounded-full border border-red-200 text-xs font-bold shadow-2xs"
-              title={`${hearts}/${maxHearts} Hearts (Vitality)`}
+            <button
+              type="button"
+              onClick={onOpenProfile}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-full border border-red-200 text-xs font-bold shadow-2xs transition-all active:scale-95"
+              title={`${hearts}/${maxHearts} Hearts (Click to open profile)`}
             >
               <Heart size={14} className="fill-red-500 text-red-500" />
               <span className="font-mono">{hearts}</span>
               <span className="text-[10px] text-red-400 hidden sm:inline">/{maxHearts}</span>
-            </div>
+            </button>
           )}
 
           {/* 2. Willpower XP Badge */}
           {user && (
-            <div
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-card rounded-full border border-hairline text-xs font-medium text-ink shadow-2xs"
-              title={`${levelTitle} — ${totalXp} Total XP`}
+            <button
+              type="button"
+              onClick={onOpenProfile}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-card hover:bg-surface-bone rounded-full border border-hairline text-xs font-medium text-ink shadow-2xs transition-all active:scale-95"
+              title={`${levelTitle} — ${totalXp} Total XP (Click to open profile)`}
             >
               <Zap size={14} className="text-amber-500 fill-amber-500" />
               <span className="font-semibold hidden sm:inline">{levelTitle}</span>
               <span className="text-stone font-mono font-bold text-xs">{totalXp} XP</span>
-            </div>
+            </button>
           )}
 
           <Button

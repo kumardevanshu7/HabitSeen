@@ -1,6 +1,6 @@
 import { Habit, HabitLog } from '../types/habit';
 import { STREAK_CHALLENGES } from '../constants/gamification';
-import { differenceInCalendarDays, parseISO, addDays, format } from 'date-fns';
+import { differenceInCalendarDays, parseISO, addDays, format, startOfWeek } from 'date-fns';
 import { isHabitDueOnDate, getTodayKey } from './dateMath';
 
 export function evaluateHabitSuccess(
@@ -93,6 +93,19 @@ export function evaluateHabitSuccess(
 }
 
 /**
+ * Returns how many EXCUSED logs a habit has used in a given month (format: 'yyyy-MM').
+ */
+export function getUsedExcusesInMonth(
+  habitId: string,
+  monthKey: string,
+  allLogs: Record<string, HabitLog>
+): number {
+  return Object.values(allLogs).filter(
+    (l) => l.habitId === habitId && l.status === 'EXCUSED' && l.date.startsWith(monthKey)
+  ).length;
+}
+
+/**
  * Checks whether any date strictly between fromDate and toDate was a due date
  * that was not completed or excused.
  */
@@ -105,9 +118,9 @@ function hasMissedDueDay(
   let check = addDays(fromDate, 1);
   while (differenceInCalendarDays(toDate, check) > 0) {
     if (isHabitDueOnDate(habit, check)) {
-      const checkKey = getTodayKey().length === 10 ? format(check, 'yyyy-MM-dd') : '';
+      const checkKey = format(check, 'yyyy-MM-dd');
       const log = allLogs[`${habit.id}_${checkKey}`];
-      // If no log exists or it was marked MISSED/FAILED, then it was truly a missed due date!
+      // If no log exists or it was marked MISSED/SKIPPED, then it was a missed due date!
       if (!log || (log.status !== 'COMPLETED' && log.status !== 'EXCUSED')) {
         return true;
       }
@@ -125,6 +138,46 @@ export function computeHabitStreaks(
   bestStreak: number;
   unlockedChallenges: number[];
 } {
+  // SPECIAL CASE: DAYS_PER_PERIOD (e.g. 3 times a week / month)
+  if (habit.frequency.type === 'DAYS_PER_PERIOD' && habit.frequency.daysPerPeriod) {
+    const { targetCount, period } = habit.frequency.daysPerPeriod;
+    const completedDates = Object.values(allLogs)
+      .filter((l) => l.habitId === habit.id && (l.status === 'COMPLETED' || l.status === 'EXCUSED'))
+      .map((l) => l.date);
+
+    // Group logs by period key
+    const periodMap = new Map<string, number>();
+    for (const dStr of completedDates) {
+      const d = parseISO(dStr);
+      let pKey = '';
+      if (period === 'MONTH') {
+        pKey = format(d, 'yyyy-MM');
+      } else if (period === 'YEAR') {
+        pKey = format(d, 'yyyy');
+      } else {
+        // Default: WEEK (starts Monday)
+        pKey = format(startOfWeek(d, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+      }
+      periodMap.set(pKey, (periodMap.get(pKey) || 0) + 1);
+    }
+
+    const successfulPeriods = Array.from(periodMap.entries())
+      .filter(([_, count]) => count >= targetCount)
+      .map(([k]) => k)
+      .sort();
+
+    const streakCount = successfulPeriods.length;
+    const finalBest = Math.max(streakCount, habit.stats?.bestStreak || 0);
+    const unlocked = STREAK_CHALLENGES.filter((c) => finalBest >= c.days).map((c) => c.days);
+
+    return {
+      currentStreak: streakCount,
+      bestStreak: finalBest,
+      unlockedChallenges: unlocked,
+    };
+  }
+
+  // STANDARD DAILY / SCHEDULE-BASED STREAKS
   // Extract streak dates (COMPLETED or EXCUSED) sorted in ascending order (deduplicated)
   const streakDates = Array.from(
     new Set(
@@ -143,22 +196,30 @@ export function computeHabitStreaks(
   }
 
   // Calculate best streak taking schedule into account
-  let bestStreak = 1;
-  let tempStreak = 1;
+  // Excused days freeze and preserve the chain, but only COMPLETED days increment the streak counter
+  let bestStreak = 0;
+  let currentChain: string[] = [streakDates[0]];
 
   for (let i = 1; i < streakDates.length; i++) {
     const prev = parseISO(streakDates[i - 1]);
     const curr = parseISO(streakDates[i]);
 
     if (!hasMissedDueDay(habit, prev, curr, allLogs)) {
-      tempStreak++;
-      if (tempStreak > bestStreak) bestStreak = tempStreak;
+      currentChain.push(streakDates[i]);
     } else {
-      tempStreak = 1;
+      const completedCount = currentChain.filter(
+        (d) => allLogs[`${habit.id}_${d}`]?.status === 'COMPLETED'
+      ).length;
+      if (completedCount > bestStreak) bestStreak = completedCount;
+      currentChain = [streakDates[i]];
     }
   }
+  const lastChainCount = currentChain.filter(
+    (d) => allLogs[`${habit.id}_${d}`]?.status === 'COMPLETED'
+  ).length;
+  if (lastChainCount > bestStreak) bestStreak = lastChainCount;
 
-  // Calculate current streak relative to today
+  // Calculate current active streak relative to today
   const todayKey = getTodayKey();
   const today = parseISO(todayKey);
 
@@ -173,16 +234,19 @@ export function computeHabitStreaks(
 
     // If no due date was missed between latest completion/excuse and today, streak is alive
     if (!hasMissedDueDay(habit, latestDate, today, allLogs)) {
-      currentStreak = 1;
+      const activeChain: string[] = [latestDateStr];
       for (let i = validDates.length - 1; i > 0; i--) {
         const curr = parseISO(validDates[i]);
         const prev = parseISO(validDates[i - 1]);
         if (!hasMissedDueDay(habit, prev, curr, allLogs)) {
-          currentStreak++;
+          activeChain.push(validDates[i - 1]);
         } else {
           break;
         }
       }
+      currentStreak = activeChain.filter(
+        (d) => allLogs[`${habit.id}_${d}`]?.status === 'COMPLETED'
+      ).length;
     }
   }
 

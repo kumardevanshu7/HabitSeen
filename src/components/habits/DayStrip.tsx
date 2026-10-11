@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
 import { getTodayKey } from '../../utils/dateMath';
 import {
@@ -6,6 +6,7 @@ import {
   subDays,
   addDays,
   parseISO,
+  differenceInCalendarDays,
 } from 'date-fns';
 import clsx from 'clsx';
 import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
@@ -14,6 +15,19 @@ export const DayStrip: React.FC = () => {
   const { selectedDate, setSelectedDate } = useAppStore();
   const todayKey = getTodayKey();
   const [anchorDate, setAnchorDate] = useState(() => parseISO(selectedDate));
+
+  // Keep anchor centered if selectedDate moves outside current window
+  useEffect(() => {
+    try {
+      const parsed = parseISO(selectedDate);
+      const diff = Math.abs(differenceInCalendarDays(parsed, anchorDate));
+      if (diff > 7) {
+        setAnchorDate(parsed);
+      }
+    } catch {
+      // Ignore invalid date parsing
+    }
+  }, [selectedDate, anchorDate]);
 
   // Generate 15 continuous days (-7 to +7 days around anchor date)
   const days = Array.from({ length: 15 }, (_, i) => addDays(anchorDate, i - 7));

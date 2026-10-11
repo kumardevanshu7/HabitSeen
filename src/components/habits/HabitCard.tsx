@@ -24,6 +24,8 @@ import {
 import clsx from 'clsx';
 import confetti from 'canvas-confetti';
 import { LogMissedModal } from './LogMissedModal';
+import { computeHabitStreaks } from '../../utils/streakEngine';
+import { getFlameTier } from '../../constants/gamification';
 
 interface HabitCardProps {
   habit: Habit;
@@ -53,6 +55,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
   const isSkipped = dayLog?.status === 'SKIPPED';
   const isExcused = dayLog?.status === 'EXCUSED';
   const isMissed = dayLog?.status === 'MISSED' || dayLog?.status === 'FAILED';
+
+  const streakInfo = computeHabitStreaks(habit, logs);
+  const currentStreak = streakInfo.currentStreak;
+  const flameTier = getFlameTier(currentStreak);
 
   const [isMissedModalOpen, setIsMissedModalOpen] = useState(false);
 
@@ -243,9 +249,23 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                 >
                   Priority {habit.schedule.priority ?? 50}
                 </span>
-                {habit.stats.currentStreak > 0 && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
-                    <Flame size={11} className="fill-primary" /> {habit.stats.currentStreak}d
+                {currentStreak > 0 && (
+                  <span
+                    className={clsx(
+                      'inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border',
+                      currentStreak >= 30
+                        ? 'bg-blue-50 text-blue-600 border-blue-200'
+                        : currentStreak >= 7
+                        ? 'bg-orange-50 text-orange-600 border-orange-200'
+                        : 'bg-primary/10 text-primary border-primary/20'
+                    )}
+                    title={`${flameTier.title} (${currentStreak} consecutive days)`}
+                  >
+                    <Flame
+                      size={11}
+                      className={clsx(flameTier.text, currentStreak >= 7 && 'fill-current')}
+                    />{' '}
+                    {currentStreak}d
                   </span>
                 )}
               </div>
@@ -604,10 +624,23 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                 </button>
               </div>
             ) : (
-              habit.stats.currentStreak > 0 && (
-                <span className="inline-flex items-center gap-1 text-xs font-mono font-bold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full border border-primary/20">
-                  <Flame size={13} className="fill-primary" />
-                  {habit.stats.currentStreak}d streak
+              currentStreak > 0 && (
+                <span
+                  className={clsx(
+                    'inline-flex items-center gap-1 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full border',
+                    currentStreak >= 30
+                      ? 'bg-blue-50 text-blue-600 border-blue-200'
+                      : currentStreak >= 7
+                      ? 'bg-orange-50 text-orange-600 border-orange-200'
+                      : 'bg-primary/10 text-primary border-primary/20'
+                  )}
+                  title={`${flameTier.title} (${currentStreak} consecutive days)`}
+                >
+                  <Flame
+                    size={13}
+                    className={clsx(flameTier.text, currentStreak >= 7 && 'fill-current')}
+                  />
+                  {currentStreak}d streak
                 </span>
               )
             )}
