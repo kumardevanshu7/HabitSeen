@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
-import { getTodayKey } from '../../utils/dateMath';
+import { getTodayKey, isHabitDueOnDate } from '../../utils/dateMath';
 import {
   format,
   subDays,
@@ -13,12 +13,15 @@ import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { useDragScroll } from '../../hooks/useDragScroll';
 
 export const DayStrip: React.FC = () => {
-  const { selectedDate, setSelectedDate } = useAppStore();
+  const { habits, logs, selectedDate, setSelectedDate } = useAppStore();
   const todayKey = getTodayKey();
   const [anchorDate, setAnchorDate] = useState(() => parseISO(selectedDate));
 
   const { ref: dayStripRef, isDragging: isStripDragging, events: stripDragEvents } =
     useDragScroll<HTMLDivElement>();
+
+  // Filter out archived habits
+  const activeHabits = habits.filter((h) => !h.isArchived);
 
   // Keep anchor centered if selectedDate moves outside current window
   useEffect(() => {
@@ -52,6 +55,9 @@ export const DayStrip: React.FC = () => {
     setAnchorDate(today);
     setSelectedDate(todayKey);
   };
+
+  const radius = 14;
+  const circumference = 2 * Math.PI * radius; // ~87.96
 
   return (
     <div className="bg-surface-card border border-hairline rounded-3xl p-4 sm:p-5 shadow-xs">
@@ -109,37 +115,108 @@ export const DayStrip: React.FC = () => {
           const isSelected = key === selectedDate;
           const isToday = key === todayKey;
 
+          // Compute habits scheduled & completed on this date
+          const dueHabits = activeHabits.filter((h) => isHabitDueOnDate(h, day));
+          const completedHabits = dueHabits.filter((h) => {
+            const l = logs[`${h.id}_${key}`];
+            return l?.status === 'COMPLETED' || l?.status === 'EXCUSED';
+          });
+
+          const totalDue = dueHabits.length;
+          const totalCompleted = completedHabits.length;
+          const completionPercentage =
+            totalDue > 0 ? Math.round((totalCompleted / totalDue) * 100) : 0;
+          const strokeOffset = circumference - (completionPercentage / 100) * circumference;
+
           return (
             <button
               key={key}
               type="button"
               onClick={() => setSelectedDate(key)}
+              title={`${format(day, 'EEEE, d MMM yyyy')}: ${totalCompleted}/${totalDue} completed (${completionPercentage}%)`}
               className={clsx(
-                'flex flex-col items-center justify-center min-w-[56px] sm:min-w-[62px] py-2.5 px-2 rounded-2xl border transition-all select-none shrink-0',
+                'flex flex-col items-center justify-center min-w-[58px] sm:min-w-[64px] py-2 px-1.5 rounded-2xl border transition-all select-none shrink-0 gap-0.5',
                 isSelected
                   ? 'bg-ink text-white border-ink ring-2 ring-primary shadow-sm scale-102'
                   : 'bg-canvas text-charcoal border-hairline hover:bg-surface-bone hover:text-ink'
               )}
             >
-              <span
-                className={clsx(
-                  'text-[10px] uppercase font-bold tracking-wider',
-                  isSelected ? 'text-primary-pink' : 'text-stone'
-                )}
-              >
-                {format(day, 'EEE')}
-              </span>
-              <span className="font-mono text-base sm:text-lg font-bold leading-tight mt-1">
-                {format(day, 'd')}
-              </span>
-              {isToday && (
+              {/* Day of Week + Today Dot */}
+              <div className="flex items-center gap-1">
                 <span
                   className={clsx(
-                    'w-1.5 h-1.5 rounded-full mt-1.5',
-                    isSelected ? 'bg-primary' : 'bg-primary'
+                    'text-[10px] uppercase font-bold tracking-wider',
+                    isSelected ? 'text-primary-pink' : 'text-stone'
                   )}
-                />
-              )}
+                >
+                  {format(day, 'EEE')}
+                </span>
+                {isToday && (
+                  <span
+                    className="w-1.5 h-1.5 rounded-full bg-primary shrink-0"
+                    title="Today"
+                  />
+                )}
+              </div>
+
+              {/* Circular Progress Ring enclosing the Date Number */}
+              <div className="relative w-9 h-9 flex items-center justify-center my-0.5">
+                <svg className="w-9 h-9 -rotate-90" viewBox="0 0 36 36">
+                  {/* Background Track Circle */}
+                  <circle
+                    cx="18"
+                    cy="18"
+                    r={radius}
+                    fill="none"
+                    stroke={isSelected ? 'rgba(255, 255, 255, 0.2)' : 'currentColor'}
+                    strokeWidth="2.5"
+                    className={clsx(!isSelected && 'text-stone/20')}
+                  />
+                  {/* Progress Indicator Circle */}
+                  {totalDue > 0 && completionPercentage > 0 && (
+                    <circle
+                      cx="18"
+                      cy="18"
+                      r={radius}
+                      fill="none"
+                      stroke={
+                        completionPercentage === 100
+                          ? '#10B981'
+                          : isSelected
+                          ? '#FF758F'
+                          : '#F43F5E'
+                      }
+                      strokeWidth="2.5"
+                      strokeDasharray={circumference}
+                      strokeDashoffset={strokeOffset}
+                      strokeLinecap="round"
+                      className="transition-all duration-300"
+                    />
+                  )}
+                </svg>
+
+                <span className="absolute font-mono text-xs sm:text-sm font-bold leading-none">
+                  {format(day, 'd')}
+                </span>
+              </div>
+
+              {/* Completion Percentage Badge */}
+              <span
+                className={clsx(
+                  'text-[10px] font-mono font-bold leading-tight',
+                  isSelected
+                    ? completionPercentage === 100
+                      ? 'text-emerald-300'
+                      : 'text-white/80'
+                    : completionPercentage === 100
+                    ? 'text-emerald-600'
+                    : completionPercentage > 0
+                    ? 'text-primary'
+                    : 'text-stone/60'
+                )}
+              >
+                {totalDue > 0 ? `${completionPercentage}%` : '0%'}
+              </span>
             </button>
           );
         })}

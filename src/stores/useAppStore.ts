@@ -31,6 +31,7 @@ import {
   saveUserProfileToDb,
   addCategoryToDb,
   deleteCategoryFromDb,
+  saveCategoriesOrderToDb,
   addHabitToDb,
   updateHabitInDb,
   deleteHabitFromDb,
@@ -69,6 +70,7 @@ interface AppState {
   // Categories
   categories: Category[];
   setCategories: (cats: Category[]) => void;
+  reorderCategories: (ordered: Category[]) => Promise<void>;
   addCategory: (cat: Omit<Category, 'id' | 'createdAt'>) => Promise<Category>;
   deleteCategory: (id: string) => Promise<void>;
 
@@ -173,7 +175,24 @@ export const useAppStore = create<AppState>()((set, get) => ({
         uniqueMap.set(norm, cat);
       }
     }
-    set({ categories: Array.from(uniqueMap.values()) });
+    const sorted = Array.from(uniqueMap.values()).sort((a, b) => {
+      const ordA = typeof a.order === 'number' ? a.order : 999;
+      const ordB = typeof b.order === 'number' ? b.order : 999;
+      return ordA - ordB;
+    });
+    set({ categories: sorted });
+  },
+
+  reorderCategories: async (orderedList) => {
+    const { currentUser } = get();
+    const updated = orderedList.map((cat, idx) => ({
+      ...cat,
+      order: idx,
+    }));
+    set({ categories: updated });
+    if (currentUser) {
+      await saveCategoriesOrderToDb(currentUser.uid, updated);
+    }
   },
 
   habits: [],

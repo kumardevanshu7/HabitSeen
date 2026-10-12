@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
 import { HabitCard } from './HabitCard';
 import { DayStrip } from './DayStrip';
-import { Habit } from '../../types/habit';
+import { Habit, Category } from '../../types/habit';
 import { isHabitDueOnDate, getTodayKey } from '../../utils/dateMath';
 import { CATEGORY_ICONS } from '../../constants/iconsAndColors';
 import { boostVibrancy, getContrastIconColor } from '../../utils/colorUtils';
@@ -10,7 +10,7 @@ import { CreateCategoryModal } from '../categories/CreateCategoryModal';
 import { Button } from '../ui/Button';
 import { parseISO, format } from 'date-fns';
 import { useDragScroll } from '../../hooks/useDragScroll';
-import { Plus, CheckCheck, LayoutGrid, List, Sparkles } from 'lucide-react';
+import { Plus, CheckCheck, LayoutGrid, List, Sparkles, ArrowLeftRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import clsx from 'clsx';
 
 interface HabitsViewProps {
@@ -22,11 +22,16 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
   onOpenCreateHabit,
   onOpenHabitDetails,
 }) => {
-  const { habits, categories, logs, selectedDate, setSelectedDate } = useAppStore();
+  const { habits, categories, logs, selectedDate, setSelectedDate, reorderCategories } = useAppStore();
 
   const [selectedCatFilter, setSelectedCatFilter] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [isReorderMode, setIsReorderMode] = useState(false);
+  const [draggedCatId, setDraggedCatId] = useState<string | null>(null);
+
+  const catHoldTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const catTouchStartPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   const { ref: categoriesScrollRef, isDragging: isCatDragging, events: catScrollEvents } =
     useDragScroll<HTMLDivElement>();
@@ -64,12 +69,108 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
   }).length;
   const isAllCompletedToday = totalDueCount > 0 && completedDueCount === totalDueCount;
 
+  // Unique categories list in order
+  const uniqueCategories = Array.from(
+    new Map(categories.map((c) => [c.name.trim().toLowerCase(), c])).values()
+  );
+
+  const handleMoveCategory = async (catId: string, direction: 'left' | 'right') => {
+    const index = uniqueCategories.findIndex((c) => c.id === catId);
+    if (index === -1) return;
+
+    const targetIndex = direction === 'left' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= uniqueCategories.length) return;
+
+    const updated = [...uniqueCategories];
+    const [removed] = updated.splice(index, 1);
+    updated.splice(targetIndex, 0, removed);
+
+    await reorderCategories(updated);
+  };
+
+  const handleDragStart = (catId: string) => {
+    setDraggedCatId(catId);
+  };
+
+  const handleDragOver = (e: React.DragEvent, targetCatId: string) => {
+    e.preventDefault();
+    if (!draggedCatId || draggedCatId === targetCatId) return;
+
+    const fromIndex = uniqueCategories.findIndex((c) => c.id === draggedCatId);
+    const toIndex = uniqueCategories.findIndex((c) => c.id === targetCatId);
+    if (fromIndex === -1 || toIndex === -1) return;
+
+    const updated = [...uniqueCategories];
+    const [removed] = updated.splice(fromIndex, 1);
+    updated.splice(toIndex, 0, removed);
+
+    reorderCategories(updated);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedCatId(null);
+  };
+
+  const handleCatTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    catTouchStartPos.current = { x: touch.clientX, y: touch.clientY };
+    catHoldTimerRef.current = setTimeout(() => {
+      navigator.vibrate?.(35);
+      setIsReorderMode(true);
+    }, 400);
+  };
+
+  const handleCatTouchMove = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    const dx = Math.abs(touch.clientX - catTouchStartPos.current.x);
+    const dy = Math.abs(touch.clientY - catTouchStartPos.current.y);
+    if (dx > 10 || dy > 10) {
+      if (catHoldTimerRef.current) clearTimeout(catHoldTimerRef.current);
+    }
+  };
+
+  const handleCatTouchEnd = () => {
+    if (catHoldTimerRef.current) clearTimeout(catHoldTimerRef.current);
+  };
+
+  const handleCatMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    catHoldTimerRef.current = setTimeout(() => {
+      setIsReorderMode(true);
+    }, 400);
+  };
+
+  const handleCatMouseUp = () => {
+    if (catHoldTimerRef.current) clearTimeout(catHoldTimerRef.current);
+  };
+
   return (
     <div className="space-y-4">
       {/* 1. DATE PICKER STRIP */}
       <DayStrip />
 
-      {/* 2. CATEGORY PILLS FILTER BAR (SMOOTH DRAG-TO-SCROLL & TOUCH SWIPE) */}
+      {/* REORDER / ALIGN CATEGORIES BANNER */}
+      {isReorderMode && (
+        <div className="p-2.5 bg-gradient-to-r from-primary/15 via-rose-500/10 to-primary/15 border border-primary/30 rounded-2xl flex items-center justify-between gap-2 shadow-2xs animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <span className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center shrink-0">
+              <ArrowLeftRight size={13} />
+            </span>
+            <span className="text-xs font-bold text-ink">
+              Reorder Mode: Tap arrows &lt; &gt; or drag to align positions
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsReorderMode(false)}
+            className="text-xs font-bold bg-primary hover:bg-primary-deep text-white px-3 py-1 rounded-full shadow-xs transition-colors shrink-0"
+          >
+            Done
+          </button>
+        </div>
+      )}
+
+      {/* 2. CATEGORY PILLS FILTER BAR (HOLD TO REORDER / ALIGN) */}
       <div
         ref={categoriesScrollRef}
         {...catScrollEvents}
@@ -90,38 +191,86 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
           All Habits ({activeHabits.length})
         </button>
 
-        {Array.from(new Map(categories.map((c) => [c.name.trim().toLowerCase(), c])).values()).map((cat) => {
+        {uniqueCategories.map((cat, catIdx) => {
           const isSelected = selectedCatFilter === cat.id;
           const Icon =
             CATEGORY_ICONS.find((i) => i.id === cat.icon)?.icon ||
             CATEGORY_ICONS[0].icon;
           const vibrantColor = boostVibrancy(cat.color);
           const iconColor = getContrastIconColor(vibrantColor);
+          const isBeingDragged = draggedCatId === cat.id;
 
           return (
-            <button
+            <div
               key={cat.id}
-              onClick={() => setSelectedCatFilter(cat.id)}
+              onTouchStart={handleCatTouchStart}
+              onTouchEnd={handleCatTouchEnd}
+              onTouchMove={handleCatTouchMove}
+              onMouseDown={handleCatMouseDown}
+              onMouseUp={handleCatMouseUp}
+              onMouseLeave={handleCatMouseUp}
+              draggable={isReorderMode}
+              onDragStart={() => handleDragStart(cat.id)}
+              onDragOver={(e) => handleDragOver(e, cat.id)}
+              onDragEnd={handleDragEnd}
               className={clsx(
-                'flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all border-2 shrink-0',
-                isSelected
-                  ? 'shadow-xs text-ink'
-                  : 'text-charcoal hover:text-ink'
+                'flex items-center transition-all shrink-0',
+                isBeingDragged && 'opacity-50 scale-95'
               )}
-              style={{
-                backgroundColor: isSelected ? `${vibrantColor}30` : `${vibrantColor}15`,
-                borderColor: vibrantColor,
-                boxShadow: isSelected ? `0 0 0 2px ${vibrantColor}` : undefined,
-              }}
             >
-              <span
-                className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 shadow-2xs"
-                style={{ backgroundColor: vibrantColor, color: iconColor }}
+              <button
+                type="button"
+                onClick={() => setSelectedCatFilter(cat.id)}
+                title="Hold to align & reorder"
+                className={clsx(
+                  'flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all border-2 shrink-0',
+                  isSelected
+                    ? 'shadow-xs text-ink'
+                    : 'text-charcoal hover:text-ink',
+                  isReorderMode && 'ring-2 ring-primary/40'
+                )}
+                style={{
+                  backgroundColor: isSelected ? `${vibrantColor}30` : `${vibrantColor}15`,
+                  borderColor: vibrantColor,
+                  boxShadow: isSelected ? `0 0 0 2px ${vibrantColor}` : undefined,
+                }}
               >
-                <Icon size={12} strokeWidth={2.5} />
-              </span>
-              <span>{cat.name}</span>
-            </button>
+                <span
+                  className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 shadow-2xs"
+                  style={{ backgroundColor: vibrantColor, color: iconColor }}
+                >
+                  <Icon size={12} strokeWidth={2.5} />
+                </span>
+                <span>{cat.name}</span>
+
+                {/* MOVE LEFT / RIGHT POSITION ARROWS IN REORDER MODE */}
+                {isReorderMode && (
+                  <span
+                    className="flex items-center gap-0.5 ml-1"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      disabled={catIdx === 0}
+                      onClick={() => handleMoveCategory(cat.id, 'left')}
+                      className="w-4 h-4 rounded-full bg-white hover:bg-stone/20 text-ink flex items-center justify-center disabled:opacity-25 border border-hairline shadow-2xs transition-all active:scale-90"
+                      title="Move Left"
+                    >
+                      <ChevronLeft size={10} />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={catIdx === uniqueCategories.length - 1}
+                      onClick={() => handleMoveCategory(cat.id, 'right')}
+                      className="w-4 h-4 rounded-full bg-white hover:bg-stone/20 text-ink flex items-center justify-center disabled:opacity-25 border border-hairline shadow-2xs transition-all active:scale-90"
+                      title="Move Right"
+                    >
+                      <ChevronRight size={10} />
+                    </button>
+                  </span>
+                )}
+              </button>
+            </div>
           );
         })}
 
@@ -130,6 +279,21 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
           className="text-xs font-semibold text-primary hover:text-primary-deep bg-surface-card border border-dashed border-primary/40 px-3 py-1.5 rounded-full whitespace-nowrap flex items-center gap-1 transition-colors shrink-0"
         >
           <Plus size={13} /> New Category
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setIsReorderMode(!isReorderMode)}
+          className={clsx(
+            'text-xs font-semibold px-3 py-1.5 rounded-full whitespace-nowrap flex items-center gap-1 transition-colors shrink-0 border',
+            isReorderMode
+              ? 'bg-ink text-white border-ink shadow-2xs'
+              : 'text-charcoal hover:text-ink bg-surface-card border-hairline hover:bg-surface-bone'
+          )}
+          title="Hold any category pill or click here to align & reorder positions"
+        >
+          <ArrowLeftRight size={12} />
+          <span>{isReorderMode ? 'Done' : 'Align'}</span>
         </button>
       </div>
 

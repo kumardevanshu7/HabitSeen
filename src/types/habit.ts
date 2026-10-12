@@ -26,6 +26,7 @@ export interface Category {
   icon: string;         // Lucide icon name
   color: string;        // Hex code
   isDefault?: boolean;
+  order?: number;       // Custom sort order
   createdAt: string;
 }
 

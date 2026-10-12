@@ -53,7 +53,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [isEditingSecurity, setIsEditingSecurity] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState(PRESET_QUESTIONS[0]);
   const [customQuestion, setCustomQuestion] = useState('');
+  const [previousAnswerInput, setPreviousAnswerInput] = useState('');
   const [answerInput, setAnswerInput] = useState('');
+  const [showPasswordToggle, setShowPasswordToggle] = useState(false);
   const [securitySuccessMsg, setSecuritySuccessMsg] = useState('');
   const [securityError, setSecurityError] = useState('');
   const [isSavingSecurity, setIsSavingSecurity] = useState(false);
@@ -75,6 +77,23 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     setSecurityError('');
     setSecuritySuccessMsg('');
 
+    // If an existing security question/password is set, MUST verify previous answer first
+    if (user.security && user.security.answer) {
+      if (!previousAnswerInput.trim()) {
+        setSecurityError('Please enter your previous secret answer / password to verify identity');
+        return;
+      }
+      if (
+        previousAnswerInput.trim().toLowerCase() !==
+        user.security.answer.trim().toLowerCase()
+      ) {
+        setSecurityError(
+          'Incorrect previous secret answer / password. Security check failed.'
+        );
+        return;
+      }
+    }
+
     const finalQuestion =
       selectedPreset === 'Custom Question...'
         ? customQuestion.trim()
@@ -86,16 +105,18 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     }
 
     if (!answerInput.trim() || answerInput.trim().length < 2) {
-      setSecurityError('Answer must be at least 2 characters long');
+      setSecurityError('New answer must be at least 2 characters long');
       return;
     }
 
     setIsSavingSecurity(true);
     try {
       await setSecurityQuestion(finalQuestion, answerInput.trim());
-      setSecuritySuccessMsg('Security question saved successfully!');
+      setSecuritySuccessMsg('Security question & password updated successfully!');
       setIsEditingSecurity(false);
+      setPreviousAnswerInput('');
       setAnswerInput('');
+      setCustomQuestion('');
     } catch (err: any) {
       setSecurityError(err.message || 'Failed to save security question');
     } finally {
@@ -325,23 +346,48 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   size="sm"
                   onClick={() => {
                     setIsEditingSecurity(true);
+                    setPreviousAnswerInput('');
+                    setAnswerInput('');
+                    setCustomQuestion('');
                     setSecuritySuccessMsg('');
                     setSecurityError('');
                   }}
                 >
-                  {existingSecurity ? 'Change Question' : 'Set Question Now'}
+                  {existingSecurity ? 'Change Question & Password' : 'Set Question Now'}
                 </Button>
               </div>
             ) : (
-              <form onSubmit={handleSaveSecurity} className="space-y-3 pt-2">
+              <form onSubmit={handleSaveSecurity} className="space-y-3.5 pt-2">
                 {securityError && (
-                  <div className="p-2.5 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl">
-                    {securityError}
+                  <div className="p-2.5 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2">
+                    <AlertTriangle size={15} className="shrink-0 text-red-600" />
+                    <span>{securityError}</span>
+                  </div>
+                )}
+
+                {/* CURRENT / PREVIOUS PASSWORD VERIFICATION (REQUIRED IF ALREADY CONFIGURED) */}
+                {existingSecurity && (
+                  <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-amber-900 font-semibold text-xs">
+                      <Lock size={13} className="text-amber-600" />
+                      <span>Security Verification</span>
+                    </div>
+                    <p className="text-[11px] text-amber-800 leading-snug">
+                      Enter your current secret answer / password to verify authorization before changing credentials.
+                    </p>
+                    <Input
+                      label="Current / Previous Secret Answer"
+                      placeholder="Enter current answer to authorize change"
+                      type={showPasswordToggle ? 'text' : 'password'}
+                      value={previousAnswerInput}
+                      onChange={(e) => setPreviousAnswerInput(e.target.value)}
+                      required
+                    />
                   </div>
                 )}
 
                 <CustomSelect
-                  label="Select Question:"
+                  label="Select New Question:"
                   value={selectedPreset}
                   options={PRESET_QUESTIONS.map((q) => ({ value: q, label: q }))}
                   onChange={(val) => setSelectedPreset(val)}
@@ -361,20 +407,38 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
                 <div>
                   <Input
-                    label="Your Secret Answer"
-                    placeholder="Enter answer (case-insensitive)"
+                    label={existingSecurity ? "New Secret Answer / Password" : "Your Secret Answer"}
+                    placeholder="Enter new secret answer (case-insensitive)"
+                    type={showPasswordToggle ? 'text' : 'password'}
                     value={answerInput}
                     onChange={(e) => setAnswerInput(e.target.value)}
                     required
                   />
+                  <div className="flex items-center justify-between mt-1 px-0.5">
+                    <span className="text-[11px] text-stone">
+                      Case-insensitive (answers match regardless of caps)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowPasswordToggle(!showPasswordToggle)}
+                      className="text-[11px] text-primary hover:underline font-semibold"
+                    >
+                      {showPasswordToggle ? 'Hide Characters' : 'Show Characters'}
+                    </button>
+                  </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-2 pt-1">
+                <div className="flex items-center justify-end gap-2 pt-1 border-t border-hairline/60">
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    onClick={() => setIsEditingSecurity(false)}
+                    onClick={() => {
+                      setIsEditingSecurity(false);
+                      setPreviousAnswerInput('');
+                      setAnswerInput('');
+                      setSecurityError('');
+                    }}
                     disabled={isSavingSecurity}
                   >
                     Cancel

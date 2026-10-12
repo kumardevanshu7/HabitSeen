@@ -83,6 +83,24 @@ export const addCategoryToDb = async (userId: string, category: Category) => {
   await setDoc(ref, cleanFirestoreData(category));
 };
 
+export const updateCategoryInDb = async (userId: string, category: Category) => {
+  const ref = doc(db, 'users', userId, 'categories', category.id);
+  await setDoc(ref, cleanFirestoreData(category), { merge: true });
+};
+
+export const saveCategoriesOrderToDb = async (userId: string, categories: Category[]) => {
+  try {
+    const batch = writeBatch(db);
+    categories.forEach((cat, index) => {
+      const ref = doc(db, 'users', userId, 'categories', cat.id);
+      batch.set(ref, cleanFirestoreData({ ...cat, order: index }), { merge: true });
+    });
+    await batch.commit();
+  } catch (err) {
+    console.error('saveCategoriesOrderToDb error:', err);
+  }
+};
+
 export const deleteCategoryFromDb = async (userId: string, categoryId: string) => {
   const ref = doc(db, 'users', userId, 'categories', categoryId);
   await deleteDoc(ref);
