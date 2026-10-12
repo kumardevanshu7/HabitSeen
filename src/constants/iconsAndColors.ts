@@ -50,11 +50,79 @@ import {
   Scale,
   Scissors,
   Eye,
+  // Added icons for requested categories
+  Candy,
+  Cake,
+  CakeSlice,
+  Cupcake,
+  IceCream,
+  IceCreamBowl,
+  Sunrise,
+  AlarmClock,
+  MoonStar,
+  CloudMoon,
+  Sunset,
+  Utensils,
+  UtensilsCrossed,
+  Salad,
+  Carrot,
+  Soup,
+  Hamburger,
+  Sandwich,
+  Popcorn,
+  CupSoda,
+  BicepsFlexed,
+  Bike,
+  PillBottle,
+  BriefcaseBusiness,
+  Laptop,
+  HeartHandshake,
+  Baby,
+  Heart,
+  HouseHeart,
 } from 'lucide-react';
+
+export type IconCategoryKey =
+  | 'all'
+  | 'sweets'
+  | 'morning'
+  | 'night'
+  | 'evening'
+  | 'eating'
+  | 'junk_food'
+  | 'exercise'
+  | 'supplements'
+  | 'work'
+  | 'family'
+  | 'vices'
+  | 'others';
+
+export interface IconCategoryMeta {
+  id: IconCategoryKey;
+  label: string;
+  emoji: string;
+}
+
+export const ICON_CATEGORIES: IconCategoryMeta[] = [
+  { id: 'all', label: 'All', emoji: '✨' },
+  { id: 'sweets', label: 'Sweets & Sugar', emoji: '🍬' },
+  { id: 'morning', label: 'Morning', emoji: '🌅' },
+  { id: 'night', label: 'Night', emoji: '🌙' },
+  { id: 'evening', label: 'Evening', emoji: '🌇' },
+  { id: 'eating', label: 'Healthy Eating', emoji: '🥗' },
+  { id: 'junk_food', label: 'Junk Food', emoji: '🍕' },
+  { id: 'exercise', label: 'Exercise & Gym', emoji: '💪' },
+  { id: 'supplements', label: 'Supplements', emoji: '💊' },
+  { id: 'work', label: 'Work & Career', emoji: '💼' },
+  { id: 'family', label: 'Parents (Mom & Dad)', emoji: '👨‍👩‍👧' },
+  { id: 'vices', label: 'Vices & Bad Habits', emoji: '🚫' },
+  { id: 'others', label: 'Mind & Others', emoji: '🎯' },
+];
 
 export interface IconOption {
   id: string;
   label: string;
+  category: IconCategoryKey;
   icon: React.ComponentType<{
     className?: string;
     size?: number | string;
@@ -63,65 +131,132 @@ export interface IconOption {
 }
 
 export const CATEGORY_ICONS: IconOption[] = [
-  // Gaming, Digital & Screen vices
-  { id: 'gamepad-2', label: 'Games & Gaming', icon: Gamepad2 },
-  { id: 'smartphone', label: 'Screen & Social Media', icon: Smartphone },
-  { id: 'tv', label: 'Binge Watching & TV', icon: Tv },
-  
-  // Beauty, Skincare & Grooming
-  { id: 'sparkles', label: 'Skincare & Glow', icon: Sparkles },
-  { id: 'scissors', label: 'Grooming & Haircare', icon: Scissors },
-  { id: 'smile', label: 'Mood & Face', icon: Smile },
+  // ==========================================
+  // 1. SWEETS & SUGAR (Requested by user)
+  // ==========================================
+  { id: 'candy', label: 'Sugar & Candy', category: 'sweets', icon: Candy },
+  { id: 'cake', label: 'Cake & Pastries', category: 'sweets', icon: Cake },
+  { id: 'cake-slice', label: 'Cake Slice & Desserts', category: 'sweets', icon: CakeSlice },
+  { id: 'cupcake', label: 'Cupcake & Bakery', category: 'sweets', icon: Cupcake },
+  { id: 'ice-cream', label: 'Ice Cream Cone', category: 'sweets', icon: IceCream },
+  { id: 'ice-cream-bowl', label: 'Sundae & Ice Cream', category: 'sweets', icon: IceCreamBowl },
+  { id: 'cookie', label: 'Cookies & Biscuits', category: 'sweets', icon: Cookie },
 
-  // Products, Shopping & Finances
-  { id: 'shopping-bag', label: 'Shopping & Clothes', icon: ShoppingBag },
-  { id: 'package', label: 'Product Deliveries', icon: Package },
-  { id: 'wallet', label: 'Finances & Budget', icon: Wallet },
-  { id: 'coins', label: 'Spending & Gambling', icon: Coins },
+  // ==========================================
+  // 2. MORNING ROUTINE
+  // ==========================================
+  { id: 'sunrise', label: 'Sunrise & Early Rise', category: 'morning', icon: Sunrise },
+  { id: 'sun', label: 'Morning Sunshine', category: 'morning', icon: Sun },
+  { id: 'alarm-clock', label: 'Alarm & Punctuality', category: 'morning', icon: AlarmClock },
+  { id: 'coffee', label: 'Morning Coffee / Tea', category: 'morning', icon: Coffee },
+  { id: 'zap', label: 'Morning Energy & Boost', category: 'morning', icon: Zap },
 
-  // Health, Diet, Food & Supplements
-  { id: 'pill', label: 'Supplements & Meds', icon: Pill },
-  { id: 'apple', label: 'Clean Diet', icon: Apple },
-  { id: 'pizza', label: 'Junk Food', icon: Pizza },
-  { id: 'cookie', label: 'Sugar & Sweets', icon: Cookie },
-  { id: 'droplets', label: 'Hydration', icon: Droplets },
-  { id: 'coffee', label: 'Caffeine & Coffee', icon: Coffee },
+  // ==========================================
+  // 3. NIGHT & SLEEP
+  // ==========================================
+  { id: 'moon', label: 'Night Routine & Moon', category: 'night', icon: Moon },
+  { id: 'moon-star', label: 'Deep Sleep & Stargazing', category: 'night', icon: MoonStar },
+  { id: 'bed', label: 'Early Bedtime', category: 'night', icon: Bed },
+  { id: 'bed-double', label: 'Restorative Sleep', category: 'night', icon: BedDouble },
+  { id: 'cloud-moon', label: 'Night Wind Down', category: 'night', icon: CloudMoon },
 
-  // Abstinence, Vices & Harm Reduction
-  { id: 'cigarette', label: 'Smoking & Vaping', icon: Cigarette },
-  { id: 'wine', label: 'Alcohol & Wine', icon: Wine },
-  { id: 'beer', label: 'Beer & Drinking', icon: Beer },
-  { id: 'skull', label: 'Toxic Habits', icon: Skull },
-  { id: 'heart-crack', label: 'Overthinking & Heartbreak', icon: HeartCrack },
-  { id: 'alert-octagon', label: 'Impulses & Triggers', icon: AlertOctagon },
-  { id: 'shield-alert', label: 'Strict Abstinence', icon: ShieldAlert },
-  { id: 'shield-check', label: 'Discipline', icon: ShieldCheck },
+  // ==========================================
+  // 4. EVENING
+  // ==========================================
+  { id: 'sunset', label: 'Sunset & Dusk', category: 'evening', icon: Sunset },
+  { id: 'book-open', label: 'Evening Reading', category: 'evening', icon: BookOpen },
+  { id: 'music', label: 'Evening Music & Unwind', category: 'evening', icon: Music },
 
-  // Fitness, Body & Sleep
-  { id: 'dumbbell', label: 'Workout & Gym', icon: Dumbbell },
-  { id: 'heart-pulse', label: 'Cardio & Heart', icon: HeartPulse },
-  { id: 'footprints', label: 'Daily Steps', icon: Footprints },
-  { id: 'bed-double', label: 'Sleep & Night Routine', icon: BedDouble },
-  { id: 'moon', label: 'Rest & Deep Sleep', icon: Moon },
-  { id: 'sun', label: 'Morning Routine', icon: Sun },
+  // ==========================================
+  // 5. HEALTHY EATING & NUTRITION
+  // ==========================================
+  { id: 'utensils', label: 'Mindful Meals & Dining', category: 'eating', icon: Utensils },
+  { id: 'utensils-crossed', label: 'Eating & Fasting Window', category: 'eating', icon: UtensilsCrossed },
+  { id: 'salad', label: 'Salad & Greens', category: 'eating', icon: Salad },
+  { id: 'apple', label: 'Fresh Fruits & Clean Diet', category: 'eating', icon: Apple },
+  { id: 'carrot', label: 'Vegetables & Fiber', category: 'eating', icon: Carrot },
+  { id: 'soup', label: 'Warm Soups & Home Food', category: 'eating', icon: Soup },
 
-  // Productivity, Learning & Mind
-  { id: 'brain', label: 'Mindset & Meditation', icon: Brain },
-  { id: 'book-open', label: 'Reading Books', icon: BookOpen },
-  { id: 'code', label: 'Coding & Dev', icon: Code },
-  { id: 'pen-tool', label: 'Writing & Journaling', icon: PenTool },
-  { id: 'target', label: 'Deep Focus', icon: Target },
-  { id: 'eye', label: 'Screen Awareness', icon: Eye },
-  { id: 'briefcase', label: 'Career & Work', icon: Briefcase },
-  { id: 'flame', label: 'Consistency & Fire', icon: Flame },
-  { id: 'trophy', label: 'Milestones & Wins', icon: Trophy },
-  { id: 'scale', label: 'Life Balance', icon: Scale },
-  { id: 'clock', label: 'Punctuality', icon: Clock },
-  { id: 'leaf', label: 'Nature & Calm', icon: Leaf },
-  { id: 'music', label: 'Music & Audio', icon: Music },
-  { id: 'palette', label: 'Art & Creativity', icon: Palette },
-  { id: 'users', label: 'Relationships & Social', icon: Users },
-  { id: 'layout-grid', label: 'General / Others', icon: LayoutGrid },
+  // ==========================================
+  // 6. JUNK FOOD
+  // ==========================================
+  { id: 'pizza', label: 'Pizza & Fast Food', category: 'junk_food', icon: Pizza },
+  { id: 'hamburger', label: 'Burgers & Fries', category: 'junk_food', icon: Hamburger },
+  { id: 'sandwich', label: 'Deli Sandwiches', category: 'junk_food', icon: Sandwich },
+  { id: 'popcorn', label: 'Late Night Snacks & Popcorn', category: 'junk_food', icon: Popcorn },
+  { id: 'cup-soda', label: 'Soda & Sugary Drinks', category: 'junk_food', icon: CupSoda },
+
+  // ==========================================
+  // 7. EXERCISE & FITNESS
+  // ==========================================
+  { id: 'dumbbell', label: 'Gym & Weight Training', category: 'exercise', icon: Dumbbell },
+  { id: 'biceps-flexed', label: 'Strength & Muscle Building', category: 'exercise', icon: BicepsFlexed },
+  { id: 'bike', label: 'Cycling & Cardio', category: 'exercise', icon: Bike },
+  { id: 'footprints', label: 'Daily Steps & Walking', category: 'exercise', icon: Footprints },
+  { id: 'heart-pulse', label: 'Cardio & Heart Health', category: 'exercise', icon: HeartPulse },
+  { id: 'flame', label: 'Calorie Burn & Fire', category: 'exercise', icon: Flame },
+  { id: 'trophy', label: 'Athletic Milestones', category: 'exercise', icon: Trophy },
+
+  // ==========================================
+  // 8. SUPPLEMENTS & HEALTH
+  // ==========================================
+  { id: 'pill', label: 'Vitamins & Capsules', category: 'supplements', icon: Pill },
+  { id: 'pill-bottle', label: 'Supplement Bottles', category: 'supplements', icon: PillBottle },
+  { id: 'droplets', label: 'Daily Hydration & Electrolytes', category: 'supplements', icon: Droplets },
+  { id: 'sparkles', label: 'Skin Care & Glow Supplements', category: 'supplements', icon: Sparkles },
+
+  // ==========================================
+  // 9. WORK, CAREER & PRODUCTIVITY
+  // ==========================================
+  { id: 'briefcase', label: 'Career & Professional Work', category: 'work', icon: Briefcase },
+  { id: 'briefcase-business', label: 'Business & Office Meetings', category: 'work', icon: BriefcaseBusiness },
+  { id: 'laptop', label: 'Deep Work & Laptop Time', category: 'work', icon: Laptop },
+  { id: 'code', label: 'Software Coding & Development', category: 'work', icon: Code },
+  { id: 'pen-tool', label: 'Writing & Creative Work', category: 'work', icon: PenTool },
+  { id: 'target', label: 'High Focus & Goal Execution', category: 'work', icon: Target },
+  { id: 'clock', label: 'Punctuality & Time Blocking', category: 'work', icon: Clock },
+  { id: 'wallet', label: 'Budget & Finances', category: 'work', icon: Wallet },
+  { id: 'coins', label: 'Savings & Income Tracking', category: 'work', icon: Coins },
+
+  // ==========================================
+  // 10. PARENTS, MOM, DAD & FAMILY (Requested by user)
+  // ==========================================
+  { id: 'users', label: 'Parents (Mom & Dad)', category: 'family', icon: Users },
+  { id: 'heart-handshake', label: 'Respect & Care for Parents', category: 'family', icon: HeartHandshake },
+  { id: 'heart', label: 'Family Love & Quality Time', category: 'family', icon: Heart },
+  { id: 'house-heart', label: 'Home & Family Bonding', category: 'family', icon: HouseHeart },
+  { id: 'baby', label: 'Children & Family Care', category: 'family', icon: Baby },
+  { id: 'smile', label: 'Family Happiness & Smiles', category: 'family', icon: Smile },
+
+  // ==========================================
+  // 11. VICES, BAD HABITS & QUITTING
+  // ==========================================
+  { id: 'cigarette', label: 'Smoking & Vaping', category: 'vices', icon: Cigarette },
+  { id: 'wine', label: 'Alcohol & Wine', category: 'vices', icon: Wine },
+  { id: 'beer', label: 'Beer & Excessive Drinking', category: 'vices', icon: Beer },
+  { id: 'gamepad-2', label: 'Gaming Addiction', category: 'vices', icon: Gamepad2 },
+  { id: 'smartphone', label: 'Doomscrolling & Phone Screen', category: 'vices', icon: Smartphone },
+  { id: 'tv', label: 'Binge Watching TV / OTT', category: 'vices', icon: Tv },
+  { id: 'shopping-bag', label: 'Impulsive Shopping', category: 'vices', icon: ShoppingBag },
+  { id: 'skull', label: 'Toxic Vices & Harmful Habits', category: 'vices', icon: Skull },
+  { id: 'heart-crack', label: 'Overthinking & Negative Loops', category: 'vices', icon: HeartCrack },
+  { id: 'alert-octagon', label: 'Impulses & Emotional Triggers', category: 'vices', icon: AlertOctagon },
+  { id: 'shield-alert', label: 'Strict Abstinence Shield', category: 'vices', icon: ShieldAlert },
+  { id: 'shield-check', label: 'Unshakable Discipline', category: 'vices', icon: ShieldCheck },
+
+  // ==========================================
+  // 12. OTHERS & GENERAL
+  // ==========================================
+  { id: 'brain', label: 'Mindset & Meditation', category: 'others', icon: Brain },
+  { id: 'leaf', label: 'Nature & Calm', category: 'others', icon: Leaf },
+  { id: 'palette', label: 'Art, Hobbies & Creativity', category: 'others', icon: Palette },
+  { id: 'scale', label: 'Life Balance', category: 'others', icon: Scale },
+  { id: 'scissors', label: 'Grooming & Self-Care', category: 'others', icon: Scissors },
+  { id: 'eye', label: 'Screen Mindfulness & Eye Care', category: 'others', icon: Eye },
+  { id: 'compass', label: 'Life Direction & Exploration', category: 'others', icon: Compass },
+  { id: 'crosshair', label: 'Precision Targets', category: 'others', icon: Crosshair },
+  { id: 'package', label: 'Deliveries & Logistics', category: 'others', icon: Package },
+  { id: 'layout-grid', label: 'General / Miscellaneous', category: 'others', icon: LayoutGrid },
 ];
 
 // Rich, ultra-vibrant, bright colors that pop clearly on screen
@@ -148,4 +283,3 @@ export {
   WILL_HABIT_TIERS,
   type StreakMilestone,
 } from './gamification';
-

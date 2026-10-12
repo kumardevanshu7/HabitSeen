@@ -3,6 +3,7 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { CATEGORY_ICONS, CATEGORY_COLORS } from '../../constants/iconsAndColors';
+import { IconPicker } from '../ui/IconPicker';
 import { useAppStore } from '../../stores/useAppStore';
 import { Category } from '../../types/habit';
 import { boostVibrancy, getContrastIconColor } from '../../utils/colorUtils';
@@ -119,34 +120,13 @@ export const CreateCategoryModal: React.FC<CreateCategoryModalProps> = ({
           </div>
         </div>
 
-        {/* 30 Motivational & Habit Icons Selection */}
-        <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-charcoal mb-2 ml-1">
-            Choose Category Icon (30 Curated Habit Icons)
-          </label>
-          <div className="grid grid-cols-6 sm:grid-cols-10 gap-2 max-h-48 overflow-y-auto p-2.5 bg-surface-card rounded-2xl border border-hairline">
-            {CATEGORY_ICONS.map((opt) => {
-              const Icon = opt.icon;
-              const isSelected = selectedIcon === opt.id;
-              return (
-                <button
-                  type="button"
-                  key={opt.id}
-                  title={opt.label}
-                  onClick={() => setSelectedIcon(opt.id)}
-                  className={clsx(
-                    'flex flex-col items-center justify-center p-2 rounded-xl transition-all aspect-square',
-                    isSelected
-                      ? 'bg-ink text-white ring-2 ring-primary scale-105 shadow-sm'
-                      : 'hover:bg-surface-bone text-charcoal hover:text-ink'
-                  )}
-                >
-                  <Icon size={20} />
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        {/* Categorized Icons Selection */}
+        <IconPicker
+          selectedIcon={selectedIcon}
+          onSelectIcon={(newIcon) => setSelectedIcon(newIcon)}
+          label="Choose Category Icon"
+          accentColor={vibrantColor}
+        />
 
         {/* 15 Curated Vibrant Colors Selection */}
         <div>

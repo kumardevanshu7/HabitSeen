@@ -81,30 +81,45 @@ export function isHabitDueOnDate(habit: Habit, targetDate: Date): boolean {
 }
 
 export function isDateInThisWeek(dateKey: string): boolean {
-  const date = parseISO(dateKey);
-  const now = new Date();
-  return isWithinInterval(date, {
-    start: startOfWeek(now, { weekStartsOn: 1 }),
-    end: endOfWeek(now, { weekStartsOn: 1 }),
-  });
+  if (!dateKey) return false;
+  try {
+    const date = parseISO(dateKey);
+    const now = new Date();
+    return isWithinInterval(date, {
+      start: startOfWeek(now, { weekStartsOn: 1 }),
+      end: endOfWeek(now, { weekStartsOn: 1 }),
+    });
+  } catch {
+    return false;
+  }
 }
 
 export function isDateInThisMonth(dateKey: string): boolean {
-  const date = parseISO(dateKey);
-  const now = new Date();
-  return isWithinInterval(date, {
-    start: startOfMonth(now),
-    end: endOfMonth(now),
-  });
+  if (!dateKey) return false;
+  try {
+    const date = parseISO(dateKey);
+    const now = new Date();
+    return isWithinInterval(date, {
+      start: startOfMonth(now),
+      end: endOfMonth(now),
+    });
+  } catch {
+    return false;
+  }
 }
 
 export function isDateInThisYear(dateKey: string): boolean {
-  const date = parseISO(dateKey);
-  const now = new Date();
-  return isWithinInterval(date, {
-    start: startOfYear(now),
-    end: endOfYear(now),
-  });
+  if (!dateKey) return false;
+  try {
+    const date = parseISO(dateKey);
+    const now = new Date();
+    return isWithinInterval(date, {
+      start: startOfYear(now),
+      end: endOfYear(now),
+    });
+  } catch {
+    return false;
+  }
 }
 
 export function formatSecondsToHMS(totalSeconds: number): {

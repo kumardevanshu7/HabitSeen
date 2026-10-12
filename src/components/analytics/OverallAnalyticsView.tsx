@@ -239,18 +239,39 @@ export const OverallAnalyticsView: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
           {categories.map((cat) => {
             const catHabits = habits.filter((h) => h.categoryId === cat.id);
+            const catBreaks = habitBreaks.filter((b) => b.categoryId === cat.id && !b.isArchived);
             const Icon =
               CATEGORY_ICONS.find((i) => i.id === cat.icon)?.icon ||
               CATEGORY_ICONS[0].icon;
             const effectiveColor = boostVibrancy(cat.color);
             const iconColor = getContrastIconColor(effectiveColor);
 
-            // Completion rate for this category
+            // Completion rate for this category's habits
             const catLogs = allLogsArray.filter((l) =>
               catHabits.some((h) => h.id === l.habitId)
             );
             const catCompleted = catLogs.filter((l) => l.status === 'COMPLETED').length;
-            const catRate = catLogs.length > 0 ? Math.round((catCompleted / catLogs.length) * 100) : 0;
+            const catHabitRate = catLogs.length > 0 ? Math.round((catCompleted / catLogs.length) * 100) : 0;
+
+            // Abstinence adherence for habit break timers
+            const breakAdherence = catBreaks.length > 0
+              ? Math.round(
+                  catBreaks.reduce((acc, b) => {
+                    const relapses = b.relapseHistory?.length || 0;
+                    return acc + Math.max(0, 100 - relapses * 15);
+                  }, 0) / catBreaks.length
+                )
+              : 0;
+
+            // Blended or specific rate
+            let catRate = 0;
+            if (catHabits.length > 0 && catBreaks.length > 0) {
+              catRate = Math.round((catHabitRate + breakAdherence) / 2);
+            } else if (catHabits.length === 0 && catBreaks.length > 0) {
+              catRate = breakAdherence;
+            } else {
+              catRate = catHabitRate;
+            }
 
             return (
               <div
@@ -268,14 +289,26 @@ export const OverallAnalyticsView: React.FC = () => {
                     </span>
                     <span className="font-bold text-xs text-ink">{cat.name}</span>
                   </div>
-                  <span className="text-[11px] font-mono text-charcoal font-semibold">
-                    {catHabits.length} habits
-                  </span>
+                  <div className="flex items-center gap-1.5 text-[11px] font-mono font-semibold">
+                    <span className="text-charcoal">{catHabits.length} habits</span>
+                    {catBreaks.length > 0 && (
+                      <>
+                        <span className="text-stone/60">•</span>
+                        <span className="text-primary font-bold">
+                          {catBreaks.length} quit {catBreaks.length === 1 ? 'timer' : 'timers'}
+                        </span>
+                      </>
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-1">
                   <div className="flex justify-between text-[11px] font-mono text-charcoal">
-                    <span>Performance</span>
+                    <span>
+                      {catHabits.length === 0 && catBreaks.length > 0
+                        ? 'Abstinence Adherence'
+                        : 'Performance'}
+                    </span>
                     <span className="font-bold text-ink">{catRate}%</span>
                   </div>
                   <div className="w-full bg-surface-bone h-2 rounded-full overflow-hidden border border-hairline/60">

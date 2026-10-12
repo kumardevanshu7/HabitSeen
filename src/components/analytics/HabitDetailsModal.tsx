@@ -53,18 +53,28 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
     CATEGORY_ICONS.find((i) => i.id === category?.icon)?.icon || CATEGORY_ICONS[0].icon;
 
   // Filter logs for this habit and derive live stats dynamically
-  const habitLogs = Object.values(logs).filter((l) => l.habitId === habit.id);
+  const habitLogs = Object.values(logs || {}).filter((l) => l && l.habitId === habit.id);
   const completedLogs = habitLogs.filter((l) => l.status === 'COMPLETED');
   const excusedLogs = habitLogs.filter((l) => l.status === 'EXCUSED');
   const missedLogs = habitLogs.filter((l) => l.status === 'MISSED' || l.status === 'FAILED');
   const skippedLogs = habitLogs.filter((l) => l.status === 'SKIPPED');
   const totalTracked = habitLogs.length;
 
-  const streakInfo = computeHabitStreaks(habit, logs);
-  const currentStreak = streakInfo.currentStreak;
-  const bestStreak = Math.max(streakInfo.bestStreak, habit.stats?.bestStreak || 0);
-  const timesCompletedThisWeek = habitLogs.filter((l) => l.status === 'COMPLETED' && isDateInThisWeek(l.date)).length;
-  const timesCompletedAllTime = completedLogs.length;
+  let streakInfo = { currentStreak: 0, bestStreak: 0, unlockedChallenges: [] as number[] };
+  try {
+    streakInfo = computeHabitStreaks(habit, logs || {});
+  } catch (err) {
+    console.error('Failed to compute streaks:', err);
+  }
+
+  const currentStreak = streakInfo.currentStreak ?? habit.stats?.currentStreak ?? 0;
+  const bestStreak = Math.max(streakInfo.bestStreak ?? 0, habit.stats?.bestStreak ?? 0);
+  const unlockedBadges = streakInfo.unlockedChallenges?.length
+    ? streakInfo.unlockedChallenges
+    : (habit.stats?.unlockedChallenges || []);
+
+  const timesCompletedThisWeek = habitLogs.filter((l) => l.status === 'COMPLETED' && l.date && isDateInThisWeek(l.date)).length;
+  const timesCompletedAllTime = completedLogs.length || habit.stats?.timesCompletedAllTime || 0;
 
   const successRate =
     totalTracked > 0 ? Math.round((completedLogs.length / totalTracked) * 100) : 0;
@@ -133,7 +143,7 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
               <p className="text-sm font-bold text-ink">
                 Priority Score:{' '}
                 <span className="font-mono text-primary font-extrabold">
-                  {habit.schedule.priority ?? 50} / 100
+                  {habit.schedule?.priority ?? 50} / 100
                 </span>
               </p>
             </div>
@@ -258,13 +268,13 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
               Streak Challenge Badges (10 Milestones)
             </h4>
             <span className="text-xs text-primary font-semibold flex items-center gap-1">
-              <Sparkles size={13} /> {habit.stats.unlockedChallenges.length} / 10 Unlocked
+              <Sparkles size={13} /> {unlockedBadges.length} / 10 Unlocked
             </span>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
             {STREAK_CHALLENGES.map((challenge) => {
-              const isUnlocked = habit.stats.bestStreak >= challenge.days;
+              const isUnlocked = bestStreak >= challenge.days || unlockedBadges.includes(challenge.days);
               return (
                 <div
                   key={challenge.days}
@@ -332,7 +342,7 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
               </span>
             ))}
             {/* Day of week offset padding */}
-            {Array.from({ length: getDay(daysInMonth[0]) }).map((_, idx) => (
+            {Array.from({ length: daysInMonth[0] ? getDay(daysInMonth[0]) : 0 }).map((_, idx) => (
               <div key={`offset-${idx}`} className="h-9" />
             ))}
             {daysInMonth.map((day) => {

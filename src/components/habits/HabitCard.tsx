@@ -72,6 +72,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
   const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
   const [duplicateName, setDuplicateName] = useState('');
   const [isSecurityDeleteOpen, setIsSecurityDeleteOpen] = useState(false);
+  const [showLockedNotice, setShowLockedNotice] = useState(false);
 
   // State for Numeric Value
   const [currentNum, setCurrentNum] = useState<number>(dayLog?.valueNumeric ?? 0);
@@ -116,8 +117,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
   // YES / NO TOGGLE
   const handleToggleYesNo = () => {
     if (isCompleted) {
-      // Toggle off / reset
-      logHabit(habit.id, dateKey, { valueYesNo: false });
+      // Habit is completed and locked for today! Do not uncheck on simple tick tap.
+      // The user must explicitly use the (Unlock) button in the header.
+      setShowLockedNotice(true);
+      setTimeout(() => setShowLockedNotice(false), 3000);
       return;
     }
     confetti({ particleCount: 45, spread: 60, origin: { y: 0.7 } });
@@ -127,7 +130,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
   // NUMERIC HANDLERS
   const adjustNumeric = (delta: number) => {
     if (isCompleted && delta < 0) {
-      // Allow modifying downward if user clicks minus
+      // Locked when completed for today!
+      setShowLockedNotice(true);
+      setTimeout(() => setShowLockedNotice(false), 3000);
+      return;
     }
     const nextVal = Math.max(0, currentNum + delta);
     setCurrentNum(nextVal);
@@ -184,10 +190,8 @@ export const HabitCard: React.FC<HabitCardProps> = ({
 
   const handleToggleChecklistComplete = () => {
     if (isCompleted) {
-      logHabit(habit.id, dateKey, {
-        valueChecklistCompletedItemIds: completedItems,
-        forceStatus: 'PARTIAL',
-      });
+      setShowLockedNotice(true);
+      setTimeout(() => setShowLockedNotice(false), 3000);
       return;
     }
     confetti({ particleCount: 45, spread: 60, origin: { y: 0.7 } });
@@ -199,6 +203,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
 
   // UNLOCK ACTION
   const handleUnlock = () => {
+    setShowLockedNotice(false);
     if (isExcused || isMissed) {
       logHabit(habit.id, dateKey, { valueYesNo: false, valueNumeric: 0, valueTimerSeconds: 0 });
       return;
@@ -394,6 +399,11 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                   </span>
                 </>
               )}
+              {showLockedNotice && (
+                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 animate-pulse inline-block">
+                  🔒 Locked! Tap &apos;Locked&apos; to edit
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -409,12 +419,16 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                 handleToggleYesNo();
               }}
               className={clsx(
-                'w-9 h-9 rounded-full flex items-center justify-center transition-all shadow-xs active:scale-90 cursor-pointer shrink-0',
+                'w-9 h-9 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0',
                 isCompleted
-                  ? 'bg-badge-success border-2 border-badge-success text-white'
-                  : 'border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500'
+                  ? 'bg-badge-success border-2 border-badge-success text-white cursor-default'
+                  : 'border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500 active:scale-90 cursor-pointer'
               )}
-              title={isCompleted ? 'Completed! Tap to unlock' : 'Tap to mark done'}
+              title={
+                isCompleted
+                  ? 'Completed & Locked for today! Tap (Unlock) above to edit'
+                  : 'Tap to mark done'
+              }
             >
               <Check size={18} className={clsx(isCompleted ? 'stroke-[3]' : 'stroke-[2.5]')} />
             </button>
@@ -477,10 +491,11 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleUnlock();
+                    setShowLockedNotice(true);
+                    setTimeout(() => setShowLockedNotice(false), 3000);
                   }}
-                  className="w-8 h-8 rounded-full bg-badge-success border-2 border-badge-success text-white flex items-center justify-center transition-all active:scale-90"
-                  title="Completed! Click to unlock"
+                  className="w-8 h-8 rounded-full bg-badge-success border-2 border-badge-success text-white flex items-center justify-center transition-all cursor-default"
+                  title="Completed & Locked for today! Tap (Unlock) to edit"
                 >
                   <Check size={16} className="stroke-[3]" />
                 </button>
@@ -509,12 +524,16 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                   handleToggleChecklistComplete();
                 }}
                 className={clsx(
-                  'w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-xs active:scale-90 cursor-pointer shrink-0',
+                  'w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0',
                   isCompleted
-                    ? 'bg-badge-success border-2 border-badge-success text-white'
-                    : 'border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500'
+                    ? 'bg-badge-success border-2 border-badge-success text-white cursor-default'
+                    : 'border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500 active:scale-90 cursor-pointer'
                 )}
-                title={isCompleted ? 'Completed! Click to unmark' : 'Tap to mark done'}
+                title={
+                  isCompleted
+                    ? 'Completed & Locked for today! Tap (Unlock) to edit'
+                    : 'Tap to mark done'
+                }
               >
                 <Check size={16} className={clsx(isCompleted ? 'stroke-[3]' : 'stroke-[2.5]')} />
               </button>
@@ -523,9 +542,19 @@ export const HabitCard: React.FC<HabitCardProps> = ({
 
           {/* STATUS / MISSED BUTTON */}
           {isCompleted ? (
-            <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-stone/20 text-charcoal text-[10px] font-bold">
-              <Lock size={10} /> Locked
-            </span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleUnlock();
+              }}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-stone/20 text-charcoal text-[10px] font-bold hover:bg-stone/30 transition-colors cursor-pointer"
+              title="Click to unlock & edit"
+            >
+              <Lock size={10} />
+              <span>Locked</span>
+              <span className="text-primary underline ml-0.5">(Unlock)</span>
+            </button>
           ) : isExcused ? (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold">
               <ShieldCheck size={11} className="text-blue-600" /> Excused
@@ -716,8 +745,12 @@ export const HabitCard: React.FC<HabitCardProps> = ({
             )}
 
             <button
-              onClick={() => onOpenDetails(habit)}
-              className="p-1 text-charcoal hover:text-ink hover:bg-surface-bone rounded-full transition-colors"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenDetails(habit);
+              }}
+              className="p-1 text-charcoal hover:text-ink hover:bg-surface-bone rounded-full transition-colors cursor-pointer"
               title="View Habit Analytics"
             >
               <BarChart2 size={16} />
@@ -737,12 +770,17 @@ export const HabitCard: React.FC<HabitCardProps> = ({
           </div>
         </div>
 
-        {/* HABIT TITLE & DESCRIPTION */}
-        <div className="mb-4">
+        {/* HABIT TITLE & DESCRIPTION (CLICK OPENS ANALYTICS) */}
+        <div
+          className="mb-4 cursor-pointer group/title"
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenDetails(habit);
+          }}
+        >
           <h3
-            onClick={() => onOpenDetails(habit)}
             className={clsx(
-              'font-display font-bold text-lg sm:text-xl text-ink tracking-tight cursor-pointer hover:text-primary transition-colors',
+              'font-display font-bold text-lg sm:text-xl text-ink tracking-tight group-hover/title:text-primary transition-colors',
               isCompleted && 'line-through text-charcoal'
             )}
           >
@@ -823,13 +861,20 @@ export const HabitCard: React.FC<HabitCardProps> = ({
               {/* 1. YES / NO HABIT */}
               {habit.type === 'YES_NO' && (
             <div className="flex items-center justify-between gap-3">
-              <span className="text-xs text-charcoal">
-                {isCompleted
-                  ? '✓ Completed & Locked for today'
-                  : isSkipped
-                  ? 'Skipped for today'
-                  : 'Tap circle to mark complete:'}
-              </span>
+              <div className="flex flex-col">
+                <span className="text-xs text-charcoal">
+                  {isCompleted
+                    ? '✓ Completed & Locked for today'
+                    : isSkipped
+                    ? 'Skipped for today'
+                    : 'Tap circle to mark complete:'}
+                </span>
+                {showLockedNotice && (
+                  <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md mt-1 border border-amber-200 animate-pulse">
+                    🔒 Locked for today! Tap &apos;(Unlock)&apos; above to edit
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-2">
                 {!isCompleted && !isSkipped && !isExcused && !isMissed && (
                   <button
@@ -844,14 +889,19 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                 )}
                 {/* RED CIRCLE -> GREEN TICK TOGGLE */}
                 <button
+                  type="button"
                   onClick={handleToggleYesNo}
                   className={clsx(
-                    'w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-xs active:scale-90 cursor-pointer shrink-0',
+                    'w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0',
                     isCompleted
-                      ? 'bg-badge-success border-2 border-badge-success text-white shadow-md'
-                      : 'border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500'
+                      ? 'bg-badge-success border-2 border-badge-success text-white shadow-md cursor-default'
+                      : 'border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500 active:scale-90 cursor-pointer'
                   )}
-                  title={isCompleted ? 'Completed! Click to unmark' : 'Tap to mark done'}
+                  title={
+                    isCompleted
+                      ? 'Completed & Locked for today! Tap (Unlock) above to edit'
+                      : 'Tap to mark done'
+                  }
                 >
                   <Check size={20} className={clsx(isCompleted ? 'stroke-[3]' : 'stroke-[2.5]')} />
                 </button>
@@ -1032,9 +1082,12 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                     {/* GREEN CIRCLE WITH WHITE CHECKMARK */}
                     <button
                       type="button"
-                      onClick={handleUnlock}
-                      className="w-12 h-12 rounded-full bg-badge-success border-2 border-badge-success text-white flex items-center justify-center shadow-md hover:opacity-90 transition-all active:scale-90 cursor-pointer shrink-0"
-                      title="Completed! Click to unlock / unmark"
+                      onClick={() => {
+                        setShowLockedNotice(true);
+                        setTimeout(() => setShowLockedNotice(false), 3000);
+                      }}
+                      className="w-12 h-12 rounded-full bg-badge-success border-2 border-badge-success text-white flex items-center justify-center shadow-md cursor-default shrink-0"
+                      title="Completed & Locked for today! Tap 'Unlock & Edit' to change"
                     >
                       <Check size={22} className="stroke-[3]" />
                     </button>
@@ -1102,14 +1155,14 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                     type="button"
                     onClick={handleToggleChecklistComplete}
                     className={clsx(
-                      'w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-xs active:scale-90 cursor-pointer shrink-0',
+                      'w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0',
                       isCompleted
-                        ? 'bg-badge-success border-2 border-badge-success text-white shadow-md'
-                        : 'border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500'
+                        ? 'bg-badge-success border-2 border-badge-success text-white shadow-md cursor-default'
+                        : 'border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500 active:scale-90 cursor-pointer'
                     )}
                     title={
                       isCompleted
-                        ? 'Completed! Click to unmark'
+                        ? 'Completed & Locked for today! Tap (Unlock) above to edit'
                         : 'Tap to mark done for today with checked tasks'
                     }
                   >
