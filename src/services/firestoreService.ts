@@ -12,6 +12,7 @@ import {
 import { db } from './firebase';
 import {
   Category,
+  Challenge,
   Habit,
   HabitBreak,
   HabitLog,
@@ -256,6 +257,58 @@ export const deleteHabitBreakFromDb = async (
   await deleteDoc(ref);
 };
 
+// 5.5 Hardcore Challenges Sync
+export const subscribeChallenges = (
+  userId: string,
+  onUpdate: (challenges: Challenge[]) => void,
+  onError?: (error: Error) => void
+) => {
+  const colRef = collection(db, 'users', userId, 'challenges');
+  return onSnapshot(
+    colRef,
+    (snap) => {
+      const list: Challenge[] = [];
+      snap.forEach((d) => {
+        list.push({ id: d.id, ...d.data() } as Challenge);
+      });
+      onUpdate(list);
+    },
+    (error) => {
+      console.error('subscribeChallenges error:', error);
+      onError?.(error);
+    }
+  );
+};
+
+export const addChallengeToDb = async (
+  userId: string,
+  challenge: Challenge
+) => {
+  const ref = doc(db, 'users', userId, 'challenges', challenge.id);
+  const cleaned = cleanFirestoreData(challenge);
+  await setDoc(ref, cleaned);
+};
+
+export const updateChallengeInDb = async (
+  userId: string,
+  challenge: Challenge
+) => {
+  const ref = doc(db, 'users', userId, 'challenges', challenge.id);
+  const cleaned = cleanFirestoreData({
+    ...challenge,
+    updatedAt: new Date().toISOString(),
+  });
+  await setDoc(ref, cleaned);
+};
+
+export const deleteChallengeFromDb = async (
+  userId: string,
+  challengeId: string
+) => {
+  const ref = doc(db, 'users', userId, 'challenges', challengeId);
+  await deleteDoc(ref);
+};
+
 // 6. Complete User Data Reset (Fresh Start)
 export const resetEntireUserDataInDb = async (userId: string) => {
   // 1. Delete habits
@@ -294,7 +347,16 @@ export const resetEntireUserDataInDb = async (userId: string) => {
     await batch4.commit();
   }
 
-  // 5. Reset user profile to isOnboarded: false
+  // 5. Delete challenges
+  const challengesCol = collection(db, 'users', userId, 'challenges');
+  const challengesSnap = await getDocs(challengesCol);
+  if (!challengesSnap.empty) {
+    const batch5 = writeBatch(db);
+    challengesSnap.forEach((d) => batch5.delete(d.ref));
+    await batch5.commit();
+  }
+
+  // 6. Reset user profile to isOnboarded: false
   const userRef = doc(db, 'users', userId);
   await setDoc(
     userRef,
@@ -314,3 +376,4 @@ export const resetEntireUserDataInDb = async (userId: string) => {
     { merge: true }
   );
 };
+

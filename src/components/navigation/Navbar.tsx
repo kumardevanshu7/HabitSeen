@@ -2,12 +2,12 @@ import React from 'react';
 import { useAppStore } from '../../stores/useAppStore';
 import { Button } from '../ui/Button';
 import { logOut } from '../../services/firebase';
-import { Plus, Award, LogOut, Heart, Zap } from 'lucide-react';
+import { Plus, Award, LogOut, Heart, Zap, Flame } from 'lucide-react';
 import clsx from 'clsx';
 
 interface NavbarProps {
-  activeTab: 'habits' | 'breaks' | 'analytics';
-  onSelectTab: (tab: 'habits' | 'breaks' | 'analytics') => void;
+  activeTab: 'habits' | 'challenges' | 'breaks' | 'analytics';
+  onSelectTab: (tab: 'habits' | 'challenges' | 'breaks' | 'analytics') => void;
   onOpenCreateHabit: () => void;
   onOpenProfile?: () => void;
 }
@@ -18,7 +18,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenCreateHabit,
   onOpenProfile,
 }) => {
-  const { user, currentUser } = useAppStore();
+  const { user, currentUser, challenges } = useAppStore();
 
   const handleLogout = async () => {
     if (window.confirm('Are you sure you want to sign out?')) {
@@ -30,6 +30,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const maxHearts = user?.gamification?.maxHearts ?? 5;
   const totalXp = user?.gamification?.totalXp ?? 0;
   const levelTitle = user?.gamification?.levelTitle ?? 'Discipline Initiate';
+  const activeChallengesCount = challenges.filter((c) => c.status === 'ACTIVE').length;
 
   return (
     <header className="sticky top-0 z-40 bg-canvas/90 backdrop-blur-md border-b border-hairline">
@@ -60,6 +61,30 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           >
             Daily Habits
+          </button>
+          <button
+            onClick={() => onSelectTab('challenges')}
+            className={clsx(
+              'px-4 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-1.5',
+              activeTab === 'challenges'
+                ? 'bg-rose-600 text-white shadow-xs'
+                : 'text-charcoal hover:text-ink'
+            )}
+          >
+            <Flame size={13} className={activeTab === 'challenges' ? 'fill-white' : 'text-rose-500'} />
+            <span>Challenges</span>
+            {activeChallengesCount > 0 && (
+              <span
+                className={clsx(
+                  'px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold',
+                  activeTab === 'challenges'
+                    ? 'bg-white text-rose-600'
+                    : 'bg-rose-100 text-rose-600'
+                )}
+              >
+                {activeChallengesCount}
+              </span>
+            )}
           </button>
           <button
             onClick={() => onSelectTab('breaks')}

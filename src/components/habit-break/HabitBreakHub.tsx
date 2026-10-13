@@ -42,9 +42,22 @@ export const HabitBreakHub: React.FC = () => {
   const [categoryId, setCategoryId] = useState(categories[0]?.id || 'cat-others');
   const [icon, setIcon] = useState('shield-check');
   const [color, setColor] = useState('#FF5C5C');
+  const [startMode, setStartMode] = useState<'now' | 'custom'>('now');
+  const [customStartDate, setCustomStartDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
+  const [customStartTime, setCustomStartTime] = useState(() => format(new Date(), 'HH:mm'));
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submittingRef = React.useRef(false);
+
+  // Sync default date/time when modal opens
+  useEffect(() => {
+    if (isAddModalOpen) {
+      const now = new Date();
+      setCustomStartDate(format(now, 'yyyy-MM-dd'));
+      setCustomStartTime(format(now, 'HH:mm'));
+      setStartMode('now');
+    }
+  }, [isAddModalOpen]);
 
   // Global ticker for live elapsed timers (updates every 1s)
   const [, setTick] = useState(0);
@@ -66,18 +79,29 @@ export const HabitBreakHub: React.FC = () => {
     setIsSubmitting(true);
 
     try {
+      let computedStartedAt = new Date().toISOString();
+      if (startMode === 'custom' && customStartDate) {
+        const timePart = customStartTime || '00:00';
+        const parsed = new Date(`${customStartDate}T${timePart}:00`);
+        if (!isNaN(parsed.getTime())) {
+          computedStartedAt = parsed.toISOString();
+        }
+      }
+
       await addHabitBreak({
         name: name.trim(),
         description: description.trim(),
         categoryId,
         icon,
         color,
+        startedAt: computedStartedAt,
       });
 
       confetti({ particleCount: 60, spread: 70, origin: { y: 0.6 } });
 
       setName('');
       setDescription('');
+      setStartMode('now');
       setIsAddModalOpen(false);
     } catch (err: any) {
       console.error(err);
@@ -98,14 +122,16 @@ export const HabitBreakHub: React.FC = () => {
   // Format Elapsed Time (Days, Hours, Mins, Secs)
   const formatElapsedTime = (startedAt: string) => {
     const startMs = new Date(startedAt).getTime();
-    const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startMs) / 1000));
+    const diffMs = Date.now() - startMs;
+    const isScheduledFuture = diffMs < 0;
+    const elapsedSeconds = Math.max(0, Math.floor(Math.abs(diffMs) / 1000));
 
     const days = Math.floor(elapsedSeconds / 86400);
     const hours = Math.floor((elapsedSeconds % 86400) / 3600);
     const mins = Math.floor((elapsedSeconds % 3600) / 60);
     const secs = elapsedSeconds % 60;
 
-    return { days, hours, mins, secs, totalSeconds: elapsedSeconds };
+    return { days, hours, mins, secs, totalSeconds: elapsedSeconds, isScheduledFuture };
   };
 
   const formatDurationReadable = (totalSecs: number) => {
@@ -219,8 +245,13 @@ export const HabitBreakHub: React.FC = () => {
 
                   {/* LIVE CHRONOMETER DISPLAY */}
                   <div className="my-4 p-4 bg-canvas rounded-2xl border border-hairline text-center">
-                    <span className="text-[10px] uppercase font-bold tracking-widest text-primary block mb-2">
-                      ● TIMER RUNNING — PERSISTENT CLEAN STREAK
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-primary block mb-1">
+                      {time.isScheduledFuture
+                        ? '⏳ SCHEDULED TO START IN'
+                        : '● TIMER RUNNING — PERSISTENT CLEAN STREAK'}
+                    </span>
+                    <span className="text-[11px] font-mono text-charcoal block mb-2.5">
+                      Started: {format(new Date(b.startedAt), 'dd MMM yyyy, hh:mm a')}
                     </span>
 
                     <div className="grid grid-cols-4 gap-2 font-mono">
@@ -325,6 +356,86 @@ export const HabitBreakHub: React.FC = () => {
             }))}
             onChange={(val) => setCategoryId(val)}
           />
+
+          {/* START DATE & CUSTOM TIME SELECTOR (1ST PIC ENHANCEMENT) */}
+          <div className="p-3.5 bg-surface-card rounded-2xl border border-hairline space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-charcoal ml-0.5">
+                  When do you want to start? (Start Date & Time)
+                </label>
+                <span className="text-[11px] text-charcoal ml-0.5">
+                  Launch right now or set a custom start date & exact time
+                </span>
+              </div>
+
+              <div className="flex items-center bg-surface-bone p-1 rounded-full border border-hairline self-start sm:self-auto shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const now = new Date();
+                    setCustomStartDate(format(now, 'yyyy-MM-dd'));
+                    setCustomStartTime(format(now, 'HH:mm'));
+                    setStartMode('now');
+                  }}
+                  className={clsx(
+                    'px-3 py-1 rounded-full text-xs font-bold transition-all whitespace-nowrap',
+                    startMode === 'now'
+                      ? 'bg-ink text-white shadow-2xs'
+                      : 'text-charcoal hover:text-ink'
+                  )}
+                >
+                  ⚡ Right Now
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStartMode('custom')}
+                  className={clsx(
+                    'px-3 py-1 rounded-full text-xs font-bold transition-all whitespace-nowrap',
+                    startMode === 'custom'
+                      ? 'bg-primary text-white shadow-2xs'
+                      : 'text-charcoal hover:text-ink'
+                  )}
+                >
+                  📅 Custom Date & Time
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-charcoal mb-1 ml-1 flex items-center gap-1">
+                  <Calendar size={12} className="text-primary" /> Start Date
+                </label>
+                <input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => {
+                    setCustomStartDate(e.target.value);
+                    setStartMode('custom');
+                  }}
+                  className="w-full bg-surface-bone text-ink text-sm font-mono font-bold px-3.5 py-2.5 h-11 rounded-full border border-hairline focus:outline-none focus:ring-2 focus:ring-primary"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-charcoal mb-1 ml-1 flex items-center gap-1">
+                  <Clock size={12} className="text-primary" /> Custom Start Time
+                </label>
+                <input
+                  type="time"
+                  value={customStartTime}
+                  onChange={(e) => {
+                    setCustomStartTime(e.target.value);
+                    setStartMode('custom');
+                  }}
+                  className="w-full bg-surface-bone text-ink text-sm font-mono font-bold px-3.5 py-2.5 h-11 rounded-full border border-hairline focus:outline-none focus:ring-2 focus:ring-primary"
+                  required
+                />
+              </div>
+            </div>
+          </div>
 
           {/* Icon Selector */}
           <IconPicker

@@ -1,4 +1,4 @@
-import React, { useEffect, useId } from 'react';
+import React, { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import clsx from 'clsx';
@@ -16,6 +16,56 @@ interface ModalProps {
 let activeModalCount = 0;
 let originalOverflow = '';
 
+// Global stack of open modals for mobile back-gesture support
+interface ModalStackEntry {
+  id: string;
+  close: () => void;
+  closedByPopState: boolean;
+}
+const openModalStack: ModalStackEntry[] = [];
+let historyModalDepth = 0;
+let programmaticBackCount = 0;
+let syncScheduled = false;
+
+const scheduleModalHistorySync = () => {
+  if (syncScheduled || typeof window === 'undefined') return;
+  syncScheduled = true;
+  queueMicrotask(() => {
+    syncScheduled = false;
+    const targetDepth = openModalStack.length;
+    if (targetDepth > historyModalDepth) {
+      const toPush = targetDepth - historyModalDepth;
+      for (let i = 0; i < toPush; i++) {
+        window.history.pushState(
+          { ...(window.history.state || {}), modalDepth: historyModalDepth + i + 1 },
+          ''
+        );
+      }
+      historyModalDepth = targetDepth;
+    } else if (targetDepth < historyModalDepth) {
+      const toPop = historyModalDepth - targetDepth;
+      historyModalDepth = targetDepth;
+      programmaticBackCount++;
+      window.history.go(-toPop);
+    }
+  });
+};
+
+export const isModalHandlingPopState = (): boolean => {
+  if (programmaticBackCount > 0) {
+    programmaticBackCount--;
+    return true;
+  }
+  if (openModalStack.length > 0) {
+    historyModalDepth = Math.max(0, historyModalDepth - 1);
+    const topModal = openModalStack.pop()!;
+    topModal.closedByPopState = true;
+    topModal.close();
+    return true;
+  }
+  return false;
+};
+
 export const Modal: React.FC<ModalProps> = ({
   isOpen,
   onClose,
@@ -25,26 +75,44 @@ export const Modal: React.FC<ModalProps> = ({
   maxWidth = 'md',
 }) => {
   const titleId = useId();
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
-  // 1. Stack-safe scroll lock
+  // 1. Stack-safe scroll lock + Mobile Back Gesture History Entry
   useEffect(() => {
-    if (isOpen) {
-      if (activeModalCount === 0) {
-        originalOverflow = document.body.style.overflow;
-        document.body.style.overflow = 'hidden';
-      }
-      activeModalCount++;
-    } else {
-      return;
+    if (!isOpen) return;
+
+    if (activeModalCount === 0) {
+      originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
     }
+    activeModalCount++;
+
+    const entry: ModalStackEntry = {
+      id: titleId,
+      close: () => onCloseRef.current(),
+      closedByPopState: false,
+    };
+    openModalStack.push(entry);
+    scheduleModalHistorySync();
 
     return () => {
       activeModalCount = Math.max(0, activeModalCount - 1);
       if (activeModalCount === 0) {
         document.body.style.overflow = originalOverflow || '';
       }
+
+      const idx = openModalStack.indexOf(entry);
+      if (idx !== -1) {
+        openModalStack.splice(idx, 1);
+      }
+
+      // If closed via UI button/backdrop (not back gesture), sync history depth in microtask
+      if (!entry.closedByPopState) {
+        scheduleModalHistorySync();
+      }
     };
-  }, [isOpen]);
+  }, [isOpen, titleId]);
 
   // 2. Escape key handler
   useEffect(() => {

@@ -17,6 +17,10 @@ import {
   CheckSquare,
   Hash,
   ToggleLeft,
+  Zap,
+  Heart,
+  Skull,
+  Trophy,
 } from 'lucide-react';
 import {
   eachDayOfInterval,
@@ -32,7 +36,7 @@ import {
 import clsx from 'clsx';
 
 export const OverallAnalyticsView: React.FC = () => {
-  const { user, habits, logs, habitBreaks, categories } = useAppStore();
+  const { user, habits, logs, habitBreaks, categories, challenges } = useAppStore();
 
   const userLevel = user?.gamification?.level ?? 1;
   const userXp = user?.gamification?.totalXp ?? 100;
@@ -325,6 +329,136 @@ export const OverallAnalyticsView: React.FC = () => {
             );
           })}
         </div>
+      </div>
+
+      {/* 3.5. HARDCORE CHALLENGES ANALYTICS */}
+      <div className="p-5 bg-surface-card border border-hairline rounded-3xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+          <div>
+            <h4 className="font-display font-bold text-lg text-ink flex items-center gap-2">
+              <Zap size={18} className="text-rose-600" /> Hardcore Challenges Analytics
+            </h4>
+            <p className="text-xs text-charcoal">
+              Survival rate, EXP rewards, and 90% health penalty ledger across your active &amp; conquered challenges.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-xs font-mono font-bold">
+            <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+              {challenges.filter((c) => c.status === 'COMPLETED').length} Conquered
+            </span>
+            <span className="px-2.5 py-1 rounded-full bg-rose-50 text-rose-600 border border-rose-200">
+              {challenges.filter((c) => c.status === 'ACTIVE').length} Active
+            </span>
+          </div>
+        </div>
+
+        {/* Summary KPI Strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+          <div className="p-3 bg-canvas rounded-2xl border border-hairline">
+            <span className="text-[11px] font-bold text-charcoal flex items-center gap-1">
+              <Trophy size={13} className="text-amber-500" /> Total Challenge EXP
+            </span>
+            <p className="font-mono text-xl font-black text-amber-600 mt-1">
+              +{challenges.reduce((acc, c) => acc + (c.totalXpEarned || 0), 0)} XP
+            </p>
+          </div>
+
+          <div className="p-3 bg-canvas rounded-2xl border border-hairline">
+            <span className="text-[11px] font-bold text-charcoal flex items-center gap-1">
+              <Heart size={13} className="text-emerald-600 fill-emerald-600" /> Hearts Earned
+            </span>
+            <p className="font-mono text-xl font-black text-emerald-600 mt-1">
+              +{challenges.reduce((acc, c) => acc + (c.totalHeartsGained || 0), 0)} ❤️
+            </p>
+          </div>
+
+          <div className="p-3 bg-canvas rounded-2xl border border-hairline">
+            <span className="text-[11px] font-bold text-charcoal flex items-center gap-1">
+              <Skull size={13} className="text-rose-600" /> Hearts Lost (90% Rule)
+            </span>
+            <p className="font-mono text-xl font-black text-rose-600 mt-1">
+              -{Number(challenges.reduce((acc, c) => acc + (c.totalHeartsLost || 0), 0).toFixed(1))} ❤️
+            </p>
+          </div>
+
+          <div className="p-3 bg-canvas rounded-2xl border border-hairline">
+            <span className="text-[11px] font-bold text-charcoal flex items-center gap-1">
+              <Flame size={13} className="text-primary" /> Challenge Days Done
+            </span>
+            <p className="font-mono text-xl font-black text-primary mt-1">
+              {challenges.reduce(
+                (acc, c) =>
+                  acc +
+                  Object.values(c.dayLogs || {}).filter((l) => l.status === 'COMPLETED').length,
+                0
+              )}d
+            </p>
+          </div>
+        </div>
+
+        {/* Individual Challenge Progress Bars */}
+        {challenges.length === 0 ? (
+          <div className="p-4 bg-canvas rounded-2xl border border-dashed border-hairline text-center text-xs text-charcoal">
+            No hardcore challenges created yet. Launch a 7, 9, 11, or custom-day challenge from the Challenges tab!
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {challenges.map((c) => {
+              const IconComp =
+                CATEGORY_ICONS.find((i) => i.id === c.icon)?.icon || CATEGORY_ICONS[0].icon;
+              const vColor = boostVibrancy(c.color);
+              const iColor = getContrastIconColor(vColor);
+              const completedDaysCount = Object.values(c.dayLogs || {}).filter(
+                (l) => l.status === 'COMPLETED'
+              ).length;
+              const pct = Math.min(100, Math.round((completedDaysCount / c.targetDays) * 100));
+
+              return (
+                <div
+                  key={c.id}
+                  className="p-3.5 bg-canvas rounded-2xl border-2 transition-all"
+                  style={{ borderColor: `${vColor}50` }}
+                >
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span
+                        className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 shadow-2xs"
+                        style={{ backgroundColor: vColor, color: iColor }}
+                      >
+                        <IconComp size={14} strokeWidth={2.5} />
+                      </span>
+                      <div className="min-w-0">
+                        <span className="font-bold text-xs text-ink block truncate">
+                          {c.name}
+                        </span>
+                        <span className="text-[10px] font-mono text-charcoal">
+                          {completedDaysCount}/{c.targetDays} Days &bull; +{c.totalXpEarned || 0} XP
+                        </span>
+                      </div>
+                    </div>
+                    <span
+                      className={clsx(
+                        'text-[10px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0',
+                        c.status === 'COMPLETED'
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'bg-amber-100 text-amber-800'
+                      )}
+                    >
+                      {c.status === 'COMPLETED' ? 'CONQUERED' : `${pct}%`}
+                    </span>
+                  </div>
+
+                  <div className="w-full bg-surface-bone h-2 rounded-full overflow-hidden border border-hairline/60">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{ width: `${pct}%`, backgroundColor: vColor }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* 4. DAY-OF-WEEK DISCIPLINE MATRIX & HABIT TYPES */}

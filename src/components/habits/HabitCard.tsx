@@ -23,6 +23,8 @@ import {
   Copy,
   Trash2,
   MoreVertical,
+  Archive,
+  ArchiveRestore,
 } from 'lucide-react';
 import clsx from 'clsx';
 import confetti from 'canvas-confetti';
@@ -47,7 +49,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
   onOpenDetails,
   variant = 'grid',
 }) => {
-  const { categories, logs, logHabit, skipHabit, addHabit, deleteHabit, user } = useAppStore();
+  const { categories, logs, logHabit, skipHabit, addHabit, toggleArchiveHabit, deleteHabit, user } = useAppStore();
 
   const category = categories.find((c) => c.id === habit.categoryId);
   const CategoryIcon =
@@ -548,20 +550,20 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                 e.stopPropagation();
                 handleUnlock();
               }}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-stone/20 text-charcoal text-[10px] font-bold hover:bg-stone/30 transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-stone/20 text-charcoal text-[10px] font-bold hover:bg-stone/30 transition-colors cursor-pointer whitespace-nowrap shrink-0"
               title="Click to unlock & edit"
             >
-              <Lock size={10} />
+              <Lock size={10} className="shrink-0" />
               <span>Locked</span>
               <span className="text-primary underline ml-0.5">(Unlock)</span>
             </button>
           ) : isExcused ? (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold">
-              <ShieldCheck size={11} className="text-blue-600" /> Excused
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold whitespace-nowrap shrink-0">
+              <ShieldCheck size={11} className="text-blue-600 shrink-0" /> Excused
             </span>
           ) : isMissed ? (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-800 text-[10px] font-bold">
-              <AlertTriangle size={11} className="text-red-600" /> Missed
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-800 text-[10px] font-bold whitespace-nowrap shrink-0">
+              <AlertTriangle size={11} className="text-red-600 shrink-0" /> Missed
             </span>
           ) : (
             <button
@@ -570,7 +572,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                 e.stopPropagation();
                 setIsMissedModalOpen(true);
               }}
-              className="text-[11px] font-semibold text-charcoal hover:text-red-600 bg-surface-bone hover:bg-red-50 border border-hairline px-2 py-1 rounded-full flex items-center gap-1 transition-colors"
+              className="text-[11px] font-semibold text-charcoal hover:text-red-600 bg-surface-bone hover:bg-red-50 border border-hairline px-2 py-1 rounded-full flex items-center gap-1 transition-colors whitespace-nowrap shrink-0"
               title="Log missed habit with reason"
             >
               <ShieldAlert size={12} />
@@ -675,9 +677,9 @@ export const HabitCard: React.FC<HabitCardProps> = ({
       }}
     >
       <div className="p-3.5 sm:p-4">
-        {/* TOP ROW: CATEGORY + STREAK + STATUS BADGE + DETAILS BUTTON */}
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <div className="flex items-center gap-2">
+        {/* TOP ROW: CATEGORY + PRIORITY + STATUS BADGE + DETAILS BUTTON (OPTIMIZED NO-WRAP) */}
+        <div className="flex items-center justify-between gap-1.5 mb-2.5 flex-wrap">
+          <div className="flex items-center gap-1.5 min-w-0">
             <span
               className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 shadow-2xs"
               style={{
@@ -687,46 +689,44 @@ export const HabitCard: React.FC<HabitCardProps> = ({
             >
               <CategoryIcon size={14} strokeWidth={2.5} />
             </span>
-            <span className="text-xs font-semibold text-charcoal uppercase tracking-wider">
+            <span className="text-[11px] font-bold text-charcoal uppercase tracking-wide whitespace-nowrap truncate max-w-[115px] sm:max-w-none">
               {category?.name || 'Category'}
             </span>
             <span
-              className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border bg-surface-bone text-charcoal border-hairline"
+              className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border bg-surface-bone text-charcoal border-hairline whitespace-nowrap shrink-0"
               title="Priority Rank (0 - 100)"
             >
               Priority {habit.schedule.priority ?? 50}
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 shrink-0 ml-auto">
             {isCompleted ? (
-              <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-stone/20 text-charcoal text-[11px] font-bold border border-stone/30">
-                <Lock size={11} />
+              <button
+                type="button"
+                onClick={handleUnlock}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-stone/20 hover:bg-stone/30 text-charcoal text-[10px] font-bold border border-stone/30 whitespace-nowrap shrink-0 transition-colors cursor-pointer"
+                title="Unlock to edit"
+              >
+                <Lock size={10} className="shrink-0" />
                 <span>Locked</span>
-                <button
-                  type="button"
-                  onClick={handleUnlock}
-                  className="text-[10px] text-primary hover:underline ml-1 font-semibold"
-                  title="Unlock to edit"
-                >
-                  (Unlock)
-                </button>
-              </div>
+                <span className="text-primary underline font-semibold">(Unlock)</span>
+              </button>
             ) : isExcused ? (
-              <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[11px] font-bold border border-blue-200">
-                <ShieldCheck size={12} className="text-blue-600" />
+              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold border border-blue-200 whitespace-nowrap shrink-0">
+                <ShieldCheck size={11} className="text-blue-600 shrink-0" />
                 <span>Shielded</span>
               </div>
             ) : isMissed ? (
-              <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-red-100 text-red-800 text-[11px] font-bold border border-red-200">
-                <AlertTriangle size={12} className="text-red-600" />
+              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-800 text-[10px] font-bold border border-red-200 whitespace-nowrap shrink-0">
+                <AlertTriangle size={11} className="text-red-600 shrink-0" />
                 <span>{dayLog?.status === 'FAILED' ? 'Skipped' : 'Missed'}</span>
               </div>
             ) : (
               currentStreak > 0 && (
                 <span
                   className={clsx(
-                    'inline-flex items-center gap-1 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full border',
+                    'inline-flex items-center gap-1 text-[11px] font-mono font-bold px-2 py-0.5 rounded-full border whitespace-nowrap shrink-0',
                     currentStreak >= 30
                       ? 'bg-blue-50 text-blue-600 border-blue-200'
                       : currentStreak >= 7
@@ -736,8 +736,8 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                   title={`${flameTier.title} (${currentStreak} consecutive days)`}
                 >
                   <Flame
-                    size={13}
-                    className={clsx(flameTier.text, currentStreak >= 7 && 'fill-current')}
+                    size={12}
+                    className={clsx(flameTier.text, currentStreak >= 7 && 'fill-current shrink-0')}
                   />
                   {currentStreak}d streak
                 </span>
@@ -750,10 +750,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                 e.stopPropagation();
                 onOpenDetails(habit);
               }}
-              className="p-1 text-charcoal hover:text-ink hover:bg-surface-bone rounded-full transition-colors cursor-pointer"
+              className="p-1 text-charcoal hover:text-ink hover:bg-surface-bone rounded-full transition-colors cursor-pointer shrink-0"
               title="View Habit Analytics"
             >
-              <BarChart2 size={16} />
+              <BarChart2 size={15} />
             </button>
 
             <button
@@ -762,10 +762,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                 e.stopPropagation();
                 setIsOptionsMenuOpen(true);
               }}
-              className="p-1 text-charcoal hover:text-ink hover:bg-surface-bone rounded-full transition-colors"
+              className="p-1 text-charcoal hover:text-ink hover:bg-surface-bone rounded-full transition-colors shrink-0"
               title="Habit Options (Hold card or tap: Delete / Duplicate)"
             >
-              <MoreVertical size={16} />
+              <MoreVertical size={15} />
             </button>
           </div>
         </div>
@@ -1254,6 +1254,35 @@ export const HabitCard: React.FC<HabitCardProps> = ({
               </span>
               <span className="text-xs text-stone">
                 Clone habit with same settings & edit name
+              </span>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setIsOptionsMenuOpen(false);
+              if (habit.isArchived) {
+                toggleArchiveHabit(habit.id, false);
+              } else if (isCompleted) {
+                handleUnlock();
+              } else {
+                toggleArchiveHabit(habit.id, true);
+              }
+            }}
+            className="w-full flex items-center gap-3 p-3 rounded-2xl bg-surface-bone hover:bg-stone/20 text-ink text-left transition-colors font-medium border border-hairline group cursor-pointer"
+          >
+            <div className="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-700 flex items-center justify-center shrink-0">
+              {habit.isArchived || isCompleted ? <ArchiveRestore size={18} /> : <Archive size={18} />}
+            </div>
+            <div>
+              <span className="font-bold text-sm block text-ink group-hover:text-primary transition-colors">
+                {habit.isArchived || isCompleted ? 'Restore from Archived' : 'Move to Archived'}
+              </span>
+              <span className="text-xs text-stone">
+                {habit.isArchived || isCompleted
+                  ? 'Unlock & return this habit to your active schedule'
+                  : 'Move habit into the Archived category'}
               </span>
             </div>
           </button>

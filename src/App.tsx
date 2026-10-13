@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './services/firebase';
 import { useAppStore } from './stores/useAppStore';
@@ -7,6 +7,7 @@ import { Navbar } from './components/navigation/Navbar';
 import { BottomNav } from './components/navigation/BottomNav';
 import { OnboardingModal } from './components/onboarding/OnboardingModal';
 import { HabitsView } from './components/habits/HabitsView';
+import { ChallengesView } from './components/challenges/ChallengesView';
 import { HabitBreakHub } from './components/habit-break/HabitBreakHub';
 import { OverallAnalyticsView } from './components/analytics/OverallAnalyticsView';
 import { CreateHabitModal } from './components/habit-creation/CreateHabitModal';
@@ -18,6 +19,7 @@ import {
   subscribeHabits,
   subscribeLogs,
   subscribeHabitBreaks,
+  subscribeChallenges,
 } from './services/firestoreService';
 import { InstallPromptBanner } from './components/pwa/InstallPromptBanner';
 import { ProfileModal } from './components/profile/ProfileModal';
@@ -25,8 +27,11 @@ import { ZeroVitalityPurgeModal } from './components/gamification/ZeroVitalityPu
 import { DashboardFooter } from './components/navigation/DashboardFooter';
 import { AchievementsModal } from './components/achievements/AchievementsModal';
 import { BrandLegalModal, BrandLegalTab } from './components/brand/BrandLegalModal';
+import { isModalHandlingPopState } from './components/ui/Modal';
 import { Button } from './components/ui/Button';
 import { AlertCircle, RefreshCw, WifiOff } from 'lucide-react';
+
+type AppTab = 'habits' | 'challenges' | 'breaks' | 'analytics';
 
 export const App: React.FC = () => {
   const {
@@ -34,7 +39,6 @@ export const App: React.FC = () => {
     authLoading,
     setCurrentUser,
     setAuthLoading,
-    user,
     profileLoading,
     syncError,
     setUser,
@@ -44,10 +48,12 @@ export const App: React.FC = () => {
     setHabits,
     setLogs,
     setHabitBreaks,
+    setChallenges,
     resetStore,
   } = useAppStore();
 
-  const [activeTab, setActiveTab] = useState<'habits' | 'breaks' | 'analytics'>('habits');
+  const [activeTab, setActiveTab] = useState<AppTab>('habits');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isCreateHabitOpen, setIsCreateHabitOpen] = useState(false);
   const [inspectedHabit, setInspectedHabit] = useState<Habit | null>(null);
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
@@ -56,6 +62,107 @@ export const App: React.FC = () => {
   const [isBrandLegalOpen, setIsBrandLegalOpen] = useState(false);
   const [brandLegalTab, setBrandLegalTab] = useState<BrandLegalTab>('explore');
   const [splashTimedOut, setSplashTimedOut] = useState(false);
+
+  const navStateRef = useRef<{ tab: AppTab; category: string }>({
+    tab: 'habits',
+    category: 'all',
+  });
+  navStateRef.current = { tab: activeTab, category: selectedCategory };
+
+  // Navigate to a tab and push browser history so mobile back gesture goes back instead of closing the app
+  const handleSelectTab = useCallback((nextTab: AppTab) => {
+    const current = navStateRef.current;
+    if (current.tab === nextTab && (nextTab !== 'habits' || current.category === 'all')) {
+      return;
+    }
+    const nextCategory = nextTab === 'habits' ? 'all' : current.category;
+    setActiveTab(nextTab);
+    if (nextTab === 'habits') {
+      setSelectedCategory('all');
+    }
+    if (typeof window !== 'undefined') {
+      window.history.pushState(
+        { tab: nextTab, category: nextCategory, isAppNav: true },
+        ''
+      );
+    }
+  }, []);
+
+  // Navigate to a category within HabitsView and push browser history so back gesture returns to 'all'
+  const handleSelectCategory = useCallback((nextCategory: string) => {
+    const current = navStateRef.current;
+    if (current.category === nextCategory) return;
+    setSelectedCategory(nextCategory);
+    if (typeof window !== 'undefined') {
+      window.history.pushState(
+        { tab: current.tab, category: nextCategory, isAppNav: true },
+        ''
+      );
+    }
+  }, []);
+
+  // Global mobile back-gesture (popstate) listener
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // Seed initial root state + guard entry so back gesture inside the app never immediately exits
+    if (!window.history.state || !window.history.state.isAppNav) {
+      window.history.replaceState(
+        { tab: 'habits', category: 'all', isAppNav: true, isRoot: true },
+        ''
+      );
+      window.history.pushState(
+        { tab: 'habits', category: 'all', isAppNav: true },
+        ''
+      );
+    }
+
+    const handlePopState = (event: PopStateEvent) => {
+      // 1. If any modal is open (or cleaning up its own history entry), let Modal handle it
+      if (isModalHandlingPopState()) {
+        return;
+      }
+
+      const state = event.state;
+      const current = navStateRef.current;
+
+      // 2. If history state has explicit tab/category, restore it
+      if (state && state.isAppNav && !state.isRoot) {
+        setActiveTab(state.tab || 'habits');
+        setSelectedCategory(state.category || 'all');
+        return;
+      }
+
+      // 3. If user hit the root guard entry while on a sub-category or non-home tab, step back gracefully
+      if (current.tab === 'habits' && current.category !== 'all') {
+        setSelectedCategory('all');
+        window.history.pushState(
+          { tab: 'habits', category: 'all', isAppNav: true },
+          ''
+        );
+        return;
+      }
+
+      if (current.tab !== 'habits') {
+        setActiveTab('habits');
+        setSelectedCategory('all');
+        window.history.pushState(
+          { tab: 'habits', category: 'all', isAppNav: true },
+          ''
+        );
+        return;
+      }
+
+      // 4. Even on Home ('habits' + 'all'), keep a buffer entry so accidental back swipe doesn't close PWA
+      window.history.pushState(
+        { tab: 'habits', category: 'all', isAppNav: true },
+        ''
+      );
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Splash screen safety timer: if cloud connection exceeds 8s, surface offline/retry controls
   useEffect(() => {
@@ -144,14 +251,36 @@ export const App: React.FC = () => {
       }
     );
 
+    const unsubChallenges = subscribeChallenges(
+      userId,
+      (challenges) => {
+        setChallenges(challenges);
+      },
+      (err) => {
+        setSyncError(err.message);
+      }
+    );
+
     return () => {
       unsubProfile();
       unsubCategories();
       unsubHabits();
       unsubLogs();
       unsubBreaks();
+      unsubChallenges();
     };
-  }, [currentUser, setUser, setProfileLoading, setSyncError, setCategories, setHabits, setLogs, setHabitBreaks, resetStore]);
+  }, [
+    currentUser,
+    setUser,
+    setProfileLoading,
+    setSyncError,
+    setCategories,
+    setHabits,
+    setLogs,
+    setHabitBreaks,
+    setChallenges,
+    resetStore,
+  ]);
 
   // Loading Splash Screen with 8s Timeout & Offline Fallback
   if (authLoading || (currentUser && profileLoading)) {
@@ -220,7 +349,7 @@ export const App: React.FC = () => {
       {/* TOP DESKTOP & MOBILE NAVBAR */}
       <Navbar
         activeTab={activeTab}
-        onSelectTab={setActiveTab}
+        onSelectTab={handleSelectTab}
         onOpenCreateHabit={() => {
           setEditingHabit(null);
           setIsCreateHabitOpen(true);
@@ -232,6 +361,9 @@ export const App: React.FC = () => {
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 pb-24 md:pb-12">
         {activeTab === 'habits' && (
           <HabitsView
+            selectedCategory={selectedCategory}
+            onSelectCategory={handleSelectCategory}
+            onOpenChallengesTab={() => handleSelectTab('challenges')}
             onOpenCreateHabit={() => {
               setEditingHabit(null);
               setIsCreateHabitOpen(true);
@@ -239,6 +371,8 @@ export const App: React.FC = () => {
             onOpenHabitDetails={(habit) => setInspectedHabit(habit)}
           />
         )}
+
+        {activeTab === 'challenges' && <ChallengesView />}
 
         {activeTab === 'breaks' && <HabitBreakHub />}
 
@@ -257,7 +391,7 @@ export const App: React.FC = () => {
       {/* MOBILE BOTTOM NAVIGATION BAR */}
       <BottomNav
         activeTab={activeTab}
-        onSelectTab={setActiveTab}
+        onSelectTab={handleSelectTab}
         onOpenCreateHabit={() => {
           setEditingHabit(null);
           setIsCreateHabitOpen(true);

@@ -2,31 +2,64 @@ import React, { useState, useRef } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
 import { HabitCard } from './HabitCard';
 import { DayStrip } from './DayStrip';
-import { Habit, Category } from '../../types/habit';
+import { Habit } from '../../types/habit';
 import { isHabitDueOnDate, getTodayKey } from '../../utils/dateMath';
 import { CATEGORY_ICONS } from '../../constants/iconsAndColors';
 import { boostVibrancy, getContrastIconColor } from '../../utils/colorUtils';
 import { CreateCategoryModal } from '../categories/CreateCategoryModal';
+import { CreateChallengeModal } from '../challenges/CreateChallengeModal';
 import { Button } from '../ui/Button';
 import { parseISO, format } from 'date-fns';
 import { useDragScroll } from '../../hooks/useDragScroll';
-import { Plus, CheckCheck, LayoutGrid, List, Sparkles, ArrowLeftRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  Plus,
+  CheckCheck,
+  LayoutGrid,
+  List,
+  Sparkles,
+  ArrowLeftRight,
+  ChevronLeft,
+  ChevronRight,
+  Archive,
+  Flame,
+} from 'lucide-react';
 import clsx from 'clsx';
 
 interface HabitsViewProps {
   onOpenCreateHabit: () => void;
   onOpenHabitDetails: (habit: Habit) => void;
+  selectedCategory?: string;
+  onSelectCategory?: (catId: string) => void;
+  onOpenChallengesTab?: () => void;
 }
 
 export const HabitsView: React.FC<HabitsViewProps> = ({
   onOpenCreateHabit,
   onOpenHabitDetails,
+  selectedCategory,
+  onSelectCategory,
+  onOpenChallengesTab,
 }) => {
-  const { habits, categories, logs, selectedDate, setSelectedDate, reorderCategories } = useAppStore();
+  const {
+    habits,
+    categories,
+    logs,
+    challenges,
+    selectedDate,
+    setSelectedDate,
+    reorderCategories,
+  } = useAppStore();
 
-  const [selectedCatFilter, setSelectedCatFilter] = useState<string>('all');
+  const [internalCatFilter, setInternalCatFilter] = useState<string>('all');
+  const selectedCatFilter = selectedCategory ?? internalCatFilter;
+  const setSelectedCatFilter = (catId: string) => {
+    setInternalCatFilter(catId);
+    onSelectCategory?.(catId);
+  };
+
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [isChallengeModalOpen, setIsChallengeModalOpen] = useState(false);
   const [isReorderMode, setIsReorderMode] = useState(false);
   const [draggedCatId, setDraggedCatId] = useState<string | null>(null);
 
@@ -38,36 +71,79 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
 
   const selectedDateTime = parseISO(selectedDate);
 
-  // Filter out archived habits
-  const activeHabits = habits.filter((h) => !h.isArchived);
+  // Check if a habit is completed/archived for the selected date
+  const isHabitInArchived = (h: Habit): boolean => {
+    if (h.isArchived) return true;
+    if (h.schedule?.endDate && selectedDate > h.schedule.endDate) return true;
+    if (
+      h.schedule?.totalDays &&
+      h.schedule.totalDays > 0 &&
+      (h.stats?.timesCompletedAllTime || 0) >= h.schedule.totalDays
+    ) {
+      return true;
+    }
+    const dayLog = logs[`${h.id}_${selectedDate}`];
+    return dayLog?.status === 'COMPLETED';
+  };
 
-  // If currently selected category was deleted, safely fallback to 'all'
-  const isSelectedCategoryValid =
-    selectedCatFilter === 'all' || categories.some((c) => c.id === selectedCatFilter);
-  const effectiveCatFilter = isSelectedCategoryValid ? selectedCatFilter : 'all';
-
-  // Filter habits due on selected date and sort by priority number (0-100) descending
-  const dueHabits = activeHabits
-    .filter((h) => {
-      // Category filter
-      if (effectiveCatFilter !== 'all' && h.categoryId !== effectiveCatFilter) {
-        return false;
-      }
-      // Frequency filter
-      return isHabitDueOnDate(h, selectedDateTime);
-    })
-    .sort((a, b) => {
-      const pA = typeof a.schedule.priority === 'number' ? a.schedule.priority : 50;
-      const pB = typeof b.schedule.priority === 'number' ? b.schedule.priority : 50;
-      return pB - pA; // Higher priority on top!
-    });
-
-  const totalDueCount = dueHabits.length;
-  const completedDueCount = dueHabits.filter((h) => {
+  // All habits due on selected date (for 100% Perfect Day calculation)
+  const allScheduledDueToday = habits.filter(
+    (h) => !h.isArchived && isHabitDueOnDate(h, selectedDateTime)
+  );
+  const totalDueCount = allScheduledDueToday.length;
+  const completedDueCount = allScheduledDueToday.filter((h) => {
     const l = logs[`${h.id}_${selectedDate}`];
     return l?.status === 'COMPLETED' || l?.status === 'EXCUSED';
   }).length;
   const isAllCompletedToday = totalDueCount > 0 && completedDueCount === totalDueCount;
+
+  // Habits that belong in the "Archived" category (completed on selectedDate, finished duration, or manually archived)
+  const archivedHabits = habits
+    .filter((h) => {
+      if (h.isArchived) return true;
+      if (h.schedule?.endDate && selectedDate > h.schedule.endDate) return true;
+      if (
+        h.schedule?.totalDays &&
+        h.schedule.totalDays > 0 &&
+        (h.stats?.timesCompletedAllTime || 0) >= h.schedule.totalDays
+      ) {
+        return true;
+      }
+      if (!isHabitDueOnDate(h, selectedDateTime)) return false;
+      return isHabitInArchived(h);
+    })
+    .sort((a, b) => {
+      const pA = typeof a.schedule.priority === 'number' ? a.schedule.priority : 50;
+      const pB = typeof b.schedule.priority === 'number' ? b.schedule.priority : 50;
+      return pB - pA;
+    });
+
+  // Active (not yet completed today & not archived) habits
+  const activeHabits = habits.filter((h) => !isHabitInArchived(h));
+
+  // If currently selected category was deleted, safely fallback to 'all'
+  const isSelectedCategoryValid =
+    selectedCatFilter === 'all' ||
+    selectedCatFilter === 'cat-archived' ||
+    categories.some((c) => c.id === selectedCatFilter);
+  const effectiveCatFilter = isSelectedCategoryValid ? selectedCatFilter : 'all';
+
+  // Filter habits to display based on whether "Archived" or an active category is selected
+  const dueHabits =
+    effectiveCatFilter === 'cat-archived'
+      ? archivedHabits
+      : activeHabits
+          .filter((h) => {
+            if (effectiveCatFilter !== 'all' && h.categoryId !== effectiveCatFilter) {
+              return false;
+            }
+            return isHabitDueOnDate(h, selectedDateTime);
+          })
+          .sort((a, b) => {
+            const pA = typeof a.schedule.priority === 'number' ? a.schedule.priority : 50;
+            const pB = typeof b.schedule.priority === 'number' ? b.schedule.priority : 50;
+            return pB - pA; // Higher priority on top!
+          });
 
   // Unique categories list in order
   const uniqueCategories = Array.from(
@@ -274,6 +350,38 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
           );
         })}
 
+        {/* ARCHIVED CATEGORY PILL (COMPLETED & ARCHIVED HABITS) */}
+        <button
+          type="button"
+          onClick={() => setSelectedCatFilter('cat-archived')}
+          className={clsx(
+            'flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all border-2 shrink-0',
+            effectiveCatFilter === 'cat-archived'
+              ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
+              : 'bg-emerald-500/10 text-emerald-800 border-emerald-500/40 hover:bg-emerald-500/20'
+          )}
+          title="View completed & archived habits"
+        >
+          <Archive size={13} />
+          <span>Archived ({archivedHabits.length})</span>
+        </button>
+
+        {/* QUICK ADD CHALLENGE BUTTON */}
+        <button
+          type="button"
+          onClick={() => setIsChallengeModalOpen(true)}
+          className="text-xs font-black text-rose-600 hover:text-rose-700 bg-rose-500/10 hover:bg-rose-500/20 border-2 border-rose-500/40 px-3.5 py-1.5 rounded-full whitespace-nowrap flex items-center gap-1.5 transition-colors shrink-0"
+          title="Create a Hardcore Challenge (-90% Health on Failure)"
+        >
+          <Flame size={13} className="fill-rose-600" />
+          <span>
+            Add Challenge
+            {challenges.filter((c) => c.status === 'ACTIVE').length > 0
+              ? ` (${challenges.filter((c) => c.status === 'ACTIVE').length})`
+              : ''}
+          </span>
+        </button>
+
         <button
           onClick={() => setIsCategoryModalOpen(true)}
           className="text-xs font-semibold text-primary hover:text-primary-deep bg-surface-card border border-dashed border-primary/40 px-3 py-1.5 rounded-full whitespace-nowrap flex items-center gap-1 transition-colors shrink-0"
@@ -309,20 +417,33 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
                 🎉 100% Perfect Day Completed!
               </span>
               <span className="text-[11px] text-charcoal">
-                All {totalDueCount} tasks conquered! Bonus Willpower XP awarded & Heart restored.
+                All {totalDueCount} tasks conquered! Completed habits moved to Archived.
               </span>
             </div>
           </div>
-          <span className="text-xs font-mono font-bold bg-white text-emerald-700 px-2.5 py-1 rounded-full border border-emerald-300 shrink-0">
-            100% Done
-          </span>
+          {effectiveCatFilter !== 'cat-archived' && (
+            <button
+              type="button"
+              onClick={() => setSelectedCatFilter('cat-archived')}
+              className="text-xs font-mono font-bold bg-white text-emerald-700 hover:bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-300 shrink-0 transition-colors"
+            >
+              View Archived ({archivedHabits.length})
+            </button>
+          )}
         </div>
       )}
 
       {/* 3. TOOLBAR: HABITS COUNT & VIEW MODE SWITCHER (GRID VS HORIZONTAL LIST) */}
       <div className="flex items-center justify-between gap-2 pt-1 pb-0.5">
-        <span className="text-xs font-bold text-charcoal uppercase tracking-wider ml-1">
-          Scheduled Habits ({dueHabits.length})
+        <span className="text-xs font-bold text-charcoal uppercase tracking-wider ml-1 flex items-center gap-1.5">
+          {effectiveCatFilter === 'cat-archived' ? (
+            <>
+              <Archive size={13} className="text-emerald-600" />
+              <span>Archived &amp; Completed Habits ({dueHabits.length})</span>
+            </>
+          ) : (
+            <span>Scheduled Habits ({dueHabits.length})</span>
+          )}
         </span>
 
         {/* View Mode Switcher: Grid vs Horizontal List */}
@@ -363,17 +484,29 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
       {dueHabits.length === 0 ? (
         <div className="text-center py-14 px-4 bg-surface-card border border-hairline rounded-3xl">
           <div className="w-14 h-14 rounded-full bg-surface-bone flex items-center justify-center text-charcoal mx-auto mb-3">
-            <CheckCheck size={28} />
+            {effectiveCatFilter === 'cat-archived' ? (
+              <Archive size={28} className="text-emerald-600" />
+            ) : (
+              <CheckCheck size={28} />
+            )}
           </div>
           <h3 className="font-display font-bold text-lg text-ink">
-            {activeHabits.length === 0
-              ? 'No Habits Created Yet'
-              : `No habits scheduled for ${format(selectedDateTime, 'EEEE, dd MMMM yyyy')}`}
+            {effectiveCatFilter === 'cat-archived'
+              ? 'No Completed or Archived Habits Yet'
+              : habits.length === 0
+                ? 'No Habits Created Yet'
+                : isAllCompletedToday
+                  ? 'All Habits Completed for Today!'
+                  : `No remaining habits for ${format(selectedDateTime, 'EEEE, dd MMMM yyyy')}`}
           </h3>
           <p className="text-charcoal text-xs sm:text-sm mt-1 max-w-md mx-auto">
-            {activeHabits.length === 0
-              ? 'Start small. Click the button below to configure your first daily habit target.'
-              : `You have ${activeHabits.length} active habit(s) in your system. Switch to "All Habits" or jump to Today to view them.`}
+            {effectiveCatFilter === 'cat-archived'
+              ? 'Whenever you complete a habit or archive it, it automatically moves into this Archived section.'
+              : habits.length === 0
+                ? 'Start small. Click the button below to configure your first daily habit target.'
+                : isAllCompletedToday
+                  ? `Your ${archivedHabits.length} completed habit(s) have been moved to the Archived category.`
+                  : `You have ${activeHabits.length} active habit(s) and ${archivedHabits.length} archived/completed habit(s).`}
           </p>
 
           <div className="flex items-center justify-center gap-2.5 mt-5 flex-wrap">
@@ -383,7 +516,18 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
                 size="md"
                 onClick={() => setSelectedCatFilter('all')}
               >
-                Clear Category Filter ({activeHabits.length})
+                Back to All Habits ({activeHabits.length})
+              </Button>
+            )}
+
+            {effectiveCatFilter !== 'cat-archived' && archivedHabits.length > 0 && (
+              <Button
+                variant="outline"
+                size="md"
+                onClick={() => setSelectedCatFilter('cat-archived')}
+                className="gap-1.5 border-emerald-500/40 text-emerald-700 hover:bg-emerald-50"
+              >
+                <Archive size={15} /> View Archived ({archivedHabits.length})
               </Button>
             )}
 
@@ -436,6 +580,16 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
         isOpen={isCategoryModalOpen}
         onClose={() => setIsCategoryModalOpen(false)}
         onCategoryCreated={(newCat) => setSelectedCatFilter(newCat.id)}
+      />
+
+      {/* Create Hardcore Challenge Modal */}
+      <CreateChallengeModal
+        isOpen={isChallengeModalOpen}
+        onClose={() => setIsChallengeModalOpen(false)}
+        onChallengeCreated={() => {
+          setIsChallengeModalOpen(false);
+          onOpenChallengesTab?.();
+        }}
       />
     </div>
   );

@@ -134,6 +134,40 @@ export interface HabitBreak {
   createdAt: string;
 }
 
+export interface ChallengeTask {
+  id: string;
+  text: string;
+}
+
+export interface ChallengeDayLog {
+  date: string; // YYYY-MM-DD
+  status: 'COMPLETED' | 'PARTIAL' | 'FAILED';
+  completedTaskIds?: string[];
+  xpEarned: number;
+  heartsDelta: number;
+  loggedAt: string;
+}
+
+export interface Challenge {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  targetDays: number; // 7, 9, 11, or custom
+  startDate: string;  // YYYY-MM-DD
+  endDate: string;    // YYYY-MM-DD
+  tasks: ChallengeTask[];
+  dayLogs: Record<string, ChallengeDayLog>; // keyed by YYYY-MM-DD
+  status: 'ACTIVE' | 'COMPLETED' | 'FAILED';
+  rulesAccepted: boolean;
+  totalXpEarned: number;
+  totalHeartsLost: number;
+  totalHeartsGained: number;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface UserSecurityConfig {
   question: string;
   answer: string; // Stored trimmed and in lowercase for case-insensitive verification
@@ -156,3 +190,4 @@ export interface UserProfile {
     perfectDaysCompleted?: string[]; // Dates (YYYY-MM-DD) where 100% perfect day bonus was awarded
   };
 }
+

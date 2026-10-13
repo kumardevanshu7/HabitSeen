@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import {
   Category,
+  Challenge,
+  ChallengeDayLog,
+  ChallengeTask,
   Habit,
   HabitBreak,
   HabitLog,
@@ -15,7 +18,7 @@ import {
   isDateInThisYear,
   isHabitDueOnDate,
 } from '../utils/dateMath';
-import { parseISO } from 'date-fns';
+import { parseISO, addDays, format } from 'date-fns';
 import confetti from 'canvas-confetti';
 import {
   computeHabitStreaks,
@@ -39,6 +42,9 @@ import {
   addHabitBreakToDb,
   updateHabitBreakInDb,
   deleteHabitBreakFromDb,
+  addChallengeToDb,
+  updateChallengeInDb,
+  deleteChallengeFromDb,
   resetEntireUserDataInDb,
 } from '../services/firestoreService';
 
@@ -79,6 +85,7 @@ interface AppState {
   setHabits: (habits: Habit[]) => void;
   addHabit: (habit: Omit<Habit, 'id' | 'createdAt' | 'updatedAt' | 'stats'>) => Promise<Habit>;
   updateHabit: (habit: Habit) => Promise<void>;
+  toggleArchiveHabit: (id: string, isArchived?: boolean) => Promise<void>;
   deleteHabit: (id: string) => Promise<void>;
 
   // Logs
@@ -113,9 +120,30 @@ interface AppState {
     icon: string;
     color: string;
     description?: string;
+    startedAt?: string;
   }) => Promise<HabitBreak>;
   relapseHabitBreak: (id: string, reason?: string) => Promise<void>;
   deleteHabitBreak: (id: string) => Promise<void>;
+
+  // Hardcore Challenges (7, 9, 11, or Custom Days with 90% Health Deduction Punishment)
+  challenges: Challenge[];
+  setChallenges: (challenges: Challenge[]) => void;
+  addChallenge: (data: {
+    name: string;
+    icon: string;
+    color: string;
+    targetDays: number;
+    startDate?: string;
+    tasks?: ChallengeTask[];
+  }) => Promise<Challenge>;
+  logChallengeDay: (
+    challengeId: string,
+    dateKey: string,
+    completedTaskIds?: string[],
+    forceComplete?: boolean
+  ) => Promise<void>;
+  failChallengeDay: (challengeId: string, dateKey: string) => Promise<void>;
+  deleteChallenge: (id: string) => Promise<void>;
 
   // Security Question & Fresh Account Reset
   setSecurityQuestion: (question: string, answer: string) => Promise<void>;
@@ -238,6 +266,12 @@ export const useAppStore = create<AppState>()((set, get) => ({
       }
     }
     set({ habitBreaks: cleaned });
+  },
+
+  challenges: [],
+  setChallenges: (incoming) => {
+    const byId = Array.from(new Map(incoming.map((c) => [c.id, c])).values());
+    set({ challenges: byId });
   },
 
   completeOnboarding: async (data) => {
@@ -373,6 +407,25 @@ export const useAppStore = create<AppState>()((set, get) => ({
     }
     set((s) => ({
       habits: s.habits.map((h) => (h.id === updated.id ? updated : h)),
+    }));
+  },
+
+  toggleArchiveHabit: async (id, forceArchived) => {
+    const { currentUser, habits } = get();
+    const target = habits.find((h) => h.id === id);
+    if (!target) return;
+
+    const updated: Habit = {
+      ...target,
+      isArchived: typeof forceArchived === 'boolean' ? forceArchived : !target.isArchived,
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (currentUser) {
+      await updateHabitInDb(currentUser.uid, updated);
+    }
+    set((s) => ({
+      habits: s.habits.map((h) => (h.id === id ? updated : h)),
     }));
   },
 
@@ -828,7 +881,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
       icon: data.icon,
       color: data.color,
       description: data.description,
-      startedAt: new Date().toISOString(),
+      startedAt: data.startedAt || new Date().toISOString(),
       bestStreakSeconds: 0,
       unlockedMilestones: [],
       relapseHistory: [],
@@ -886,6 +939,240 @@ export const useAppStore = create<AppState>()((set, get) => ({
     }));
   },
 
+  addChallenge: async (data) => {
+    const { currentUser } = get();
+    const startDate = data.startDate || getTodayKey();
+    const daysCount = Math.max(1, Number(data.targetDays) || 7);
+    const endDate = format(addDays(parseISO(startDate), daysCount - 1), 'yyyy-MM-dd');
+
+    const newChallenge: Challenge = {
+      id: `chl-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      name: data.name.trim(),
+      icon: data.icon || 'flame',
+      color: data.color || '#EA2804',
+      targetDays: daysCount,
+      startDate,
+      endDate,
+      tasks: data.tasks && data.tasks.length > 0 ? data.tasks : [],
+      dayLogs: {},
+      status: 'ACTIVE',
+      rulesAccepted: true,
+      totalXpEarned: 0,
+      totalHeartsLost: 0,
+      totalHeartsGained: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (currentUser) {
+      await addChallengeToDb(currentUser.uid, newChallenge);
+    }
+    set((s) => ({
+      challenges: s.challenges.some((c) => c.id === newChallenge.id)
+        ? s.challenges
+        : [newChallenge, ...s.challenges],
+    }));
+    return newChallenge;
+  },
+
+  logChallengeDay: async (challengeId, dateKey, completedTaskIds, forceComplete) => {
+    const state = get();
+    const challenge = state.challenges.find((c) => c.id === challengeId);
+    if (!challenge || !state.currentUser) return;
+
+    const existingLogs = challenge.dayLogs || {};
+    const prevLog = existingLogs[dateKey];
+    const wasAlreadyCompleted = prevLog?.status === 'COMPLETED';
+
+    const hasSubTasks = Array.isArray(challenge.tasks) && challenge.tasks.length > 0;
+    const effectiveTaskIds =
+      completedTaskIds ??
+      (forceComplete && hasSubTasks ? challenge.tasks.map((t) => t.id) : prevLog?.completedTaskIds || []);
+
+    const isAllTasksDone = hasSubTasks
+      ? effectiveTaskIds.length >= challenge.tasks.length || Boolean(forceComplete)
+      : true;
+
+    if (!isAllTasksDone) {
+      // Partial task check-in on a multi-task challenge
+      const partialLog: ChallengeDayLog = {
+        date: dateKey,
+        status: 'PARTIAL',
+        completedTaskIds: effectiveTaskIds,
+        xpEarned: 0,
+        heartsDelta: 0,
+        loggedAt: new Date().toISOString(),
+      };
+      const updatedChallenge: Challenge = {
+        ...challenge,
+        dayLogs: {
+          ...existingLogs,
+          [dateKey]: partialLog,
+        },
+        updatedAt: new Date().toISOString(),
+      };
+      await updateChallengeInDb(state.currentUser.uid, updatedChallenge);
+      set((s) => ({
+        challenges: s.challenges.map((c) => (c.id === challengeId ? updatedChallenge : c)),
+      }));
+      return;
+    }
+
+    // Daily Completion Reward: +50 XP & +1 Heart healed
+    const dailyXp = 50;
+    const dailyHeartHeal = 1;
+
+    const newDayLog: ChallengeDayLog = {
+      date: dateKey,
+      status: 'COMPLETED',
+      completedTaskIds: effectiveTaskIds,
+      xpEarned: dailyXp,
+      heartsDelta: dailyHeartHeal,
+      loggedAt: new Date().toISOString(),
+    };
+
+    const nextDayLogs: Record<string, ChallengeDayLog> = {
+      ...existingLogs,
+      [dateKey]: newDayLog,
+    };
+
+    const completedDaysCount = Object.values(nextDayLogs).filter(
+      (l) => l.status === 'COMPLETED'
+    ).length;
+
+    const isChallengeNowConquered =
+      completedDaysCount >= challenge.targetDays && challenge.status !== 'COMPLETED';
+
+    // Full Challenge Victory Bonus: +(targetDays * 30) XP & Full Health Restore (+2 Hearts)
+    const victoryBonusXp = isChallengeNowConquered ? challenge.targetDays * 30 : 0;
+    const victoryHeartHeal = isChallengeNowConquered ? 2 : 0;
+
+    const xpGain = (wasAlreadyCompleted ? 0 : dailyXp) + victoryBonusXp;
+    const heartGain = (wasAlreadyCompleted ? 0 : dailyHeartHeal) + victoryHeartHeal;
+
+    const updatedChallenge: Challenge = {
+      ...challenge,
+      dayLogs: nextDayLogs,
+      status: isChallengeNowConquered || challenge.status === 'COMPLETED' ? 'COMPLETED' : 'ACTIVE',
+      completedAt: isChallengeNowConquered
+        ? new Date().toISOString()
+        : challenge.completedAt,
+      totalXpEarned: (challenge.totalXpEarned || 0) + xpGain,
+      totalHeartsGained: (challenge.totalHeartsGained || 0) + heartGain,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await updateChallengeInDb(state.currentUser.uid, updatedChallenge);
+
+    if (state.user && (xpGain > 0 || heartGain > 0)) {
+      const newTotalXp = Math.max(0, (state.user.gamification.totalXp || 0) + xpGain);
+      const lvlInfo = levelFromXp(newTotalXp);
+      const newMaxHearts = calculateMaxHearts(newTotalXp);
+      const currentHearts = state.user.gamification.hearts ?? 5;
+      const newHearts = isChallengeNowConquered
+        ? newMaxHearts
+        : Math.min(newMaxHearts, Number((currentHearts + heartGain).toFixed(1)));
+
+      const updatedUser: UserProfile = {
+        ...state.user,
+        gamification: {
+          ...state.user.gamification,
+          totalXp: newTotalXp,
+          level: lvlInfo.level,
+          levelTitle: lvlInfo.title,
+          hearts: newHearts,
+          maxHearts: newMaxHearts,
+        },
+      };
+
+      await saveUserProfileToDb(state.currentUser.uid, updatedUser);
+      set({ user: updatedUser });
+    }
+
+    confetti({
+      particleCount: isChallengeNowConquered ? 120 : 55,
+      spread: isChallengeNowConquered ? 90 : 65,
+      origin: { y: 0.6 },
+    });
+
+    set((s) => ({
+      challenges: s.challenges.map((c) => (c.id === challengeId ? updatedChallenge : c)),
+    }));
+  },
+
+  failChallengeDay: async (challengeId, dateKey) => {
+    const state = get();
+    const challenge = state.challenges.find((c) => c.id === challengeId);
+    if (!challenge || !state.currentUser) return;
+
+    const existingLogs = challenge.dayLogs || {};
+    if (existingLogs[dateKey]?.status === 'FAILED') return;
+
+    // 90% HEALTH DEDUCTION PUNISHMENT!
+    const currentHearts = state.user?.gamification?.hearts ?? 5;
+    const deductedHearts = Number((currentHearts * 0.9).toFixed(2));
+    const remainingHearts = Math.max(0.05, Number((currentHearts - deductedHearts).toFixed(2)));
+    const xpPenalty = 50;
+
+    const failedLog: ChallengeDayLog = {
+      date: dateKey,
+      status: 'FAILED',
+      completedTaskIds: [],
+      xpEarned: -xpPenalty,
+      heartsDelta: -deductedHearts,
+      loggedAt: new Date().toISOString(),
+    };
+
+    const nextDayLogs: Record<string, ChallengeDayLog> = {
+      ...existingLogs,
+      [dateKey]: failedLog,
+    };
+
+    const updatedChallenge: Challenge = {
+      ...challenge,
+      dayLogs: nextDayLogs,
+      totalHeartsLost: Number(((challenge.totalHeartsLost || 0) + deductedHearts).toFixed(1)),
+      updatedAt: new Date().toISOString(),
+    };
+
+    await updateChallengeInDb(state.currentUser.uid, updatedChallenge);
+
+    if (state.user) {
+      const newTotalXp = Math.max(0, (state.user.gamification.totalXp || 0) - xpPenalty);
+      const lvlInfo = levelFromXp(newTotalXp);
+      const newMaxHearts = calculateMaxHearts(newTotalXp);
+
+      const updatedUser: UserProfile = {
+        ...state.user,
+        gamification: {
+          ...state.user.gamification,
+          hearts: Math.min(newMaxHearts, remainingHearts),
+          maxHearts: newMaxHearts,
+          totalXp: newTotalXp,
+          level: lvlInfo.level,
+          levelTitle: lvlInfo.title,
+        },
+      };
+
+      await saveUserProfileToDb(state.currentUser.uid, updatedUser);
+      set({ user: updatedUser });
+    }
+
+    set((s) => ({
+      challenges: s.challenges.map((c) => (c.id === challengeId ? updatedChallenge : c)),
+    }));
+  },
+
+  deleteChallenge: async (id) => {
+    const { currentUser } = get();
+    if (currentUser) {
+      await deleteChallengeFromDb(currentUser.uid, id);
+    }
+    set((s) => ({
+      challenges: s.challenges.filter((c) => c.id !== id),
+    }));
+  },
+
   setSecurityQuestion: async (question, answer) => {
     const { currentUser, user } = get();
     if (!currentUser || !user) return;
@@ -910,6 +1197,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
       logs: {},
       categories: [DEFAULT_CATEGORY],
       habitBreaks: [],
+      challenges: [],
       user: user
         ? {
             ...user,
@@ -939,5 +1227,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
       habits: [],
       logs: {},
       habitBreaks: [],
+      challenges: [],
     }),
 }));

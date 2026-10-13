@@ -50,6 +50,11 @@ service cloud.firestore {
       match /gamification/{docId} {
         allow read, write: if isOwner(userId);
       }
+
+      // Hardcore Challenges collection
+      match /challenges/{challengeId} {
+        allow read, write: if isOwner(userId);
+      }
     }
 
     // Explicit fallback: Deny all unauthenticated or stray collection access
