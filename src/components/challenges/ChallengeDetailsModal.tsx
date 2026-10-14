@@ -18,6 +18,7 @@ import {
   Trash2,
   Award,
   TrendingUp,
+  Pencil,
 } from 'lucide-react';
 import { addDays, format, parseISO, isSameDay } from 'date-fns';
 import clsx from 'clsx';
@@ -27,6 +28,7 @@ interface ChallengeDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onDelete?: (challenge: Challenge) => void;
+  onEdit?: (challenge: Challenge) => void;
 }
 
 export const ChallengeDetailsModal: React.FC<ChallengeDetailsModalProps> = ({
@@ -34,6 +36,7 @@ export const ChallengeDetailsModal: React.FC<ChallengeDetailsModalProps> = ({
   isOpen,
   onClose,
   onDelete,
+  onEdit,
 }) => {
   if (!challenge) return null;
 
@@ -366,8 +369,21 @@ export const ChallengeDetailsModal: React.FC<ChallengeDetailsModalProps> = ({
           </div>
         </div>
 
-        <div className="flex justify-end pt-2 border-t border-hairline">
-          <Button variant="dark" onClick={onClose}>
+        <div className="flex items-center justify-between pt-2 border-t border-hairline gap-2 flex-wrap">
+          {onEdit && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                onClose();
+                onEdit(challenge);
+              }}
+              className="gap-1.5 text-xs"
+            >
+              <Pencil size={14} /> Edit Challenge & Tasks
+            </Button>
+          )}
+          <Button variant="dark" onClick={onClose} className="ml-auto">
             Close Challenge Analytics
           </Button>
         </div>

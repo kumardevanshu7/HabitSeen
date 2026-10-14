@@ -21,6 +21,7 @@ import {
   Trash2,
   CheckCircle2,
   XCircle,
+  Pencil,
 } from 'lucide-react';
 import { addDays, format, parseISO } from 'date-fns';
 import clsx from 'clsx';
@@ -35,6 +36,7 @@ export const ChallengesView: React.FC = () => {
   } = useAppStore();
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [editingChallenge, setEditingChallenge] = useState<Challenge | null>(null);
   const [inspectedChallenge, setInspectedChallenge] = useState<Challenge | null>(null);
   const [challengeToDelete, setChallengeToDelete] = useState<Challenge | null>(null);
   const [penaltyToast, setPenaltyToast] = useState<string | null>(null);
@@ -102,9 +104,13 @@ export const ChallengesView: React.FC = () => {
     taskId: string
   ) => {
     const dayLog = challenge.dayLogs?.[dateKey];
-    if (dayLog?.status === 'COMPLETED' || dayLog?.status === 'FAILED') return;
+    if (dayLog?.status === 'FAILED') return;
 
-    const currentIds = dayLog?.completedTaskIds || [];
+    const isCurrentlyDone = dayLog?.status === 'COMPLETED';
+    const currentIds = isCurrentlyDone
+      ? challenge.tasks?.map((t) => t.id) || []
+      : dayLog?.completedTaskIds || [];
+
     const exists = currentIds.includes(taskId);
     const nextIds = exists
       ? currentIds.filter((id) => id !== taskId)
@@ -308,6 +314,14 @@ export const ChallengesView: React.FC = () => {
                     <div className="flex items-center gap-1 shrink-0">
                       <button
                         type="button"
+                        onClick={() => setEditingChallenge(c)}
+                        className="p-1.5 text-charcoal hover:text-primary hover:bg-surface-bone rounded-full transition-colors cursor-pointer"
+                        title="Edit Challenge & Rename Tasks"
+                      >
+                        <Pencil size={16} />
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => setInspectedChallenge(c)}
                         className="p-1.5 text-charcoal hover:text-ink hover:bg-surface-bone rounded-full transition-colors"
                         title="View Challenge Analytics"
@@ -375,9 +389,19 @@ export const ChallengesView: React.FC = () => {
                   {/* SUB-TASKS CHECKLIST IF CONFIGURED */}
                   {hasSubTasks && (
                     <div className="space-y-1.5 pt-1">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-charcoal block">
-                        Mandatory Daily Tasks ({todayCompletedTaskIds.length}/{c.tasks.length}):
-                      </span>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-charcoal block">
+                          Mandatory Daily Tasks ({todayCompletedTaskIds.length}/{c.tasks.length}):
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setEditingChallenge(c)}
+                          className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                          title="Rename or edit tasks"
+                        >
+                          <Pencil size={10} /> Rename / Edit Tasks
+                        </button>
+                      </div>
                       {c.tasks.map((task) => {
                         const isChecked =
                           isTodayCompleted || todayCompletedTaskIds.includes(task.id);
@@ -388,22 +412,34 @@ export const ChallengesView: React.FC = () => {
                               handleToggleSubTask(c, activeDateKey, task.id)
                             }
                             className={clsx(
-                              'flex items-center justify-between p-2.5 rounded-xl border text-xs cursor-pointer transition-all',
+                              'flex items-center justify-between p-2.5 rounded-xl border text-xs cursor-pointer transition-all select-none',
                               isChecked
-                                ? 'bg-emerald-50/60 border-emerald-300 text-charcoal line-through'
+                                ? 'bg-emerald-50/70 border-emerald-300 text-charcoal'
                                 : 'bg-surface-bone/70 border-hairline text-ink hover:bg-stone/20'
                             )}
+                            title={isChecked ? 'Click to uncheck task' : 'Click to complete task'}
                           >
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                readOnly
-                                className="rounded-full text-badge-success focus:ring-0 cursor-pointer"
-                              />
-                              <span className="font-medium">{task.text}</span>
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div
+                                className={clsx(
+                                  'w-4 h-4 rounded-md flex items-center justify-center border transition-all shrink-0',
+                                  isChecked
+                                    ? 'bg-badge-success border-badge-success text-white'
+                                    : 'border-hairline-strong bg-white'
+                                )}
+                              >
+                                {isChecked && <Check size={11} strokeWidth={3.5} />}
+                              </div>
+                              <span
+                                className={clsx(
+                                  'font-medium truncate',
+                                  isChecked && 'line-through text-charcoal/70'
+                                )}
+                              >
+                                {task.text}
+                              </span>
                             </div>
-                            <span className="text-[10px] font-mono text-stone">
+                            <span className="text-[10px] font-mono text-stone shrink-0 ml-2">
                               Required
                             </span>
                           </div>
@@ -418,15 +454,30 @@ export const ChallengesView: React.FC = () => {
                   {isTodayCompleted ? (
                     <div className="flex items-center justify-between w-full">
                       <span className="text-xs font-bold text-badge-success flex items-center gap-1.5">
-                        <CheckCircle2 size={16} /> Completed for {activeDateKey} (+50 XP &amp; +1 ❤️)
+                        <CheckCircle2 size={16} /> Completed (+50 XP &amp; +1 ❤️)
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => setInspectedChallenge(c)}
-                        className="text-xs font-bold text-primary hover:underline"
-                      >
-                        Analytics
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const allIds = c.tasks?.map((t) => t.id) || [];
+                            const nextIds =
+                              allIds.length > 0 ? allIds.slice(0, allIds.length - 1) : [];
+                            logChallengeDay(c.id, activeDateKey, nextIds, false);
+                          }}
+                          className="text-xs font-semibold text-charcoal hover:text-red-600 underline cursor-pointer"
+                          title="Undo today's completion and uncheck tasks"
+                        >
+                          Undo
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setInspectedChallenge(c)}
+                          className="text-xs font-bold text-primary hover:underline"
+                        >
+                          Analytics
+                        </button>
+                      </div>
                     </div>
                   ) : isTodayFailed ? (
                     <div className="flex items-center justify-between w-full">
@@ -480,10 +531,14 @@ export const ChallengesView: React.FC = () => {
         </div>
       )}
 
-      {/* CREATE CHALLENGE MODAL (+ RULES DISCLAIMER POPUP) */}
+      {/* CREATE & EDIT CHALLENGE MODAL */}
       <CreateChallengeModal
-        isOpen={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
+        isOpen={isCreateOpen || Boolean(editingChallenge)}
+        onClose={() => {
+          setIsCreateOpen(false);
+          setEditingChallenge(null);
+        }}
+        challengeToEdit={editingChallenge}
       />
 
       {/* CHALLENGE ANALYTICS MODAL */}
@@ -499,6 +554,10 @@ export const ChallengesView: React.FC = () => {
         onDelete={(chl) => {
           setInspectedChallenge(null);
           setChallengeToDelete(chl);
+        }}
+        onEdit={(chl) => {
+          setInspectedChallenge(null);
+          setEditingChallenge(chl);
         }}
       />
 

@@ -5,7 +5,7 @@ import { Input } from '../ui/Input';
 import { IconPicker } from '../ui/IconPicker';
 import { CATEGORY_ICONS, CATEGORY_COLORS } from '../../constants/iconsAndColors';
 import { useAppStore } from '../../stores/useAppStore';
-import { ChallengeTask } from '../../types/habit';
+import { Challenge, ChallengeTask } from '../../types/habit';
 import { boostVibrancy, getContrastIconColor } from '../../utils/colorUtils';
 import {
   Flame,
@@ -21,6 +21,7 @@ import {
   CheckCircle2,
   Sparkles,
   Clock,
+  Edit2,
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -28,14 +29,16 @@ interface CreateChallengeModalProps {
   isOpen: boolean;
   onClose: () => void;
   onChallengeCreated?: () => void;
+  challengeToEdit?: Challenge | null;
 }
 
 export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
   isOpen,
   onClose,
   onChallengeCreated,
+  challengeToEdit,
 }) => {
-  const { addChallenge, user, challenges, habits } = useAppStore();
+  const { addChallenge, updateChallenge, user, challenges, habits } = useAppStore();
 
   const [name, setName] = useState('');
   const [selectedIcon, setSelectedIcon] = useState('flame');
@@ -115,17 +118,34 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      setName('');
-      setSelectedIcon('flame');
-      setSelectedColor(CATEGORY_COLORS[0].hex);
-      setDurationPreset(7);
-      setCustomDays(21);
-      setTasks([]);
-      setNewTaskText('');
-      setError('');
-      setIsRulesModalOpen(false);
+      if (challengeToEdit) {
+        setName(challengeToEdit.name);
+        setSelectedIcon(challengeToEdit.icon || 'flame');
+        setSelectedColor(challengeToEdit.color || CATEGORY_COLORS[0].hex);
+        if ([7, 9, 11].includes(challengeToEdit.targetDays as any)) {
+          setDurationPreset(challengeToEdit.targetDays as 7 | 9 | 11);
+          setCustomDays(21);
+        } else {
+          setDurationPreset('custom');
+          setCustomDays(challengeToEdit.targetDays);
+        }
+        setTasks(challengeToEdit.tasks || []);
+        setNewTaskText('');
+        setError('');
+        setIsRulesModalOpen(false);
+      } else {
+        setName('');
+        setSelectedIcon('flame');
+        setSelectedColor(CATEGORY_COLORS[0].hex);
+        setDurationPreset(7);
+        setCustomDays(21);
+        setTasks([]);
+        setNewTaskText('');
+        setError('');
+        setIsRulesModalOpen(false);
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, challengeToEdit]);
 
   const effectiveDays =
     durationPreset === 'custom' ? Math.max(1, Number(customDays) || 7) : durationPreset;
@@ -146,11 +166,17 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
     setNewTaskText('');
   };
 
+  const handleRenameTask = (id: string, newText: string) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, text: newText } : t))
+    );
+  };
+
   const handleRemoveTask = (id: string) => {
     setTasks(tasks.filter((t) => t.id !== id));
   };
 
-  const handleProceedToRules = (e: React.FormEvent) => {
+  const handleProceedToRules = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       setError('Please enter a challenge name');
@@ -161,6 +187,40 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
       return;
     }
     setError('');
+
+    // If EDITING an existing challenge, save directly without re-triggering rules disclaimer
+    if (challengeToEdit) {
+      if (isSubmitting) return;
+      setIsSubmitting(true);
+      try {
+        const finalTasks = [...tasks];
+        if (newTaskText.trim()) {
+          finalTasks.push({
+            id: `ctask-${Date.now()}`,
+            text: newTaskText.trim(),
+          });
+        }
+        const updated: Challenge = {
+          ...challengeToEdit,
+          name: name.trim(),
+          icon: selectedIcon,
+          color: vibrantColor,
+          targetDays: effectiveDays,
+          tasks: finalTasks,
+          updatedAt: new Date().toISOString(),
+        };
+        await updateChallenge(updated);
+        onClose();
+        onChallengeCreated?.();
+      } catch (err: any) {
+        console.error('Failed to update challenge:', err);
+        setError(err.message || 'Failed to update challenge');
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
     setIsRulesModalOpen(true);
   };
 
@@ -207,8 +267,12 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
       <Modal
         isOpen={isOpen && !isRulesModalOpen}
         onClose={onClose}
-        title="Add New Hardcore Challenge"
-        subtitle="Configure name, icon, color, and duration (7, 9, 11, or Custom days)"
+        title={challengeToEdit ? `Edit Challenge: ${challengeToEdit.name}` : 'Add New Hardcore Challenge'}
+        subtitle={
+          challengeToEdit
+            ? 'Modify challenge parameters, rename or manage mandatory daily tasks'
+            : 'Configure name, icon, color, and duration (7, 9, 11, or Custom days)'
+        }
         maxWidth="lg"
       >
         <form onSubmit={handleProceedToRules} className="space-y-5">
@@ -363,19 +427,28 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
             </div>
 
             {tasks.length > 0 && (
-              <div className="space-y-1.5 max-h-36 overflow-y-auto">
+              <div className="space-y-2 max-h-52 overflow-y-auto p-0.5">
                 {tasks.map((t, idx) => (
                   <div
                     key={t.id}
-                    className="flex items-center justify-between gap-2 px-3 py-2 bg-surface-bone rounded-xl border border-hairline text-xs"
+                    className="flex items-center justify-between gap-2 px-3 py-1.5 bg-surface-bone rounded-xl border border-hairline text-xs group hover:border-primary/40 transition-colors"
                   >
-                    <span className="font-medium text-ink truncate">
-                      {idx + 1}. {t.text}
+                    <span className="font-mono text-stone text-[11px] font-bold shrink-0">
+                      {idx + 1}.
                     </span>
+                    <input
+                      type="text"
+                      value={t.text}
+                      onChange={(e) => handleRenameTask(t.id, e.target.value)}
+                      className="flex-1 bg-transparent text-xs font-semibold text-ink px-2 py-1 rounded-lg border border-transparent focus:border-primary focus:bg-white focus:outline-none transition-all"
+                      placeholder="Rename task description..."
+                      title="Click directly to rename task"
+                    />
                     <button
                       type="button"
                       onClick={() => handleRemoveTask(t.id)}
-                      className="text-stone hover:text-red-500 p-1 rounded-full transition-colors"
+                      className="text-stone hover:text-red-500 p-1.5 rounded-lg hover:bg-white transition-colors shrink-0"
+                      title="Delete Task"
                     >
                       <Trash2 size={14} />
                     </button>
@@ -445,10 +518,20 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
               type="submit"
               variant="primary"
               size="lg"
+              disabled={isSubmitting}
               className="w-full sm:w-auto justify-center gap-2 shadow-sm font-bold order-1 sm:order-2"
             >
-              <ShieldAlert size={17} />
-              <span>Review Rules &amp; Create Challenge</span>
+              {challengeToEdit ? (
+                <>
+                  <Check size={17} />
+                  <span>{isSubmitting ? 'Saving...' : 'Save Changes'}</span>
+                </>
+              ) : (
+                <>
+                  <ShieldAlert size={17} />
+                  <span>Review Rules &amp; Create Challenge</span>
+                </>
+              )}
             </Button>
             <Button
               type="button"

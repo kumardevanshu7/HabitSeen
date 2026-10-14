@@ -150,6 +150,7 @@ interface AppState {
     completedTaskIds?: string[],
     forceComplete?: boolean
   ) => Promise<void>;
+  updateChallenge: (updated: Challenge) => Promise<void>;
   failChallengeDay: (challengeId: string, dateKey: string) => Promise<void>;
   deleteChallenge: (id: string) => Promise<void>;
 
@@ -1147,7 +1148,10 @@ export const useAppStore = create<AppState>()((set, get) => ({
       : true;
 
     if (!isAllTasksDone) {
-      // Partial task check-in on a multi-task challenge
+      // Partial task check-in on a multi-task challenge (or unchecking a task)
+      const xpRevert = wasAlreadyCompleted ? 50 : 0;
+      const heartRevert = wasAlreadyCompleted ? 1 : 0;
+
       const partialLog: ChallengeDayLog = {
         date: dateKey,
         status: 'PARTIAL',
@@ -1162,9 +1166,35 @@ export const useAppStore = create<AppState>()((set, get) => ({
           ...existingLogs,
           [dateKey]: partialLog,
         },
+        status: 'ACTIVE',
+        totalXpEarned: Math.max(0, (challenge.totalXpEarned || 0) - xpRevert),
+        totalHeartsGained: Math.max(0, (challenge.totalHeartsGained || 0) - heartRevert),
         updatedAt: new Date().toISOString(),
       };
       await updateChallengeInDb(state.currentUser.uid, updatedChallenge);
+
+      if (state.user && (xpRevert > 0 || heartRevert > 0)) {
+        const newTotalXp = Math.max(0, (state.user.gamification.totalXp || 0) - xpRevert);
+        const lvlInfo = levelFromXp(newTotalXp);
+        const newMaxHearts = calculateMaxHearts(newTotalXp);
+        const currentHearts = state.user.gamification.hearts ?? 5;
+        const newHearts = Math.max(0.1, Math.min(newMaxHearts, Number((currentHearts - heartRevert).toFixed(1))));
+
+        const updatedUser: UserProfile = {
+          ...state.user,
+          gamification: {
+            ...state.user.gamification,
+            totalXp: newTotalXp,
+            level: lvlInfo.level,
+            levelTitle: lvlInfo.title,
+            hearts: newHearts,
+            maxHearts: newMaxHearts,
+          },
+        };
+        await saveUserProfileToDb(state.currentUser.uid, updatedUser);
+        set({ user: updatedUser });
+      }
+
       set((s) => ({
         challenges: s.challenges.map((c) => (c.id === challengeId ? updatedChallenge : c)),
       }));
@@ -1250,6 +1280,16 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
     set((s) => ({
       challenges: s.challenges.map((c) => (c.id === challengeId ? updatedChallenge : c)),
+    }));
+  },
+
+  updateChallenge: async (updated: Challenge) => {
+    const { currentUser } = get();
+    if (currentUser) {
+      await updateChallengeInDb(currentUser.uid, updated);
+    }
+    set((s) => ({
+      challenges: s.challenges.map((c) => (c.id === updated.id ? updated : c)),
     }));
   },
 
