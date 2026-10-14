@@ -104,18 +104,16 @@ export const ChallengesView: React.FC = () => {
     taskId: string
   ) => {
     const dayLog = challenge.dayLogs?.[dateKey];
-    if (dayLog?.status === 'FAILED') return;
+    if (dayLog?.status === 'FAILED' || dayLog?.status === 'COMPLETED') return;
 
-    const isCurrentlyDone = dayLog?.status === 'COMPLETED';
-    const currentIds = isCurrentlyDone
-      ? challenge.tasks?.map((t) => t.id) || []
-      : dayLog?.completedTaskIds || [];
+    const currentIds = dayLog?.completedTaskIds || [];
 
-    const exists = currentIds.includes(taskId);
-    const nextIds = exists
-      ? currentIds.filter((id) => id !== taskId)
-      : [...currentIds, taskId];
+    // STRICT HARDCORE PROTOCOL: Once marked, a task CANNOT be unchecked!
+    if (currentIds.includes(taskId)) {
+      return;
+    }
 
+    const nextIds = [...currentIds, taskId];
     await logChallengeDay(challenge.id, dateKey, nextIds, false);
   };
 
@@ -408,16 +406,18 @@ export const ChallengesView: React.FC = () => {
                         return (
                           <div
                             key={task.id}
-                            onClick={() =>
-                              handleToggleSubTask(c, activeDateKey, task.id)
-                            }
+                            onClick={() => {
+                              if (!isChecked) {
+                                handleToggleSubTask(c, activeDateKey, task.id);
+                              }
+                            }}
                             className={clsx(
-                              'flex items-center justify-between p-2.5 rounded-xl border text-xs cursor-pointer transition-all select-none',
+                              'flex items-center justify-between p-2.5 rounded-xl border text-xs transition-all select-none',
                               isChecked
-                                ? 'bg-emerald-50/70 border-emerald-300 text-charcoal'
-                                : 'bg-surface-bone/70 border-hairline text-ink hover:bg-stone/20'
+                                ? 'bg-emerald-50/70 border-emerald-300 text-charcoal cursor-default'
+                                : 'bg-surface-bone/70 border-hairline text-ink hover:bg-stone/20 cursor-pointer'
                             )}
-                            title={isChecked ? 'Click to uncheck task' : 'Click to complete task'}
+                            title={isChecked ? 'Task completed' : 'Click to complete task'}
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
                               <div
@@ -439,8 +439,13 @@ export const ChallengesView: React.FC = () => {
                                 {task.text}
                               </span>
                             </div>
-                            <span className="text-[10px] font-mono text-stone shrink-0 ml-2">
-                              Required
+                            <span
+                              className={clsx(
+                                'text-[10px] font-mono shrink-0 ml-2',
+                                isChecked ? 'text-emerald-700 font-semibold' : 'text-stone'
+                              )}
+                            >
+                              {isChecked ? 'Done' : 'Required'}
                             </span>
                           </div>
                         );
@@ -456,28 +461,13 @@ export const ChallengesView: React.FC = () => {
                       <span className="text-xs font-bold text-badge-success flex items-center gap-1.5">
                         <CheckCircle2 size={16} /> Completed (+50 XP &amp; +1 ❤️)
                       </span>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const allIds = c.tasks?.map((t) => t.id) || [];
-                            const nextIds =
-                              allIds.length > 0 ? allIds.slice(0, allIds.length - 1) : [];
-                            logChallengeDay(c.id, activeDateKey, nextIds, false);
-                          }}
-                          className="text-xs font-semibold text-charcoal hover:text-red-600 underline cursor-pointer"
-                          title="Undo today's completion and uncheck tasks"
-                        >
-                          Undo
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setInspectedChallenge(c)}
-                          className="text-xs font-bold text-primary hover:underline"
-                        >
-                          Analytics
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setInspectedChallenge(c)}
+                        className="text-xs font-bold text-primary hover:underline"
+                      >
+                        Analytics
+                      </button>
                     </div>
                   ) : isTodayFailed ? (
                     <div className="flex items-center justify-between w-full">
