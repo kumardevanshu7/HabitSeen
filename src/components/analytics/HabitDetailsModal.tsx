@@ -124,48 +124,45 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
     >
       <div className="space-y-6">
         {/* HEADER BADGE */}
-        <div className="flex items-center justify-between p-3.5 bg-surface-card rounded-2xl border border-hairline shadow-xs">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between gap-2 p-3 sm:p-4 bg-surface-card rounded-2xl border border-hairline shadow-xs">
+          <div className="flex items-center gap-2.5 min-w-0">
             <div
-              className="w-11 h-11 rounded-full flex items-center justify-center shadow-xs shrink-0"
+              className="w-10 h-10 rounded-full flex items-center justify-center shadow-xs shrink-0"
               style={{
                 backgroundColor: boostVibrancy(category?.color),
                 color: getContrastIconColor(boostVibrancy(category?.color)),
               }}
             >
-              <CategoryIcon size={22} strokeWidth={2.5} />
+              <CategoryIcon size={20} strokeWidth={2.5} />
             </div>
-            <div>
-              <span className="text-xs font-bold text-charcoal uppercase tracking-wider block">
+            <div className="min-w-0">
+              <span className="text-[11px] sm:text-xs font-bold text-charcoal uppercase tracking-wider block truncate">
                 {category?.name || 'Category'}
               </span>
-              <p className="text-sm font-bold text-ink">
-                Priority Score:{' '}
-                <span className="font-mono text-primary font-extrabold">
-                  {habit.schedule?.priority ?? 50} / 100
-                </span>
+              <p className="text-xs sm:text-sm font-semibold text-charcoal truncate">
+                Priority: <span className="font-mono text-primary font-bold">{habit.schedule?.priority ?? 50}/100</span>
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 shrink-0">
             {onEdit && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleRequestEdit}
-                className="gap-1.5"
+                className="gap-1 text-xs py-1.5 px-2.5 h-8"
               >
-                <Edit2 size={14} /> Edit
+                <Edit2 size={13} /> <span className="hidden xs:inline">Edit</span>
               </Button>
             )}
             <Button
               variant="danger"
               size="sm"
               onClick={handleRequestDelete}
-              className="gap-1.5"
+              className="gap-1 text-xs py-1.5 px-2.5 h-8"
             >
-              <Trash2 size={14} /> Delete
+              <Trash2 size={13} /> <span className="hidden xs:inline">Delete</span>
             </Button>
           </div>
         </div>
@@ -214,11 +211,11 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
 
         {/* 2. SUCCESS VS FAILURE DISTRIBUTION */}
         <div className="p-4 bg-surface-card border border-hairline rounded-2xl">
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-charcoal ml-1">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-charcoal ml-1 truncate">
               Consistency & Breakdown
             </h4>
-            <span className="text-xs font-mono font-bold text-ink bg-surface-bone px-2.5 py-1 rounded-full border border-hairline">
+            <span className="text-xs font-mono font-bold text-ink bg-surface-bone px-2.5 py-1 rounded-full border border-hairline whitespace-nowrap shrink-0">
               {successRate}% Success Rate
             </span>
           </div>

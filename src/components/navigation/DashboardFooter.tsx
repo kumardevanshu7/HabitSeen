@@ -30,7 +30,7 @@ export const DashboardFooter: React.FC<DashboardFooterProps> = ({
   }, [habits, logs, user, habitBreaks, categories]);
 
   return (
-    <footer className="w-full mt-12 border-t border-hairline bg-surface-card/60 backdrop-blur-sm">
+    <footer className="w-full mt-12 border-t border-hairline bg-surface-card/60 backdrop-blur-sm pb-28 sm:pb-32 safe-bottom">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 space-y-10">
         {/* 1. 100 ACHIEVEMENTS SHOWCASE BANNER */}
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-amber-500/10 via-surface-card to-primary/5 border border-amber-200/70 p-6 sm:p-8 shadow-sm">

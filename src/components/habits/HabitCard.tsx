@@ -588,18 +588,17 @@ export const HabitCard: React.FC<HabitCardProps> = ({
             </button>
           )}
 
-          {/* ANALYTICS BUTTON */}
+          {/* ANALYTICS BUTTON (ICON-ONLY) */}
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               onOpenDetails(habit);
             }}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-bone hover:bg-stone/20 text-charcoal hover:text-ink text-xs font-semibold border border-hairline transition-colors shrink-0 cursor-pointer"
+            className="p-1.5 rounded-full bg-surface-bone hover:bg-stone/20 text-charcoal hover:text-ink border border-hairline transition-colors shrink-0 cursor-pointer"
             title="View Habit Analytics & History"
           >
             <BarChart2 size={13} className="text-primary" />
-            <span className="hidden sm:inline">Analytics</span>
           </button>
 
           {/* MORE OPTIONS (DELETE / DUPLICATE) */}
@@ -692,7 +691,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
     >
       <div className="p-3.5 sm:p-4">
         {/* TOP ROW: CATEGORY + PRIORITY + STATUS BADGE + DETAILS BUTTON (OPTIMIZED NO-WRAP) */}
-        <div className="flex items-center justify-between gap-1.5 mb-2.5 flex-wrap">
+        <div className="flex items-center justify-between gap-1.5 mb-2.5">
           <div
             onClick={(e) => {
               e.stopPropagation();
@@ -709,14 +708,14 @@ export const HabitCard: React.FC<HabitCardProps> = ({
             >
               <CategoryIcon size={14} strokeWidth={2.5} />
             </span>
-            <span className="text-[11px] font-bold text-charcoal uppercase tracking-wide whitespace-nowrap truncate max-w-[115px] sm:max-w-none">
+            <span className="text-[11px] font-bold text-charcoal uppercase tracking-wide whitespace-nowrap truncate max-w-[85px] xs:max-w-[120px] sm:max-w-none">
               {category?.name || 'Category'}
             </span>
             <span
-              className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border bg-surface-bone text-charcoal border-hairline whitespace-nowrap shrink-0"
+              className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full border bg-surface-bone text-charcoal border-hairline whitespace-nowrap shrink-0"
               title="Priority Rank (0 - 100)"
             >
-              Priority {habit.schedule.priority ?? 50}
+              Pri {habit.schedule.priority ?? 50}
             </span>
           </div>
 
@@ -759,7 +758,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                     size={12}
                     className={clsx(flameTier.text, currentStreak >= 7 && 'fill-current shrink-0')}
                   />
-                  {currentStreak}d streak
+                  {currentStreak}d
                 </span>
               )
             )}
@@ -770,11 +769,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                 e.stopPropagation();
                 onOpenDetails(habit);
               }}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-bone hover:bg-stone/20 text-charcoal hover:text-ink text-xs font-semibold border border-hairline transition-colors cursor-pointer shrink-0"
+              className="p-1.5 rounded-full bg-surface-bone hover:bg-stone/20 text-charcoal hover:text-ink border border-hairline transition-colors cursor-pointer shrink-0"
               title="View Habit Analytics & History"
             >
               <BarChart2 size={13} className="text-primary" />
-              <span>Analytics</span>
             </button>
 
             <button
