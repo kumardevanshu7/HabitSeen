@@ -168,6 +168,75 @@ export const DEFAULT_CATEGORY: Category = {
   createdAt: new Date().toISOString(),
 };
 
+/**
+ * Pure transition calculator for Daily 100% Perfect Day Bonus (+100 XP & +1 Heart)
+ */
+function checkPerfectDayTransition(
+  habits: Habit[],
+  updatedLogs: Record<string, HabitLog>,
+  dateKey: string,
+  perfectDaysList: string[],
+  currentHearts: number,
+  maxHearts: number
+): {
+  extraBonusXp: number;
+  bonusHeartHealed: number;
+  updatedPerfectDays: string[];
+  justAwarded: boolean;
+} {
+  try {
+    const parsedDate = parseISO(dateKey);
+    const dueHabits = habits.filter(
+      (h) => !h.isArchived && isHabitDueOnDate(h, parsedDate, updatedLogs)
+    );
+
+    if (dueHabits.length === 0) {
+      return {
+        extraBonusXp: 0,
+        bonusHeartHealed: 0,
+        updatedPerfectDays: perfectDaysList,
+        justAwarded: false,
+      };
+    }
+
+    const allCompleted = dueHabits.every((h) => {
+      const l = updatedLogs[`${h.id}_${dateKey}`];
+      return l?.status === 'COMPLETED' || l?.status === 'EXCUSED';
+    });
+
+    const wasAlreadyPerfect = perfectDaysList.includes(dateKey);
+
+    if (allCompleted && !wasAlreadyPerfect) {
+      // Newly achieved 100% Perfect Day! Award +100 bonus Willpower XP & restore +1 heart
+      return {
+        extraBonusXp: 100,
+        bonusHeartHealed: currentHearts < maxHearts ? 1 : 0,
+        updatedPerfectDays: [...perfectDaysList, dateKey],
+        justAwarded: true,
+      };
+    }
+
+    if (!allCompleted && wasAlreadyPerfect) {
+      // Habit uncompleted/unlocked on a previously perfect day: roll back the 100 XP bonus
+      return {
+        extraBonusXp: -100,
+        bonusHeartHealed: 0,
+        updatedPerfectDays: perfectDaysList.filter((d) => d !== dateKey),
+        justAwarded: false,
+      };
+    }
+  } catch (err) {
+    console.error('Error checking perfect day transition:', err);
+  }
+
+  return {
+    extraBonusXp: 0,
+    bonusHeartHealed: 0,
+    updatedPerfectDays: perfectDaysList,
+    justAwarded: false,
+  };
+}
+
 export const useAppStore = create<AppState>()((set, get) => ({
   currentUser: null,
   authLoading: true,
@@ -583,56 +652,52 @@ export const useAppStore = create<AppState>()((set, get) => ({
     await updateHabitInDb(state.currentUser.uid, updatedHabit);
 
     // 100% PERFECT DAY BONUS ALGORITHM
-    let perfectDayBonusAwarded = false;
-    let perfectDaysList = state.user?.gamification?.perfectDaysCompleted || [];
-    let extraBonusXp = 0;
-    let bonusHeartHealed = 0;
+    const currentPerfectDays = state.user?.gamification?.perfectDaysCompleted || [];
+    const currentHearts = state.user?.gamification?.hearts ?? 5;
+    const maxHearts = state.user?.gamification?.maxHearts ?? 5;
 
-    if (status === 'COMPLETED' && state.user) {
-      try {
-        const parsedDate = parseISO(dateKey);
-        const dueHabits = state.habits.filter(
-          (h) => !h.isArchived && isHabitDueOnDate(h, parsedDate, updatedLogs)
-        );
+    const {
+      extraBonusXp,
+      bonusHeartHealed,
+      updatedPerfectDays,
+      justAwarded,
+    } = state.user
+      ? checkPerfectDayTransition(
+          state.habits,
+          updatedLogs,
+          dateKey,
+          currentPerfectDays,
+          currentHearts,
+          maxHearts
+        )
+      : {
+          extraBonusXp: 0,
+          bonusHeartHealed: 0,
+          updatedPerfectDays: currentPerfectDays,
+          justAwarded: false,
+        };
 
-        if (dueHabits.length > 0) {
-          const allCompleted = dueHabits.every((h) => {
-            const hLogKey = `${h.id}_${dateKey}`;
-            const logEntry = h.id === habitId ? newLog : updatedLogs[hLogKey];
-            return logEntry?.status === 'COMPLETED' || logEntry?.status === 'EXCUSED';
-          });
-
-          if (allCompleted && !perfectDaysList.includes(dateKey)) {
-            perfectDayBonusAwarded = true;
-            extraBonusXp = 100; // +100 Perfect Day Willpower XP Bonus!
-            perfectDaysList = [...perfectDaysList, dateKey];
-            if ((state.user.gamification.hearts ?? 5) < (state.user.gamification.maxHearts ?? 5)) {
-              bonusHeartHealed = 1;
-            }
-
-            // Confetti celebration
-            confetti({
-              particleCount: 100,
-              spread: 80,
-              origin: { y: 0.5 },
-              colors: ['#10B981', '#F59E0B', '#3B82F6', '#EC4899'],
-            });
-          }
-        }
-      } catch (e) {
-        console.error('Error computing perfect day bonus:', e);
-      }
+    if (justAwarded) {
+      // Confetti celebration
+      confetti({
+        particleCount: 100,
+        spread: 80,
+        origin: { y: 0.5 },
+        colors: ['#10B981', '#F59E0B', '#3B82F6', '#EC4899'],
+      });
     }
 
     // Update user XP & vitality in Firestore if changed
     const totalXpDelta = xpDelta + extraBonusXp;
-    if (state.user && (totalXpDelta !== 0 || bonusHeartHealed > 0 || perfectDayBonusAwarded)) {
+    const perfectDaysChanged = updatedPerfectDays.length !== currentPerfectDays.length ||
+      updatedPerfectDays.some((d, i) => d !== currentPerfectDays[i]);
+
+    if (state.user && (totalXpDelta !== 0 || bonusHeartHealed > 0 || perfectDaysChanged)) {
       const newTotalXp = Math.max(0, state.user.gamification.totalXp + totalXpDelta);
       const lvlInfo = levelFromXp(newTotalXp);
       const oldMaxHearts = state.user.gamification.maxHearts ?? 5;
       const newMaxHearts = calculateMaxHearts(newTotalXp);
       const heartCapacityGain = Math.max(0, newMaxHearts - oldMaxHearts);
-      const currentHearts = state.user.gamification.hearts ?? 5;
       const newHearts = Math.min(newMaxHearts, currentHearts + heartCapacityGain + bonusHeartHealed);
 
       const updatedUser: UserProfile = {
@@ -644,7 +709,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
           levelTitle: lvlInfo.title,
           hearts: newHearts,
           maxHearts: newMaxHearts,
-          perfectDaysCompleted: perfectDaysList,
+          perfectDaysCompleted: updatedPerfectDays,
         },
       };
 
@@ -729,15 +794,36 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
     await updateHabitInDb(state.currentUser.uid, updatedHabit);
 
-    // Revert previously earned XP if user is now skipping a previously completed habit
-    if (state.user && xpDelta !== 0) {
-      const newTotalXp = Math.max(0, state.user.gamification.totalXp + xpDelta);
+    // Revert previously earned XP and rollback perfect day bonus if user is skipping a previously completed habit
+    const currentPerfectDays = state.user?.gamification?.perfectDaysCompleted || [];
+    const currentHearts = state.user?.gamification?.hearts ?? 5;
+    const maxHearts = state.user?.gamification?.maxHearts ?? 5;
+
+    const {
+      extraBonusXp,
+      updatedPerfectDays,
+    } = state.user
+      ? checkPerfectDayTransition(
+          state.habits,
+          updatedLogs,
+          dateKey,
+          currentPerfectDays,
+          currentHearts,
+          maxHearts
+        )
+      : { extraBonusXp: 0, updatedPerfectDays: currentPerfectDays };
+
+    const totalXpDelta = xpDelta + extraBonusXp;
+    const perfectDaysChanged = updatedPerfectDays.length !== currentPerfectDays.length ||
+      updatedPerfectDays.some((d, i) => d !== currentPerfectDays[i]);
+
+    if (state.user && (totalXpDelta !== 0 || perfectDaysChanged)) {
+      const newTotalXp = Math.max(0, state.user.gamification.totalXp + totalXpDelta);
       const lvlInfo = levelFromXp(newTotalXp);
       const newLevel = lvlInfo.level;
       const newLevelTitle = lvlInfo.title;
 
       const newMaxHearts = calculateMaxHearts(newTotalXp);
-      const currentHearts = state.user.gamification.hearts ?? 5;
       const newHearts = Math.min(newMaxHearts, currentHearts);
 
       const updatedUser: UserProfile = {
@@ -749,6 +835,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
           levelTitle: newLevelTitle,
           hearts: newHearts,
           maxHearts: newMaxHearts,
+          perfectDaysCompleted: updatedPerfectDays,
         },
       };
 
@@ -849,9 +936,35 @@ export const useAppStore = create<AppState>()((set, get) => ({
     await updateHabitInDb(state.currentUser.uid, updatedHabit);
 
     if (state.user) {
+      const currentPerfectDays = state.user.gamification.perfectDaysCompleted || [];
       const currentHearts = state.user.gamification.hearts ?? 5;
-      const newHearts = Math.max(0, currentHearts - heartLoss);
-      const newTotalXp = Math.max(0, state.user.gamification.totalXp + xpDelta);
+      const maxHearts = state.user.gamification.maxHearts ?? 5;
+
+      const {
+        extraBonusXp,
+        bonusHeartHealed,
+        updatedPerfectDays,
+        justAwarded,
+      } = checkPerfectDayTransition(
+        state.habits,
+        updatedLogs,
+        dateKey,
+        currentPerfectDays,
+        currentHearts,
+        maxHearts
+      );
+
+      if (justAwarded) {
+        confetti({
+          particleCount: 100,
+          spread: 80,
+          origin: { y: 0.5 },
+          colors: ['#10B981', '#F59E0B', '#3B82F6', '#EC4899'],
+        });
+      }
+
+      const newHearts = Math.max(0, currentHearts - heartLoss + bonusHeartHealed);
+      const newTotalXp = Math.max(0, state.user.gamification.totalXp + xpDelta + extraBonusXp);
 
       const lvlInfo = levelFromXp(newTotalXp);
       const newLevel = lvlInfo.level;
@@ -863,11 +976,12 @@ export const useAppStore = create<AppState>()((set, get) => ({
         ...state.user,
         gamification: {
           ...state.user.gamification,
-          hearts: newHearts,
+          hearts: Math.min(newMaxHearts, newHearts),
           maxHearts: newMaxHearts,
           totalXp: newTotalXp,
           level: newLevel,
           levelTitle: newLevelTitle,
+          perfectDaysCompleted: updatedPerfectDays,
         },
       };
 

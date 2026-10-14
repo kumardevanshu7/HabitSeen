@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
 import { HabitCard } from './HabitCard';
 import { DayStrip } from './DayStrip';
@@ -22,6 +22,7 @@ import {
   ChevronRight,
   Archive,
   Flame,
+  Zap,
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -88,6 +89,19 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
     return l?.status === 'COMPLETED' || l?.status === 'EXCUSED';
   }).length;
   const isAllCompletedToday = totalDueCount > 0 && completedDueCount === totalDueCount;
+
+  // Floating celebratory toast when user achieves 100% completion
+  const [showPerfectDayToast, setShowPerfectDayToast] = useState(false);
+  const prevAllCompletedRef = useRef(isAllCompletedToday);
+
+  useEffect(() => {
+    if (!prevAllCompletedRef.current && isAllCompletedToday) {
+      setShowPerfectDayToast(true);
+      const timer = setTimeout(() => setShowPerfectDayToast(false), 5000);
+      return () => clearTimeout(timer);
+    }
+    prevAllCompletedRef.current = isAllCompletedToday;
+  }, [isAllCompletedToday]);
 
   // Habits that belong in the "Archived" category (finished duration or manually archived)
   const archivedHabits = habits
@@ -385,19 +399,33 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
         </button>
       </div>
 
+      {/* 100% PERFECT DAY CELEBRATION FLOATING TOAST */}
+      {showPerfectDayToast && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-ink/95 text-white text-xs sm:text-sm font-semibold px-4 sm:px-5 py-2.5 rounded-full shadow-2xl border border-amber-400/50 flex items-center gap-2.5 animate-in slide-in-from-top-4 duration-300">
+          <Sparkles size={16} className="text-amber-400 shrink-0" />
+          <span>🎉 <strong>100% Perfect Day!</strong> +100 Bonus Willpower XP Awarded! ⚡</span>
+        </div>
+      )}
+
       {/* 100% PERFECT DAY CELEBRATION BANNER */}
       {isAllCompletedToday && (
-        <div className="p-3.5 bg-gradient-to-r from-emerald-500/10 via-amber-500/15 to-emerald-500/10 border-2 border-emerald-500/40 rounded-2xl flex items-center justify-between gap-3 shadow-2xs animate-in fade-in duration-300">
-          <div className="flex items-center gap-2.5">
-            <span className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-              <Sparkles size={18} />
+        <div className="p-3.5 sm:p-4 bg-gradient-to-r from-emerald-500/15 via-amber-500/15 to-emerald-500/15 border-2 border-emerald-500/40 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm animate-in fade-in duration-300">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <Sparkles size={19} />
             </span>
-            <div>
-              <span className="text-xs font-black text-ink block">
-                🎉 100% Perfect Day Completed!
-              </span>
-              <span className="text-[11px] text-charcoal">
-                All {totalDueCount} tasks conquered for today! Fantastic consistency.
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs sm:text-sm font-black text-ink block">
+                  🎉 100% Perfect Day Completed!
+                </span>
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-black bg-amber-400/25 text-amber-800 border border-amber-400/50 shadow-2xs">
+                  <Zap size={11} className="fill-amber-500 text-amber-500 shrink-0" />
+                  +100 Bonus XP
+                </span>
+              </div>
+              <span className="text-[11px] sm:text-xs text-charcoal block mt-0.5">
+                All {totalDueCount} tasks conquered for today! +100 Willpower XP added to your score.
               </span>
             </div>
           </div>
