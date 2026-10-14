@@ -94,6 +94,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({
         />
         <input
           type="text"
+          aria-label="Search icons"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search icons (e.g. sugar, cake, morning, mom, gym...)"
@@ -102,6 +103,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({
         {searchQuery && (
           <button
             type="button"
+            aria-label="Clear search query"
             onClick={() => setSearchQuery('')}
             className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-charcoal hover:text-ink"
           >
@@ -141,7 +143,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({
                       }
                     : isSelected
                     ? {
-                        backgroundColor: '#FF5C5C',
+                        backgroundColor: '#E63946',
                         color: '#FFFFFF',
                       }
                     : undefined

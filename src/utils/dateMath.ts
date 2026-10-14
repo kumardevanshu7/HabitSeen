@@ -11,7 +11,7 @@ import {
   endOfYear,
   isWithinInterval,
 } from 'date-fns';
-import { Habit } from '../types/habit';
+import { Habit, HabitLog } from '../types/habit';
 
 export function getTodayKey(): string {
   return format(new Date(), 'yyyy-MM-dd');
@@ -33,7 +33,11 @@ export function calculateDaysBetween(startDateStr: string, endDateStr?: string):
   }
 }
 
-export function isHabitDueOnDate(habit: Habit, targetDate: Date): boolean {
+export function isHabitDueOnDate(
+  habit: Habit,
+  targetDate: Date,
+  allLogs?: Record<string, HabitLog>
+): boolean {
   const targetKey = format(targetDate, 'yyyy-MM-dd');
   const { startDate, endDate } = habit.schedule;
 
@@ -41,7 +45,7 @@ export function isHabitDueOnDate(habit: Habit, targetDate: Date): boolean {
   if (targetKey < startDate) return false;
   if (endDate && targetKey > endDate) return false;
 
-  const { type, daysOfWeek, daysOfMonth, daysOfYear, repeatEveryDays } = habit.frequency;
+  const { type, daysOfWeek, daysOfMonth, daysOfYear, repeatEveryDays, daysPerPeriod } = habit.frequency;
 
   switch (type) {
     case 'EVERYDAY':
@@ -54,8 +58,14 @@ export function isHabitDueOnDate(habit: Habit, targetDate: Date): boolean {
     }
 
     case 'SPECIFIC_DAYS_OF_MONTH': {
+      if (!Array.isArray(daysOfMonth)) return false;
       const dayOfMonth = targetDate.getDate();
-      return Array.isArray(daysOfMonth) ? daysOfMonth.includes(dayOfMonth) : false;
+      const lastDayOfMonth = endOfMonth(targetDate).getDate();
+      // If target is the last day of month (e.g. Feb 28, Apr 30), match scheduled days beyond the month length
+      if (dayOfMonth === lastDayOfMonth && daysOfMonth.some((d) => d >= lastDayOfMonth)) {
+        return true;
+      }
+      return daysOfMonth.includes(dayOfMonth);
     }
 
     case 'SPECIFIC_DAYS_OF_YEAR': {
@@ -63,9 +73,44 @@ export function isHabitDueOnDate(habit: Habit, targetDate: Date): boolean {
       return Array.isArray(daysOfYear) ? daysOfYear.includes(monthDay) : false;
     }
 
-    case 'DAYS_PER_PERIOD':
-      // Marked as active target for that cycle
-      return true;
+    case 'DAYS_PER_PERIOD': {
+      if (!daysPerPeriod) return true;
+      const { targetCount, period } = daysPerPeriod;
+      if (!allLogs) return true;
+
+      // If targetDate was explicitly completed, it is due & completed
+      const logToday = allLogs[`${habit.id}_${targetKey}`];
+      if (logToday && (logToday.status === 'COMPLETED' || logToday.status === 'EXCUSED')) {
+        return true;
+      }
+
+      // Check completions within targetDate's period
+      let pStart: Date;
+      let pEnd: Date;
+      if (period === 'MONTH') {
+        pStart = startOfMonth(targetDate);
+        pEnd = endOfMonth(targetDate);
+      } else if (period === 'YEAR') {
+        pStart = startOfYear(targetDate);
+        pEnd = endOfYear(targetDate);
+      } else {
+        pStart = startOfWeek(targetDate, { weekStartsOn: 1 });
+        pEnd = endOfWeek(targetDate, { weekStartsOn: 1 });
+      }
+
+      let completedCount = 0;
+      for (const log of Object.values(allLogs)) {
+        if (log.habitId === habit.id && log.status === 'COMPLETED') {
+          const lDate = parseISO(log.date);
+          if (isWithinInterval(lDate, { start: pStart, end: pEnd })) {
+            completedCount++;
+          }
+        }
+      }
+
+      // Due only while target count in period is not yet met
+      return completedCount < targetCount;
+    }
 
     case 'INTERVAL_REPEAT': {
       const start = parseISO(startDate);

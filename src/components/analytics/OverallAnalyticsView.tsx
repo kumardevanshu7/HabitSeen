@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAppStore } from '../../stores/useAppStore';
 import { WILL_HABIT_TIERS, CATEGORY_ICONS } from '../../constants/iconsAndColors';
+import { levelFromXp } from '../../constants/gamification';
 import { boostVibrancy, getContrastIconColor } from '../../utils/colorUtils';
 import {
   Award,
@@ -21,6 +22,8 @@ import {
   Heart,
   Skull,
   Trophy,
+  BarChart2,
+  ChevronRight,
 } from 'lucide-react';
 import {
   eachDayOfInterval,
@@ -34,8 +37,15 @@ import {
   isWithinInterval,
 } from 'date-fns';
 import clsx from 'clsx';
+import { Habit } from '../../types/habit';
 
-export const OverallAnalyticsView: React.FC = () => {
+interface OverallAnalyticsViewProps {
+  onOpenHabitDetails?: (habit: Habit) => void;
+}
+
+export const OverallAnalyticsView: React.FC<OverallAnalyticsViewProps> = ({
+  onOpenHabitDetails,
+}) => {
   const { user, habits, logs, habitBreaks, categories, challenges } = useAppStore();
 
   const userLevel = user?.gamification?.level ?? 1;
@@ -43,19 +53,11 @@ export const OverallAnalyticsView: React.FC = () => {
   const userTitle = user?.gamification?.levelTitle ?? 'Will Habit Initiate';
   const userConsistency = user?.gamification?.consistencyScore ?? 100;
 
+  const lvlInfo = levelFromXp(userXp);
   const currentTier =
     WILL_HABIT_TIERS.find((t) => t.level === userLevel) || WILL_HABIT_TIERS[0];
   const nextTier = WILL_HABIT_TIERS.find((t) => t.level === userLevel + 1);
-
-  const xpProgress = nextTier
-    ? Math.min(
-        100,
-        Math.max(
-          0,
-          ((userXp - currentTier.minXp) / (nextTier.minXp - currentTier.minXp)) * 100
-        )
-      )
-    : 100;
+  const xpProgress = lvlInfo.progress * 100;
 
   // Total Completed Logs
   const allLogsArray = Object.values(logs);
@@ -461,7 +463,97 @@ export const OverallAnalyticsView: React.FC = () => {
         )}
       </div>
 
-      {/* 4. DAY-OF-WEEK DISCIPLINE MATRIX & HABIT TYPES */}
+      {/* 4. INDIVIDUAL HABITS CONSISTENCY & DETAILED ANALYTICS */}
+      <div className="bg-surface-card border border-hairline rounded-3xl p-6 shadow-xs">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div>
+            <h4 className="font-display font-bold text-lg text-ink flex items-center gap-2">
+              <BarChart2 size={19} className="text-primary" /> Individual Habit Analytics
+            </h4>
+            <p className="text-xs text-charcoal">
+              Tap any habit to view in-depth streaks, calendar completion matrix, and metrics.
+            </p>
+          </div>
+          <span className="font-mono text-xs font-bold text-charcoal bg-surface-bone px-2.5 py-1 rounded-full border border-hairline">
+            {habits.length} Habits Tracked
+          </span>
+        </div>
+
+        {habits.length === 0 ? (
+          <div className="p-4 bg-canvas rounded-2xl border border-dashed border-hairline text-center text-xs text-charcoal">
+            No habits created yet. Go to Habits tab and create your first routine!
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {habits.map((h) => {
+              const category = categories.find((c) => c.id === h.categoryId);
+              const CatIcon =
+                CATEGORY_ICONS.find((i) => i.id === category?.icon)?.icon || CATEGORY_ICONS[0].icon;
+              const catColor = boostVibrancy(category?.color);
+              const iconColor = getContrastIconColor(catColor);
+
+              const hLogs = allLogsArray.filter((l) => l.habitId === h.id);
+              const hCompleted = hLogs.filter((l) => l.status === 'COMPLETED').length;
+              const hSuccessRate =
+                hLogs.length > 0 ? Math.round((hCompleted / hLogs.length) * 100) : 0;
+              const streak = h.stats?.currentStreak || 0;
+
+              return (
+                <div
+                  key={h.id}
+                  onClick={() => onOpenHabitDetails?.(h)}
+                  className="p-3.5 bg-canvas hover:bg-surface-bone/80 rounded-2xl border border-hairline hover:border-hairline-strong transition-all cursor-pointer flex items-center justify-between gap-3 group shadow-2xs"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span
+                      className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-2xs"
+                      style={{ backgroundColor: catColor, color: iconColor }}
+                    >
+                      <CatIcon size={18} strokeWidth={2.5} />
+                    </span>
+                    <div className="min-w-0">
+                      <h5 className="font-bold text-sm text-ink group-hover:text-primary transition-colors truncate">
+                        {h.name}
+                      </h5>
+                      <div className="flex items-center gap-2 text-[10px] text-charcoal mt-0.5 flex-wrap">
+                        <span className="font-semibold uppercase tracking-wider">
+                          {category?.name || 'General'}
+                        </span>
+                        <span>•</span>
+                        <span className="font-mono">
+                          {hCompleted} completed
+                        </span>
+                        {streak > 0 && (
+                          <>
+                            <span>•</span>
+                            <span className="font-mono font-bold text-primary flex items-center gap-0.5">
+                              <Flame size={10} className="fill-current" /> {streak}d streak
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="text-right">
+                      <span className="font-mono text-xs font-bold text-ink block">
+                        {hSuccessRate}%
+                      </span>
+                      <span className="text-[9px] text-stone uppercase">Rate</span>
+                    </div>
+                    <span className="w-7 h-7 rounded-full bg-surface-card group-hover:bg-primary group-hover:text-white text-charcoal flex items-center justify-center transition-colors border border-hairline">
+                      <ChevronRight size={14} />
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* 5. DAY-OF-WEEK DISCIPLINE MATRIX & HABIT TYPES */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Day of Week Consistency */}
         <div className="p-5 bg-surface-card border border-hairline rounded-3xl">

@@ -122,6 +122,9 @@ export const HabitBreakHub: React.FC = () => {
   // Format Elapsed Time (Days, Hours, Mins, Secs)
   const formatElapsedTime = (startedAt: string) => {
     const startMs = new Date(startedAt).getTime();
+    if (isNaN(startMs)) {
+      return { days: 0, hours: 0, mins: 0, secs: 0, totalSeconds: 0, isScheduledFuture: false };
+    }
     const diffMs = Date.now() - startMs;
     const isScheduledFuture = diffMs < 0;
     const elapsedSeconds = Math.max(0, Math.floor(Math.abs(diffMs) / 1000));

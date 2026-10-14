@@ -71,24 +71,16 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
 
   const selectedDateTime = parseISO(selectedDate);
 
-  // Check if a habit is completed/archived for the selected date
-  const isHabitInArchived = (h: Habit): boolean => {
+  // Check if a habit is permanently ended/archived (NOT just completed for today)
+  const isHabitArchived = (h: Habit): boolean => {
     if (h.isArchived) return true;
     if (h.schedule?.endDate && selectedDate > h.schedule.endDate) return true;
-    if (
-      h.schedule?.totalDays &&
-      h.schedule.totalDays > 0 &&
-      (h.stats?.timesCompletedAllTime || 0) >= h.schedule.totalDays
-    ) {
-      return true;
-    }
-    const dayLog = logs[`${h.id}_${selectedDate}`];
-    return dayLog?.status === 'COMPLETED';
+    return false;
   };
 
   // All habits due on selected date (for 100% Perfect Day calculation)
   const allScheduledDueToday = habits.filter(
-    (h) => !h.isArchived && isHabitDueOnDate(h, selectedDateTime)
+    (h) => !isHabitArchived(h) && isHabitDueOnDate(h, selectedDateTime, logs)
   );
   const totalDueCount = allScheduledDueToday.length;
   const completedDueCount = allScheduledDueToday.filter((h) => {
@@ -97,29 +89,17 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
   }).length;
   const isAllCompletedToday = totalDueCount > 0 && completedDueCount === totalDueCount;
 
-  // Habits that belong in the "Archived" category (completed on selectedDate, finished duration, or manually archived)
+  // Habits that belong in the "Archived" category (finished duration or manually archived)
   const archivedHabits = habits
-    .filter((h) => {
-      if (h.isArchived) return true;
-      if (h.schedule?.endDate && selectedDate > h.schedule.endDate) return true;
-      if (
-        h.schedule?.totalDays &&
-        h.schedule.totalDays > 0 &&
-        (h.stats?.timesCompletedAllTime || 0) >= h.schedule.totalDays
-      ) {
-        return true;
-      }
-      if (!isHabitDueOnDate(h, selectedDateTime)) return false;
-      return isHabitInArchived(h);
-    })
+    .filter((h) => isHabitArchived(h))
     .sort((a, b) => {
       const pA = typeof a.schedule.priority === 'number' ? a.schedule.priority : 50;
       const pB = typeof b.schedule.priority === 'number' ? b.schedule.priority : 50;
       return pB - pA;
     });
 
-  // Active (not yet completed today & not archived) habits
-  const activeHabits = habits.filter((h) => !isHabitInArchived(h));
+  // Active (not archived / ended) habits
+  const activeHabits = habits.filter((h) => !isHabitArchived(h));
 
   // If currently selected category was deleted, safely fallback to 'all'
   const isSelectedCategoryValid =
@@ -137,7 +117,7 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
             if (effectiveCatFilter !== 'all' && h.categoryId !== effectiveCatFilter) {
               return false;
             }
-            return isHabitDueOnDate(h, selectedDateTime);
+            return isHabitDueOnDate(h, selectedDateTime, logs);
           })
           .sort((a, b) => {
             const pA = typeof a.schedule.priority === 'number' ? a.schedule.priority : 50;
@@ -417,19 +397,10 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
                 🎉 100% Perfect Day Completed!
               </span>
               <span className="text-[11px] text-charcoal">
-                All {totalDueCount} tasks conquered! Completed habits moved to Archived.
+                All {totalDueCount} tasks conquered for today! Fantastic consistency.
               </span>
             </div>
           </div>
-          {effectiveCatFilter !== 'cat-archived' && (
-            <button
-              type="button"
-              onClick={() => setSelectedCatFilter('cat-archived')}
-              className="text-xs font-mono font-bold bg-white text-emerald-700 hover:bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-300 shrink-0 transition-colors"
-            >
-              View Archived ({archivedHabits.length})
-            </button>
-          )}
         </div>
       )}
 
@@ -439,7 +410,7 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
           {effectiveCatFilter === 'cat-archived' ? (
             <>
               <Archive size={13} className="text-emerald-600" />
-              <span>Archived &amp; Completed Habits ({dueHabits.length})</span>
+              <span>Archived Habits ({dueHabits.length})</span>
             </>
           ) : (
             <span>Scheduled Habits ({dueHabits.length})</span>
@@ -492,21 +463,17 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
           </div>
           <h3 className="font-display font-bold text-lg text-ink">
             {effectiveCatFilter === 'cat-archived'
-              ? 'No Completed or Archived Habits Yet'
+              ? 'No Archived Habits Yet'
               : habits.length === 0
                 ? 'No Habits Created Yet'
-                : isAllCompletedToday
-                  ? 'All Habits Completed for Today!'
-                  : `No remaining habits for ${format(selectedDateTime, 'EEEE, dd MMMM yyyy')}`}
+                : `No scheduled habits for ${format(selectedDateTime, 'EEEE, dd MMMM yyyy')}`}
           </h3>
           <p className="text-charcoal text-xs sm:text-sm mt-1 max-w-md mx-auto">
             {effectiveCatFilter === 'cat-archived'
-              ? 'Whenever you complete a habit or archive it, it automatically moves into this Archived section.'
+              ? 'Habits that reach their end date or are manually archived will appear here.'
               : habits.length === 0
                 ? 'Start small. Click the button below to configure your first daily habit target.'
-                : isAllCompletedToday
-                  ? `Your ${archivedHabits.length} completed habit(s) have been moved to the Archived category.`
-                  : `You have ${activeHabits.length} active habit(s) and ${archivedHabits.length} archived/completed habit(s).`}
+                : `You have ${activeHabits.length} active habit(s).`}
           </p>
 
           <div className="flex items-center justify-center gap-2.5 mt-5 flex-wrap">

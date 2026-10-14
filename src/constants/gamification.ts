@@ -6,7 +6,7 @@ export interface StreakMilestone {
 }
 
 export const STREAK_CHALLENGES: StreakMilestone[] = [
-  { days: 1, title: 'The Spark', badgeLabel: '1D', description: 'The journey of consistency begins with single day.' },
+  { days: 1, title: 'The Spark', badgeLabel: '1D', description: 'The journey of consistency begins with a single day.' },
   { days: 7, title: 'One-Week Strong', badgeLabel: '7D', description: 'Survived the first full cycle and weekend.' },
   { days: 10, title: 'Double Digits', badgeLabel: '10D', description: 'Breaking through the initial novelty phase.' },
   { days: 15, title: 'Fortitude', badgeLabel: '15D', description: 'Neural pathways are actively rewiring.' },
@@ -16,14 +16,6 @@ export const STREAK_CHALLENGES: StreakMilestone[] = [
   { days: 200, title: 'Unwavering Pillar', badgeLabel: '200D', description: 'Resistant to excuses, distractions, and burnout.' },
   { days: 365, title: 'Year of Triumph', badgeLabel: '365D', description: 'One complete rotation around the sun unconquered.' },
   { days: 500, title: 'Legendary Monk', badgeLabel: '500D', description: 'Top 0.1% dedication tier achieved.' },
-];
-
-export const WILL_HABIT_TIERS = [
-  { level: 1, title: 'Will Habit Initiate', minXp: 0, maxXp: 500, color: '#646464' },
-  { level: 2, title: 'Will Habit: Iron Will', minXp: 500, maxXp: 1500, color: '#2b9a66' },
-  { level: 3, title: 'Will Habit: Unbreakable', minXp: 1500, maxXp: 3500, color: '#3b82f6' },
-  { level: 4, title: 'Will Habit: Master Mind', minXp: 3500, maxXp: 7000, color: '#8b5cf6' },
-  { level: 5, title: 'Will Habit: Legendary God', minXp: 7000, maxXp: 20000, color: '#ea2804' },
 ];
 
 export const MISS_PENALTIES = {
@@ -36,7 +28,7 @@ export const MISS_PENALTIES = {
     badge: '🛡️ Streak Preserved',
   },
   FORGOT_ACCIDENTAL: {
-    xpPenalty: 10,
+    xpPenalty: 15,
     heartsLost: 1,
     preserveStreak: false,
     maxPerMonth: Infinity,
@@ -45,10 +37,10 @@ export const MISS_PENALTIES = {
   },
   INTENTIONAL_MISS: {
     xpPenalty: 25,
-    heartsLost: 2,
+    heartsLost: 1,
     preserveStreak: false,
     maxPerMonth: Infinity,
-    title: 'Intentional Skip',
+    title: 'Intentional Skip / Procrastinated',
     badge: '❌ Major Penalty',
   },
 } as const;
@@ -66,7 +58,51 @@ export function getFlameTier(streak: number) {
 }
 
 // 30-level dynamic XP progression curve: XP(L) = round(100 * L^1.6)
-export const xpForLevel = (L: number) => Math.round(100 * Math.pow(L, 1.6));
+export const xpForLevel = (L: number) => Math.round(100 * Math.pow(Math.max(1, L), 1.6));
+
+export function getTitleForLevel(level: number): string {
+  const L = Math.floor(Math.max(1, level));
+  if (L >= 30) return 'The Ascended';
+  if (L >= 25) return 'Legendary Monk';
+  if (L >= 20) return 'Stoic Sage';
+  if (L >= 15) return 'Master Mind';
+  if (L >= 10) return 'The Centurion';
+  if (L >= 8) return 'Neural Master';
+  if (L >= 5) return 'Iron Will Veteran';
+  if (L >= 2) return 'Iron Will';
+  return 'Will Habit Initiate';
+}
+
+export function getColorForLevel(level: number): string {
+  const L = Math.floor(Math.max(1, level));
+  if (L >= 30) return '#ea2804'; // Mythic red
+  if (L >= 25) return '#f59e0b'; // Amber
+  if (L >= 20) return '#8b5cf6'; // Purple
+  if (L >= 15) return '#3b82f6'; // Blue
+  if (L >= 10) return '#06b6d4'; // Cyan
+  if (L >= 5) return '#10b981';  // Emerald
+  if (L >= 2) return '#2b9a66';  // Green
+  return '#646464';              // Slate
+}
+
+export interface WillHabitTier {
+  level: number;
+  title: string;
+  minXp: number;
+  maxXp: number;
+  color: string;
+}
+
+export const WILL_HABIT_TIERS: WillHabitTier[] = Array.from({ length: 30 }, (_, i) => {
+  const level = i + 1;
+  return {
+    level,
+    title: getTitleForLevel(level),
+    minXp: level === 1 ? 0 : xpForLevel(level),
+    maxXp: level === 30 ? Infinity : xpForLevel(level + 1),
+    color: getColorForLevel(level),
+  };
+});
 
 export function levelFromXp(totalXp: number): {
   level: number;
@@ -75,23 +111,25 @@ export function levelFromXp(totalXp: number): {
   nextLevelXp: number;
   progress: number;
 } {
+  const safeXp = Math.max(0, Math.floor(Number(totalXp) || 0));
   let L = 1;
-  while (L < 30 && totalXp >= xpForLevel(L + 1)) {
+  while (L < 30 && safeXp >= xpForLevel(L + 1)) {
     L++;
   }
-  const currentLevelXp = xpForLevel(L);
+  const currentLevelXp = L === 1 ? 0 : xpForLevel(L);
   const nextLevelXp = xpForLevel(L + 1);
-  const progress = Math.min(1, Math.max(0, (totalXp - currentLevelXp) / Math.max(1, nextLevelXp - currentLevelXp)));
+  const progress = Math.min(
+    1,
+    Math.max(0, (safeXp - currentLevelXp) / Math.max(1, nextLevelXp - currentLevelXp))
+  );
 
-  let title = 'Will Initiate';
-  if (L >= 30) title = 'Ascended';
-  else if (L >= 25) title = 'Legendary Monk';
-  else if (L >= 20) title = 'Stoic Sage';
-  else if (L >= 15) title = 'Master Mind';
-  else if (L >= 10) title = 'Unbreakable';
-  else if (L >= 5) title = 'Iron Will';
-
-  return { level: L, title, currentLevelXp, nextLevelXp, progress };
+  return {
+    level: L,
+    title: getTitleForLevel(L),
+    currentLevelXp,
+    nextLevelXp,
+    progress,
+  };
 }
 
 /**
@@ -127,5 +165,17 @@ export function getNextHeartsUpgrade(totalXp: number): {
     currentMax,
     nextThreshold,
     xpNeeded: Math.max(0, nextThreshold - totalXp),
+  };
+}
+
+export function getChallengeReward(challenge: { targetDays: number }) {
+  const targetDays = Math.max(1, challenge.targetDays || 7);
+  const dailyXp = 50;
+  const victoryBonusXp = targetDays * 30;
+  const totalPossibleXp = targetDays * dailyXp + victoryBonusXp;
+  return {
+    dailyXp,
+    victoryBonusXp,
+    totalPossibleXp,
   };
 }

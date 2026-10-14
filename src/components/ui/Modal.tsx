@@ -114,19 +114,23 @@ export const Modal: React.FC<ModalProps> = ({
     };
   }, [isOpen, titleId]);
 
-  // 2. Escape key handler
+  // 2. Escape key handler (only closes the top-most modal in the stack)
   useEffect(() => {
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        const topModal = openModalStack[openModalStack.length - 1];
+        if (topModal && topModal.id === titleId) {
+          e.stopPropagation();
+          onClose();
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, titleId]);
 
   if (!isOpen) return null;
 

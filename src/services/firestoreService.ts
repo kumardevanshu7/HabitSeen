@@ -8,6 +8,9 @@ import {
   query,
   where,
   getDocs,
+  deleteField,
+  updateDoc,
+  CollectionReference,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import {
@@ -20,24 +23,46 @@ import {
 } from '../types/habit';
 import { cleanFirestoreData } from '../utils/firestoreCleaner';
 
+export interface ProfileSnapshotMeta {
+  exists: boolean;
+  fromCache: boolean;
+}
+
 // 1. User Profile Sync
 export const subscribeUserProfile = (
   userId: string,
-  onUpdate: (profile: UserProfile | null) => void,
-  onError?: (error: Error) => void
+  onUpdate: (profile: UserProfile | null, meta: ProfileSnapshotMeta) => void,
+  onError?: (error: Error) => void,
+  onReady?: () => void
 ) => {
   const ref = doc(db, 'users', userId);
+  let hasFired = false;
+  const timeoutId = setTimeout(() => {
+    if (!hasFired) {
+      onReady?.();
+    }
+  }, 6000);
+
   return onSnapshot(
     ref,
+    { includeMetadataChanges: true },
     (snap) => {
-      if (snap.exists()) {
-        onUpdate(snap.data() as UserProfile);
-      } else if (!snap.metadata.fromCache) {
+      hasFired = true;
+      clearTimeout(timeoutId);
+      const exists = snap.exists();
+      const fromCache = snap.metadata.fromCache;
+      if (exists) {
+        onUpdate(snap.data() as UserProfile, { exists: true, fromCache });
+      } else if (!fromCache) {
         // Document genuinely doesn't exist on server (not an initial offline cache miss)
-        onUpdate(null);
+        onUpdate(null, { exists: false, fromCache: false });
+      } else {
+        // Offline cache miss
+        onReady?.();
       }
     },
     (error) => {
+      clearTimeout(timeoutId);
       console.error('subscribeUserProfile error:', error);
       onError?.(error);
     }
@@ -54,6 +79,14 @@ export const saveUserProfileToDb = async (
     updatedAt: new Date().toISOString(),
   });
   await setDoc(ref, cleaned, { merge: true });
+};
+
+export const clearUserSecurityInDb = async (userId: string) => {
+  const ref = doc(db, 'users', userId);
+  await updateDoc(ref, {
+    security: deleteField(),
+    updatedAt: new Date().toISOString(),
+  });
 };
 
 // 2. Categories Sync
@@ -309,59 +342,47 @@ export const deleteChallengeFromDb = async (
   await deleteDoc(ref);
 };
 
+// Helper: Delete entire collection in safe chunks of 400 to respect Firestore 500-operation limit
+export const deleteCollectionInChunks = async (
+  colRef: CollectionReference,
+  chunkSize: number = 400
+) => {
+  const snap = await getDocs(colRef);
+  if (!snap.empty) {
+    const docs = snap.docs;
+    for (let i = 0; i < docs.length; i += chunkSize) {
+      const chunk = docs.slice(i, i + chunkSize);
+      const batch = writeBatch(db);
+      chunk.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+    }
+  }
+};
+
 // 6. Complete User Data Reset (Fresh Start)
 export const resetEntireUserDataInDb = async (userId: string) => {
   // 1. Delete habits
-  const habitsCol = collection(db, 'users', userId, 'habits');
-  const habitsSnap = await getDocs(habitsCol);
-  if (!habitsSnap.empty) {
-    const batch1 = writeBatch(db);
-    habitsSnap.forEach((d) => batch1.delete(d.ref));
-    await batch1.commit();
-  }
+  await deleteCollectionInChunks(collection(db, 'users', userId, 'habits'));
 
   // 2. Delete logs
-  const logsCol = collection(db, 'users', userId, 'logs');
-  const logsSnap = await getDocs(logsCol);
-  if (!logsSnap.empty) {
-    const batch2 = writeBatch(db);
-    logsSnap.forEach((d) => batch2.delete(d.ref));
-    await batch2.commit();
-  }
+  await deleteCollectionInChunks(collection(db, 'users', userId, 'logs'));
 
   // 3. Delete categories
-  const catsCol = collection(db, 'users', userId, 'categories');
-  const catsSnap = await getDocs(catsCol);
-  if (!catsSnap.empty) {
-    const batch3 = writeBatch(db);
-    catsSnap.forEach((d) => batch3.delete(d.ref));
-    await batch3.commit();
-  }
+  await deleteCollectionInChunks(collection(db, 'users', userId, 'categories'));
 
   // 4. Delete habit breaks
-  const breaksCol = collection(db, 'users', userId, 'habitBreaks');
-  const breaksSnap = await getDocs(breaksCol);
-  if (!breaksSnap.empty) {
-    const batch4 = writeBatch(db);
-    breaksSnap.forEach((d) => batch4.delete(d.ref));
-    await batch4.commit();
-  }
+  await deleteCollectionInChunks(collection(db, 'users', userId, 'habitBreaks'));
 
   // 5. Delete challenges
-  const challengesCol = collection(db, 'users', userId, 'challenges');
-  const challengesSnap = await getDocs(challengesCol);
-  if (!challengesSnap.empty) {
-    const batch5 = writeBatch(db);
-    challengesSnap.forEach((d) => batch5.delete(d.ref));
-    await batch5.commit();
-  }
+  await deleteCollectionInChunks(collection(db, 'users', userId, 'challenges'));
 
-  // 6. Reset user profile to isOnboarded: false
+  // 6. Reset user profile to isOnboarded: false (Done last so failed delete can be retried safely)
   const userRef = doc(db, 'users', userId);
   await setDoc(
     userRef,
     {
       isOnboarded: false,
+      security: deleteField(),
       gamification: {
         level: 1,
         levelTitle: 'Will Habit Initiate',

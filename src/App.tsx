@@ -28,6 +28,7 @@ import { DashboardFooter } from './components/navigation/DashboardFooter';
 import { AchievementsModal } from './components/achievements/AchievementsModal';
 import { BrandLegalModal, BrandLegalTab } from './components/brand/BrandLegalModal';
 import { isModalHandlingPopState } from './components/ui/Modal';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { Button } from './components/ui/Button';
 import { AlertCircle, RefreshCw, WifiOff } from 'lucide-react';
 
@@ -43,6 +44,7 @@ export const App: React.FC = () => {
     syncError,
     setUser,
     setProfileLoading,
+    setProfileStatus,
     setSyncError,
     setCategories,
     setHabits,
@@ -62,6 +64,9 @@ export const App: React.FC = () => {
   const [isBrandLegalOpen, setIsBrandLegalOpen] = useState(false);
   const [brandLegalTab, setBrandLegalTab] = useState<BrandLegalTab>('explore');
   const [splashTimedOut, setSplashTimedOut] = useState(false);
+  const [showExitToast, setShowExitToast] = useState(false);
+  const exitToastTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastBackPressTimeRef = useRef<number>(0);
 
   const navStateRef = useRef<{ tab: AppTab; category: string }>({
     tab: 'habits',
@@ -153,7 +158,18 @@ export const App: React.FC = () => {
         return;
       }
 
-      // 4. Even on Home ('habits' + 'all'), keep a buffer entry so accidental back swipe doesn't close PWA
+      // 4. On Home ('habits' + 'all'): Double-back to exit
+      const now = Date.now();
+      if (now - lastBackPressTimeRef.current < 2000) {
+        window.history.back();
+        return;
+      }
+
+      lastBackPressTimeRef.current = now;
+      setShowExitToast(true);
+      if (exitToastTimerRef.current) clearTimeout(exitToastTimerRef.current);
+      exitToastTimerRef.current = setTimeout(() => setShowExitToast(false), 2000);
+
       window.history.pushState(
         { tab: 'habits', category: 'all', isAppNav: true },
         ''
@@ -192,22 +208,32 @@ export const App: React.FC = () => {
   }, [setCurrentUser, setAuthLoading, resetStore]);
 
   // 2. Real-time Cloud Firestore Subscriptions for Authenticated User
+  const currentUid = currentUser?.uid;
+
   useEffect(() => {
-    if (!currentUser) {
-      resetStore();
+    if (!currentUid) {
       return;
     }
 
     setProfileLoading(true);
-    const userId = currentUser.uid;
+    const userId = currentUid;
 
     const unsubProfile = subscribeUserProfile(
       userId,
-      (profile) => {
+      (profile, meta) => {
         setUser(profile);
+        if (profile) {
+          setProfileStatus('exists');
+        } else if (!meta.fromCache) {
+          setProfileStatus('missing');
+        }
       },
       (err) => {
         setSyncError(err.message);
+      },
+      () => {
+        setProfileStatus('unknown');
+        setProfileLoading(false);
       }
     );
 
@@ -270,7 +296,7 @@ export const App: React.FC = () => {
       unsubChallenges();
     };
   }, [
-    currentUser,
+    currentUid,
     setUser,
     setProfileLoading,
     setSyncError,
@@ -279,7 +305,7 @@ export const App: React.FC = () => {
     setLogs,
     setHabitBreaks,
     setChallenges,
-    resetStore,
+    setProfileStatus,
   ]);
 
   // Loading Splash Screen with 8s Timeout & Offline Fallback
@@ -319,7 +345,10 @@ export const App: React.FC = () => {
                 variant="dark"
                 size="sm"
                 className="flex-1 text-xs gap-1.5"
-                onClick={() => setProfileLoading(false)}
+                onClick={() => {
+                  setProfileStatus('unknown');
+                  setProfileLoading(false);
+                }}
               >
                 <WifiOff size={13} /> Continue Offline
               </Button>
@@ -358,25 +387,49 @@ export const App: React.FC = () => {
       />
 
       {/* MAIN CONTAINER */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 pb-24 md:pb-12">
-        {activeTab === 'habits' && (
-          <HabitsView
-            selectedCategory={selectedCategory}
-            onSelectCategory={handleSelectCategory}
-            onOpenChallengesTab={() => handleSelectTab('challenges')}
-            onOpenCreateHabit={() => {
-              setEditingHabit(null);
-              setIsCreateHabitOpen(true);
-            }}
-            onOpenHabitDetails={(habit) => setInspectedHabit(habit)}
-          />
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 pb-24 md:pb-12 space-y-4">
+        {syncError && (
+          <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-2xl flex items-center justify-between gap-3 text-xs text-amber-900 shadow-2xs">
+            <div className="flex items-center gap-2">
+              <AlertCircle size={16} className="text-amber-600 shrink-0" />
+              <span>
+                <strong>Cloud Sync Alert:</strong> {syncError} (operating in local offline cache mode)
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSyncError(null)}
+              className="text-amber-700 hover:text-amber-900 underline font-semibold shrink-0"
+            >
+              Dismiss
+            </button>
+          </div>
         )}
 
-        {activeTab === 'challenges' && <ChallengesView />}
+        <ErrorBoundary fallbackTitle="An error occurred rendering this section">
+          {activeTab === 'habits' && (
+            <HabitsView
+              selectedCategory={selectedCategory}
+              onSelectCategory={handleSelectCategory}
+              onOpenChallengesTab={() => handleSelectTab('challenges')}
+              onOpenCreateHabit={() => {
+                setEditingHabit(null);
+                setIsCreateHabitOpen(true);
+              }}
+              onOpenHabitDetails={(habit) => setInspectedHabit(habit)}
+            />
+          )}
 
-        {activeTab === 'breaks' && <HabitBreakHub />}
+          {activeTab === 'challenges' && <ChallengesView />}
 
-        {activeTab === 'analytics' && <OverallAnalyticsView />}
+          {activeTab === 'breaks' && <HabitBreakHub />}
+
+          {activeTab === 'analytics' && (
+            <OverallAnalyticsView
+              onOpenHabitDetails={(habit) => setInspectedHabit(habit)}
+            />
+          )}
+        </ErrorBoundary>
       </main>
 
       {/* DASHBOARD AUTHENTICATED FOOTER: 100 ACHIEVEMENTS & ARIGATO LABS BRANDING */}
@@ -444,6 +497,13 @@ export const App: React.FC = () => {
           setIsCreateHabitOpen(true);
         }}
       />
+
+      {/* DOUBLE-BACK EXIT TOAST */}
+      {showExitToast && (
+        <div className="fixed bottom-20 md:bottom-8 left-1/2 -translate-x-1/2 z-50 bg-ink/95 text-white text-xs font-semibold px-4 py-2 rounded-full shadow-lg border border-white/10 animate-in fade-in duration-200 pointer-events-none">
+          Press back again to exit
+        </div>
+      )}
     </div>
   );
 };

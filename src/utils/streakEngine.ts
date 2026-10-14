@@ -1,6 +1,18 @@
 import { Habit, HabitLog } from '../types/habit';
 import { STREAK_CHALLENGES } from '../constants/gamification';
-import { differenceInCalendarDays, parseISO, addDays, format, startOfWeek } from 'date-fns';
+import {
+  differenceInCalendarDays,
+  parseISO,
+  addDays,
+  format,
+  startOfWeek,
+  addWeeks,
+  subWeeks,
+  addMonths,
+  subMonths,
+  addYears,
+  subYears,
+} from 'date-fns';
 import { isHabitDueOnDate, getTodayKey } from './dateMath';
 
 export function evaluateHabitSuccess(
@@ -19,42 +31,66 @@ export function evaluateHabitSuccess(
     case 'NUMERIC': {
       const cfg = habit.config.numeric;
       if (!cfg) return { isSuccess: false, progressRatio: 0 };
+      if (log.valueNumeric === undefined && log.status !== 'COMPLETED') {
+        return { isSuccess: false, progressRatio: 0 };
+      }
       const current = Number(log.valueNumeric) || 0;
-      const goal = Number(cfg.goal) || 1;
+      const rawGoal = Number(cfg.goal);
+      const goal = Number.isFinite(rawGoal) ? rawGoal : 1;
       const op = (cfg.operator || 'AT_LEAST').toUpperCase();
       let ok = false;
-      if (op === 'LESS_THAN') ok = current >= 0 && current < goal;
+      if (op === 'LESS_THAN') ok = log.valueNumeric !== undefined && current < goal;
       else if (op === 'EXACTLY') ok = current === goal;
       else if (op === 'ANY_VALUE') ok = current > 0;
       else ok = current >= goal;
 
+      let ratio = 0;
+      if (op === 'LESS_THAN') {
+        ratio = goal > 0 ? Math.min(1, Math.max(0, 1 - current / goal)) : current < goal ? 1 : 0;
+      } else {
+        ratio = goal > 0 ? Math.min(1, Math.max(0, current / goal)) : ok ? 1 : 0;
+      }
+
       return {
         isSuccess: ok,
-        progressRatio: Math.min(1, Math.max(0, goal > 0 ? current / goal : 1)),
+        progressRatio: ratio,
       };
     }
 
     case 'TIMER': {
       const cfg = habit.config.timer;
       if (!cfg) return { isSuccess: false, progressRatio: 0 };
+      if (log.valueTimerSeconds === undefined && log.status !== 'COMPLETED') {
+        return { isSuccess: false, progressRatio: 0 };
+      }
       const current = Number(log.valueTimerSeconds) || 0;
-      const target = Number(cfg.targetSeconds) || 1;
+      const rawTarget = Number(cfg.targetSeconds);
+      const target = Number.isFinite(rawTarget) ? rawTarget : 1;
       const op = (cfg.operator || 'AT_LEAST').toUpperCase();
       let ok = false;
-      if (op === 'LESS_THAN') ok = current >= 0 && current < target;
+      if (op === 'LESS_THAN') ok = log.valueTimerSeconds !== undefined && current < target;
       else if (op === 'ANY_VALUE') ok = current > 0;
       else ok = current >= target;
 
+      let ratio = 0;
+      if (op === 'LESS_THAN') {
+        ratio = target > 0 ? Math.min(1, Math.max(0, 1 - current / target)) : current < target ? 1 : 0;
+      } else {
+        ratio = target > 0 ? Math.min(1, Math.max(0, current / target)) : ok ? 1 : 0;
+      }
+
       return {
         isSuccess: ok,
-        progressRatio: Math.min(1, Math.max(0, target > 0 ? current / target : 1)),
+        progressRatio: ratio,
       };
     }
 
     case 'CHECKLIST': {
       const cfg = habit.config.checklist;
       if (!cfg || !cfg.items.length) return { isSuccess: false, progressRatio: 0 };
-      const completed = log.valueChecklistCompletedItemIds || [];
+      const validItemIds = new Set(cfg.items.map((it) => it.id));
+      const rawCompleted = log.valueChecklistCompletedItemIds || [];
+      const completed = rawCompleted.filter((id) => validItemIds.has(id));
 
       if (cfg.successCondition === 'ALL_MANDATORY') {
         const ok = cfg.items.every((it) => completed.includes(it.id));
@@ -74,7 +110,7 @@ export function evaluateHabitSuccess(
         const ok = starred.every((it) => completed.includes(it.id));
         return {
           isSuccess: ok,
-          progressRatio: Math.min(1, Math.max(0, completed.length / cfg.items.length)),
+          progressRatio: Math.min(1, Math.max(0, completed.length / starred.length)),
         };
       } else {
         // CUSTOM_MIN_ITEMS
@@ -115,9 +151,17 @@ function hasMissedDueDay(
   toDate: Date,
   allLogs: Record<string, HabitLog>
 ): boolean {
+  const totalDays = differenceInCalendarDays(toDate, fromDate);
+  if (totalDays <= 1) return false;
+  // If gap is more than 365 days and habit is not yearly, it has missed due days
+  if (totalDays > 365 && habit.frequency.type !== 'SPECIFIC_DAYS_OF_YEAR') {
+    return true;
+  }
   let check = addDays(fromDate, 1);
-  while (differenceInCalendarDays(toDate, check) > 0) {
-    if (isHabitDueOnDate(habit, check)) {
+  let iterations = 0;
+  while (differenceInCalendarDays(toDate, check) > 0 && iterations < 366) {
+    iterations++;
+    if (isHabitDueOnDate(habit, check, allLogs)) {
       const checkKey = format(check, 'yyyy-MM-dd');
       const log = allLogs[`${habit.id}_${checkKey}`];
       // If no log exists or it was marked MISSED/SKIPPED, then it was a missed due date!
@@ -127,7 +171,7 @@ function hasMissedDueDay(
     }
     check = addDays(check, 1);
   }
-  return false;
+  return iterations >= 366;
 }
 
 export function computeHabitStreaks(
@@ -141,8 +185,11 @@ export function computeHabitStreaks(
   // SPECIAL CASE: DAYS_PER_PERIOD (e.g. 3 times a week / month)
   if (habit.frequency.type === 'DAYS_PER_PERIOD' && habit.frequency.daysPerPeriod) {
     const { targetCount, period } = habit.frequency.daysPerPeriod;
+    const periodDays = period === 'MONTH' ? 30 : period === 'YEAR' ? 365 : 7;
+
+    // Only COMPLETED logs increment the period target
     const completedDates = Object.values(allLogs)
-      .filter((l) => l.habitId === habit.id && (l.status === 'COMPLETED' || l.status === 'EXCUSED'))
+      .filter((l) => l.habitId === habit.id && l.status === 'COMPLETED')
       .map((l) => l.date);
 
     // Group logs by period key
@@ -161,18 +208,64 @@ export function computeHabitStreaks(
       periodMap.set(pKey, (periodMap.get(pKey) || 0) + 1);
     }
 
-    const successfulPeriods = Array.from(periodMap.entries())
+    const getPeriodKey = (d: Date): string => {
+      if (period === 'MONTH') return format(d, 'yyyy-MM');
+      if (period === 'YEAR') return format(d, 'yyyy');
+      return format(startOfWeek(d, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+    };
+
+    const prevPeriodDate = (d: Date): Date => {
+      if (period === 'MONTH') return subMonths(d, 1);
+      if (period === 'YEAR') return subYears(d, 1);
+      return subWeeks(d, 1);
+    };
+
+    // Calculate current consecutive successful periods ending at current or previous period
+    const now = new Date();
+    const currentPKey = getPeriodKey(now);
+    const prevPDate = prevPeriodDate(now);
+
+    let consecutiveCurrent = 0;
+    let checkDate: Date;
+
+    if ((periodMap.get(currentPKey) || 0) >= targetCount) {
+      consecutiveCurrent = 1;
+      checkDate = prevPDate;
+    } else {
+      checkDate = prevPDate;
+    }
+
+    while ((periodMap.get(getPeriodKey(checkDate)) || 0) >= targetCount) {
+      consecutiveCurrent++;
+      checkDate = prevPeriodDate(checkDate);
+    }
+
+    // Calculate best consecutive periods historically across all periods
+    const successfulPeriodKeys = Array.from(periodMap.entries())
       .filter(([_, count]) => count >= targetCount)
       .map(([k]) => k)
       .sort();
 
-    const streakCount = successfulPeriods.length;
-    const finalBest = Math.max(streakCount, habit.stats?.bestStreak || 0);
-    const unlocked = STREAK_CHALLENGES.filter((c) => finalBest >= c.days).map((c) => c.days);
+    let bestPeriods = 0;
+    for (const key of successfulPeriodKeys) {
+      let chain = 1;
+      const d = parseISO(key.length === 4 ? `${key}-01-01` : key.length === 7 ? `${key}-01` : key);
+      let nextD = period === 'MONTH' ? addMonths(d, 1) : period === 'YEAR' ? addYears(d, 1) : addWeeks(d, 1);
+      while (successfulPeriodKeys.includes(getPeriodKey(nextD))) {
+        chain++;
+        nextD = period === 'MONTH' ? addMonths(nextD, 1) : period === 'YEAR' ? addYears(nextD, 1) : addWeeks(nextD, 1);
+      }
+      if (chain > bestPeriods) bestPeriods = chain;
+    }
+    bestPeriods = Math.max(bestPeriods, consecutiveCurrent);
+
+    const currentStreakDays = consecutiveCurrent * periodDays;
+    const bestStreakDays = bestPeriods * periodDays;
+    const unlocked = STREAK_CHALLENGES.filter((c) => bestStreakDays >= c.days).map((c) => c.days);
 
     return {
-      currentStreak: streakCount,
-      bestStreak: finalBest,
+      currentStreak: currentStreakDays,
+      bestStreak: bestStreakDays,
       unlockedChallenges: unlocked,
     };
   }

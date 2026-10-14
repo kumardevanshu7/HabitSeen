@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
 import { computeUserAchievements } from '../../constants/achievements';
+import { APP_CONFIG } from '../../constants/appConfig';
 import { BrandLegalTab } from '../brand/BrandLegalModal';
 import {
   Trophy,
@@ -41,7 +42,7 @@ export const DashboardFooter: React.FC<DashboardFooterProps> = ({
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2.5">
                   <h3 className="font-display font-black text-xl sm:text-2xl text-ink tracking-tight">
-                    100 Mastery Achievements
+                    {totalCount} Mastery Achievements
                   </h3>
                   <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
                     {unlockedCount} / {totalCount} Unlocked
@@ -184,16 +185,16 @@ export const DashboardFooter: React.FC<DashboardFooterProps> = ({
         {/* 3. LEGAL COPYRIGHT & NOTICE */}
         <div className="pt-6 border-t border-hairline text-center text-xs text-stone space-y-1.5">
           <p className="leading-relaxed">
-            <strong>HabitsSeen</strong> is a product of <strong>Arigato Labs</strong>, proudly
-            developed by <strong>Kumar Devanshu</strong> in 2026.
+            <strong>{APP_CONFIG.appName}</strong> is a product of <strong>{APP_CONFIG.companyName}</strong>, proudly
+            developed by <strong>{APP_CONFIG.founderName}</strong> in {APP_CONFIG.copyrightYear}.
           </p>
           <p className="text-[11px]">
-            Copyright © 2026 Arigato Labs. All Rights Reserved. Contact:{' '}
+            Copyright © {APP_CONFIG.copyrightYear} {APP_CONFIG.companyName}. All Rights Reserved. Contact:{' '}
             <a
-              href="mailto:kumardevanshu3001@gmail.com"
+              href={`mailto:${APP_CONFIG.supportEmail}`}
               className="font-mono text-charcoal hover:text-primary transition-colors"
             >
-              kumardevanshu3001@gmail.com
+              {APP_CONFIG.supportEmail}
             </a>
           </p>
         </div>

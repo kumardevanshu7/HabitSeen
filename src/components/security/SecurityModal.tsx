@@ -3,8 +3,10 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { useAppStore } from '../../stores/useAppStore';
-import { ShieldCheck, ShieldAlert, Lock, AlertTriangle, KeyRound } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, Lock, AlertTriangle, KeyRound, Info } from 'lucide-react';
 import clsx from 'clsx';
+import { verifySecurityAnswer, hashSecurityAnswer } from '../../utils/cryptoUtils';
+import { saveUserProfileToDb } from '../../services/firestoreService';
 
 interface SecurityModalProps {
   isOpen: boolean;
@@ -25,7 +27,7 @@ export const SecurityModal: React.FC<SecurityModalProps> = ({
   onSuccess,
   onOpenProfileSetup,
 }) => {
-  const { user } = useAppStore();
+  const { user, currentUser } = useAppStore();
   const [answer, setAnswer] = useState('');
   const [error, setError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
@@ -41,39 +43,83 @@ export const SecurityModal: React.FC<SecurityModalProps> = ({
   if (!isOpen) return null;
 
   const security = user?.security;
-  const hasSecurityQuestion = Boolean(security?.question && security?.answer);
+  const hasSecurityQuestion = Boolean(security?.question && (security?.answerHash || security?.answer));
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
     if (!hasSecurityQuestion) {
-      // If no question set, directly allow
-      await onSuccess();
-      onClose();
+      setIsVerifying(true);
+      try {
+        await onSuccess();
+        onClose();
+      } catch (err: any) {
+        console.error('Action failed:', err);
+        setError(err?.message || 'Action failed');
+      } finally {
+        setIsVerifying(false);
+      }
       return;
     }
 
     const trimmedInput = answer.trim().toLowerCase();
-    const expectedAnswer = security?.answer?.trim().toLowerCase();
-
     if (!trimmedInput) {
       setError('Please enter your security answer');
       return;
     }
 
-    if (trimmedInput !== expectedAnswer) {
-      setError('Incorrect answer. Please check your answer and try again.');
-      return;
-    }
-
     setIsVerifying(true);
     try {
+      let isMatch = false;
+
+      if (security?.answerHash && security?.salt) {
+        isMatch = await verifySecurityAnswer(trimmedInput, security.answerHash, security.salt);
+      } else if (security?.answer) {
+        // Legacy plain text verification + auto migration to PBKDF2 hash
+        isMatch = trimmedInput === security.answer.trim().toLowerCase();
+        if (isMatch && currentUser && user) {
+          try {
+            const { hash, salt } = await hashSecurityAnswer(trimmedInput);
+            await saveUserProfileToDb(currentUser.uid, {
+              ...user,
+              security: {
+                question: security.question,
+                answerHash: hash,
+                salt,
+              },
+            });
+          } catch (migrateErr) {
+            console.warn('Auto migration of security answer failed:', migrateErr);
+          }
+        }
+      }
+
+      if (!isMatch) {
+        setError('Incorrect answer. Please check your answer and try again.');
+        setIsVerifying(false);
+        return;
+      }
+
       await onSuccess();
       onClose();
     } catch (err: any) {
       console.error('Security action failed:', err);
-      setError(err.message || 'Action failed');
+      setError(err?.message || 'Action failed');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const handleProceedWithoutGuard = async () => {
+    setIsVerifying(true);
+    setError('');
+    try {
+      await onSuccess();
+      onClose();
+    } catch (err: any) {
+      console.error('Action failed:', err);
+      setError(err?.message || 'Action failed');
     } finally {
       setIsVerifying(false);
     }
@@ -84,7 +130,7 @@ export const SecurityModal: React.FC<SecurityModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={title}
-      subtitle="Identity verification protects your habits and personal records"
+      subtitle="Accidental-Action Guard: Protects your account against unintended actions"
       maxWidth="md"
     >
       <form onSubmit={handleVerify} className="space-y-4 pt-1">
@@ -108,6 +154,12 @@ export const SecurityModal: React.FC<SecurityModalProps> = ({
             </span>
             <p className="text-xs sm:text-sm font-bold leading-tight">{actionTitle}</p>
           </div>
+        </div>
+
+        {/* CLARIFICATION NOTE */}
+        <div className="flex items-start gap-2 p-2.5 bg-surface-bone/60 rounded-xl text-[11px] text-charcoal border border-hairline/60">
+          <Info size={14} className="text-charcoal shrink-0 mt-0.5" />
+          <span>This confirmation guard protects against accidental edits, deletions, and resets.</span>
         </div>
 
         {hasSecurityQuestion ? (
@@ -139,7 +191,7 @@ export const SecurityModal: React.FC<SecurityModalProps> = ({
                 required
               />
               <p className="text-[11px] text-stone ml-1">
-                Answers are case-insensitive.
+                Answers are case-insensitive and hashed via PBKDF2 Web Crypto.
               </p>
             </div>
 
@@ -184,8 +236,15 @@ export const SecurityModal: React.FC<SecurityModalProps> = ({
               </p>
             </div>
 
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2 animate-in fade-in">
+                <ShieldAlert size={15} className="shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
             <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-hairline">
-              <Button type="button" variant="ghost" onClick={onClose}>
+              <Button type="button" variant="ghost" onClick={onClose} disabled={isVerifying}>
                 Cancel
               </Button>
               {onOpenProfileSetup && (
@@ -193,6 +252,7 @@ export const SecurityModal: React.FC<SecurityModalProps> = ({
                   type="button"
                   variant="outline"
                   size="md"
+                  disabled={isVerifying}
                   onClick={() => {
                     onClose();
                     onOpenProfileSetup();
@@ -206,12 +266,10 @@ export const SecurityModal: React.FC<SecurityModalProps> = ({
                 type="button"
                 variant={isDanger ? 'danger' : 'primary'}
                 size="md"
-                onClick={async () => {
-                  await onSuccess();
-                  onClose();
-                }}
+                disabled={isVerifying}
+                onClick={handleProceedWithoutGuard}
               >
-                Proceed Without Guard
+                {isVerifying ? 'Processing...' : 'Proceed Without Guard'}
               </Button>
             </div>
           </div>

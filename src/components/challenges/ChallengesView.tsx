@@ -345,7 +345,7 @@ export const ChallengesView: React.FC = () => {
                   </div>
 
                   {/* DAY PILLS MATRIX STRIP */}
-                  <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+                  <div className="flex items-center gap-2 overflow-x-auto no-scrollbar px-2 py-3 -mx-1 min-h-[48px]">
                     {dayPills.map((dp) => {
                       const isDone = dp.status === 'COMPLETED';
                       const isFail = dp.status === 'FAILED';
@@ -362,7 +362,7 @@ export const ChallengesView: React.FC = () => {
                             !isDone &&
                               !isFail &&
                               'bg-surface-bone text-charcoal border-hairline',
-                            isSelectedDay && 'ring-2 ring-ink ring-offset-1'
+                            isSelectedDay && 'ring-2 ring-ink ring-offset-2 shadow-xs'
                           )}
                           title={`Day ${dp.dayNum} (${dp.dateKey})`}
                         >

@@ -13,46 +13,23 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    // Gamification validation for user document
+    function isValidUserDoc(data) {
+      return !('gamification' in data) || (
+        data.gamification.hearts is number &&
+        data.gamification.hearts >= 0 &&
+        data.gamification.totalXp is number &&
+        data.gamification.totalXp >= 0
+      );
+    }
+
     // Root user document (Profile & Gamification stats)
     match /users/{userId} {
-      allow read, write: if isOwner(userId);
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId) && isValidUserDoc(request.resource.data);
 
-      // User custom categories
-      match /categories/{categoryId} {
-        allow read, write: if isOwner(userId);
-      }
-
-      // User habits collection
-      match /habits/{habitId} {
-        allow read, write: if isOwner(userId);
-
-        // Nested logs under habit (if needed)
-        match /logs/{logId} {
-          allow read, write: if isOwner(userId);
-        }
-      }
-
-      // Daily execution logs subcollection (/users/{userId}/logs/{logKey})
-      match /logs/{logKey} {
-        allow read, write: if isOwner(userId);
-      }
-
-      // "Timer Habit Break" (Quit habit chronometers & relapses)
-      match /habitBreaks/{breakId} {
-        allow read, write: if isOwner(userId);
-
-        match /relapses/{relapseId} {
-          allow read, write: if isOwner(userId);
-        }
-      }
-
-      // Gamification history / XP logs
-      match /gamification/{docId} {
-        allow read, write: if isOwner(userId);
-      }
-
-      // Hardcore Challenges collection
-      match /challenges/{challengeId} {
+      // All user subcollections (/categories, /habits, /logs, /habitBreaks, /challenges, etc.)
+      match /{document=**} {
         allow read, write: if isOwner(userId);
       }
     }

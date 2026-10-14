@@ -3,8 +3,6 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
   User as FirebaseUser,
@@ -17,14 +15,28 @@ import {
   Firestore,
 } from 'firebase/firestore';
 
+const apiKey = import.meta.env.VITE_FIREBASE_API_KEY;
+const authDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN;
+const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
+const storageBucket = import.meta.env.VITE_FIREBASE_STORAGE_BUCKET;
+const messagingSenderId = import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID;
+const appId = import.meta.env.VITE_FIREBASE_APP_ID;
+const measurementId = import.meta.env.VITE_FIREBASE_MEASUREMENT_ID;
+
+if (!apiKey || !projectId || !appId) {
+  throw new Error(
+    'Firebase environment configuration missing. Please ensure VITE_FIREBASE_* variables are set in your .env file.'
+  );
+}
+
 export const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyAMyiIzXonkgJoYXSRTLis_P-YGeBhRQJ4",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "pro13-habitseen.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "pro13-habitseen",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "pro13-habitseen.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "408400447866",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:408400447866:web:71c80fe3d021084f21aec3",
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-0BYW7QTZHY",
+  apiKey,
+  authDomain,
+  projectId,
+  storageBucket,
+  messagingSenderId,
+  appId,
+  measurementId,
 };
 
 // Initialize Firebase App
@@ -49,14 +61,6 @@ export const googleProvider = new GoogleAuthProvider();
 // Auth Helpers
 export const signInWithGoogle = async () => {
   return await signInWithPopup(auth, googleProvider);
-};
-
-export const signInWithEmail = async (email: string, pass: string) => {
-  return await signInWithEmailAndPassword(auth, email, pass);
-};
-
-export const signUpWithEmail = async (email: string, pass: string) => {
-  return await createUserWithEmailAndPassword(auth, email, pass);
 };
 
 export const logOut = async () => {

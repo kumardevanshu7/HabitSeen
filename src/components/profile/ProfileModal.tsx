@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { SecurityModal } from '../security/SecurityModal';
 import { getNextHeartsUpgrade } from '../../constants/gamification';
+import { verifySecurityAnswer } from '../../utils/cryptoUtils';
 import clsx from 'clsx';
 
 import { Trophy, ChevronRight } from 'lucide-react';
@@ -78,15 +79,25 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     setSecuritySuccessMsg('');
 
     // If an existing security question/password is set, MUST verify previous answer first
-    if (user.security && user.security.answer) {
+    if (user.security && (user.security.answerHash || user.security.answer)) {
       if (!previousAnswerInput.trim()) {
         setSecurityError('Please enter your previous secret answer / password to verify identity');
         return;
       }
-      if (
-        previousAnswerInput.trim().toLowerCase() !==
-        user.security.answer.trim().toLowerCase()
-      ) {
+      let isValid = false;
+      if (user.security.answerHash && user.security.salt) {
+        isValid = await verifySecurityAnswer(
+          previousAnswerInput.trim(),
+          user.security.answerHash,
+          user.security.salt
+        );
+      } else if (user.security.answer) {
+        isValid =
+          previousAnswerInput.trim().toLowerCase() ===
+          user.security.answer.trim().toLowerCase();
+      }
+
+      if (!isValid) {
         setSecurityError(
           'Incorrect previous secret answer / password. Security check failed.'
         );

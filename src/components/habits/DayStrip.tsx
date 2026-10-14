@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
-import { getTodayKey, isHabitDueOnDate } from '../../utils/dateMath';
+import { isHabitDueOnDate } from '../../utils/dateMath';
+import { useTodayKey } from '../../hooks/useTodayKey';
 import {
   format,
   subDays,
@@ -14,7 +15,7 @@ import { useDragScroll } from '../../hooks/useDragScroll';
 
 export const DayStrip: React.FC = () => {
   const { habits, logs, selectedDate, setSelectedDate } = useAppStore();
-  const todayKey = getTodayKey();
+  const todayKey = useTodayKey();
   const [anchorDate, setAnchorDate] = useState(() => parseISO(selectedDate));
 
   const { ref: dayStripRef, isDragging: isStripDragging, events: stripDragEvents } =
@@ -23,8 +24,11 @@ export const DayStrip: React.FC = () => {
   // Filter out archived habits
   const activeHabits = habits.filter((h) => !h.isArchived);
 
-  // Keep anchor centered if selectedDate moves outside current window
+  // Center anchor only when selectedDate explicitly changes to a date outside the current window
+  const prevSelectedDateRef = useRef(selectedDate);
   useEffect(() => {
+    if (prevSelectedDateRef.current === selectedDate) return;
+    prevSelectedDateRef.current = selectedDate;
     try {
       const parsed = parseISO(selectedDate);
       const diff = Math.abs(differenceInCalendarDays(parsed, anchorDate));
@@ -51,7 +55,7 @@ export const DayStrip: React.FC = () => {
   };
 
   const handleTodayClick = () => {
-    const today = new Date();
+    const today = parseISO(todayKey);
     setAnchorDate(today);
     setSelectedDate(todayKey);
   };
@@ -116,7 +120,7 @@ export const DayStrip: React.FC = () => {
           const isToday = key === todayKey;
 
           // Compute habits scheduled & completed on this date
-          const dueHabits = activeHabits.filter((h) => isHabitDueOnDate(h, day));
+          const dueHabits = activeHabits.filter((h) => isHabitDueOnDate(h, day, logs));
           const completedHabits = dueHabits.filter((h) => {
             const l = logs[`${h.id}_${key}`];
             return l?.status === 'COMPLETED' || l?.status === 'EXCUSED';

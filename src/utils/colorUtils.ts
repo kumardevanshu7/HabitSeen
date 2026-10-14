@@ -1,8 +1,23 @@
 // Color and contrast utilities for HabitsSeen
 
+function normalizeHex(hex?: string): string {
+  if (!hex || typeof hex !== 'string') return '';
+  let clean = hex.trim().replace(/^#/, '');
+  if (clean.length === 3 && /^[0-9a-fA-F]{3}$/.test(clean)) {
+    clean = clean.split('').map((c) => c + c).join('');
+  }
+  return /^[0-9a-fA-F]{6}$/.test(clean) ? clean : '';
+}
+
 export function boostVibrancy(hex?: string): string {
-  if (!hex || hex === '#EDEDE9' || hex === '#ffffff' || hex === '#FFFFFF') {
-    return '#2563EB'; // Solid electric blue default
+  if (!hex || typeof hex !== 'string') return '#2563EB';
+
+  const clean = normalizeHex(hex);
+  if (!clean) return '#2563EB';
+
+  const fullHex = `#${clean.toUpperCase()}`;
+  if (fullHex === '#EDEDE9' || fullHex === '#FFFFFF') {
+    return '#2563EB';
   }
 
   // Map known pale pastels to ultra-vivid, punchy colors
@@ -25,31 +40,26 @@ export function boostVibrancy(hex?: string): string {
     '#F0E6EF': '#9333EA',
   };
 
-  const upper = hex.toUpperCase();
-  if (paleMap[upper]) {
-    return paleMap[upper];
+  if (paleMap[fullHex]) {
+    return paleMap[fullHex];
   }
 
-  // Check if hex is too light / low-saturation
-  const cleanHex = hex.replace('#', '');
-  if (cleanHex.length === 6) {
-    const r = parseInt(cleanHex.substring(0, 2), 16) || 0;
-    const g = parseInt(cleanHex.substring(2, 4), 16) || 0;
-    const b = parseInt(cleanHex.substring(4, 6), 16) || 0;
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-    // If color is very washed out / near white, replace with a vivid fallback
-    if (luminance > 0.85) {
-      return '#2563EB';
-    }
+  const r = parseInt(clean.substring(0, 2), 16) || 0;
+  const g = parseInt(clean.substring(2, 4), 16) || 0;
+  const b = parseInt(clean.substring(4, 6), 16) || 0;
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+
+  if (luminance > 0.85) {
+    return '#2563EB';
   }
 
-  return hex;
+  return fullHex;
 }
 
 export function getContrastIconColor(bgColor?: string): string {
-  if (!bgColor) return '#FFFFFF';
-  const clean = bgColor.replace('#', '');
-  if (clean.length < 6) return '#FFFFFF';
+  if (!bgColor || typeof bgColor !== 'string') return '#FFFFFF';
+  const clean = normalizeHex(bgColor);
+  if (!clean) return '#FFFFFF';
 
   const r = parseInt(clean.substring(0, 2), 16) || 0;
   const g = parseInt(clean.substring(2, 4), 16) || 0;

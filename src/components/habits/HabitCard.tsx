@@ -251,7 +251,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
     holdTimerRef.current = setTimeout(() => {
       navigator.vibrate?.(40);
       setIsOptionsMenuOpen(true);
-    }, 450);
+    }, 650);
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
@@ -274,7 +274,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
 
     holdTimerRef.current = setTimeout(() => {
       setIsOptionsMenuOpen(true);
-    }, 450);
+    }, 650);
   };
 
   const handleMouseUp = () => {
@@ -338,8 +338,13 @@ export const HabitCard: React.FC<HabitCardProps> = ({
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
       onContextMenu={handleContextMenu}
+      onClick={(e) => {
+        const target = e.target as HTMLElement;
+        if (target.closest('button, input, textarea, a, select, [data-interactive="true"]')) return;
+        onOpenDetails(habit);
+      }}
       className={clsx(
-        'group relative rounded-2xl border transition-all duration-200 overflow-hidden shadow-2xs select-none w-full',
+        'group relative rounded-2xl border transition-all duration-200 overflow-hidden shadow-2xs select-none w-full cursor-pointer',
         isCompleted
           ? 'bg-stone/10 border-stone/30 opacity-70'
           : isExcused
@@ -358,7 +363,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
       <div className="p-2.5 sm:p-3 flex items-center justify-between gap-2.5 sm:gap-3.5">
         {/* LEFT: Category Icon + Habit Title & Meta */}
         <div
-          onClick={() => onOpenDetails(habit)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenDetails(habit);
+          }}
           className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1 cursor-pointer"
         >
           <span
@@ -580,17 +588,18 @@ export const HabitCard: React.FC<HabitCardProps> = ({
             </button>
           )}
 
-          {/* ANALYTICS ICON */}
+          {/* ANALYTICS BUTTON */}
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               onOpenDetails(habit);
             }}
-            className="p-1.5 text-charcoal hover:text-ink hover:bg-surface-bone rounded-full transition-colors"
-            title="View Habit Analytics"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-bone hover:bg-stone/20 text-charcoal hover:text-ink text-xs font-semibold border border-hairline transition-colors shrink-0 cursor-pointer"
+            title="View Habit Analytics & History"
           >
-            <BarChart2 size={15} />
+            <BarChart2 size={13} className="text-primary" />
+            <span className="hidden sm:inline">Analytics</span>
           </button>
 
           {/* MORE OPTIONS (DELETE / DUPLICATE) */}
@@ -659,8 +668,13 @@ export const HabitCard: React.FC<HabitCardProps> = ({
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
       onContextMenu={handleContextMenu}
+      onClick={(e) => {
+        const target = e.target as HTMLElement;
+        if (target.closest('button, input, textarea, a, select, [data-interactive="true"]')) return;
+        onOpenDetails(habit);
+      }}
       className={clsx(
-        'group relative rounded-2xl border transition-all duration-200 overflow-hidden shadow-xs hover:shadow-md h-fit w-full select-none',
+        'group relative rounded-2xl border transition-all duration-200 overflow-hidden shadow-xs hover:shadow-md h-fit w-full select-none cursor-pointer',
         isCompleted
           ? 'bg-stone/10 border-stone/30 opacity-65 grayscale-[35%]'
           : isExcused
@@ -679,7 +693,13 @@ export const HabitCard: React.FC<HabitCardProps> = ({
       <div className="p-3.5 sm:p-4">
         {/* TOP ROW: CATEGORY + PRIORITY + STATUS BADGE + DETAILS BUTTON (OPTIMIZED NO-WRAP) */}
         <div className="flex items-center justify-between gap-1.5 mb-2.5 flex-wrap">
-          <div className="flex items-center gap-1.5 min-w-0">
+          <div
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenDetails(habit);
+            }}
+            className="flex items-center gap-1.5 min-w-0 cursor-pointer"
+          >
             <span
               className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 shadow-2xs"
               style={{
@@ -750,10 +770,11 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                 e.stopPropagation();
                 onOpenDetails(habit);
               }}
-              className="p-1 text-charcoal hover:text-ink hover:bg-surface-bone rounded-full transition-colors cursor-pointer shrink-0"
-              title="View Habit Analytics"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-bone hover:bg-stone/20 text-charcoal hover:text-ink text-xs font-semibold border border-hairline transition-colors cursor-pointer shrink-0"
+              title="View Habit Analytics & History"
             >
-              <BarChart2 size={15} />
+              <BarChart2 size={13} className="text-primary" />
+              <span>Analytics</span>
             </button>
 
             <button
@@ -1262,27 +1283,21 @@ export const HabitCard: React.FC<HabitCardProps> = ({
             type="button"
             onClick={() => {
               setIsOptionsMenuOpen(false);
-              if (habit.isArchived) {
-                toggleArchiveHabit(habit.id, false);
-              } else if (isCompleted) {
-                handleUnlock();
-              } else {
-                toggleArchiveHabit(habit.id, true);
-              }
+              toggleArchiveHabit(habit.id, !habit.isArchived);
             }}
             className="w-full flex items-center gap-3 p-3 rounded-2xl bg-surface-bone hover:bg-stone/20 text-ink text-left transition-colors font-medium border border-hairline group cursor-pointer"
           >
             <div className="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-700 flex items-center justify-center shrink-0">
-              {habit.isArchived || isCompleted ? <ArchiveRestore size={18} /> : <Archive size={18} />}
+              {habit.isArchived ? <ArchiveRestore size={18} /> : <Archive size={18} />}
             </div>
             <div>
               <span className="font-bold text-sm block text-ink group-hover:text-primary transition-colors">
-                {habit.isArchived || isCompleted ? 'Restore from Archived' : 'Move to Archived'}
+                {habit.isArchived ? 'Restore / Unarchive Habit' : 'Archive Habit (End Task)'}
               </span>
               <span className="text-xs text-stone">
-                {habit.isArchived || isCompleted
-                  ? 'Unlock & return this habit to your active schedule'
-                  : 'Move habit into the Archived category'}
+                {habit.isArchived
+                  ? 'Return this habit to your active schedule'
+                  : 'End this habit completely and move it to Archived'}
               </span>
             </div>
           </button>
@@ -1309,7 +1324,9 @@ export const HabitCard: React.FC<HabitCardProps> = ({
             type="button"
             onClick={() => {
               setIsOptionsMenuOpen(false);
-              onOpenDetails(habit);
+              setTimeout(() => {
+                onOpenDetails(habit);
+              }, 50);
             }}
             className="w-full flex items-center gap-3 p-3 rounded-2xl bg-surface-bone hover:bg-stone/20 text-ink text-left transition-colors font-medium border border-hairline group cursor-pointer"
           >

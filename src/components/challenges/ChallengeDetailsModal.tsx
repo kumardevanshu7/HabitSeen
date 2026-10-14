@@ -4,6 +4,7 @@ import { Button } from '../ui/Button';
 import { Challenge } from '../../types/habit';
 import { CATEGORY_ICONS } from '../../constants/iconsAndColors';
 import { boostVibrancy, getContrastIconColor } from '../../utils/colorUtils';
+import { getChallengeReward } from '../../constants/gamification';
 import {
   Flame,
   Trophy,
@@ -78,7 +79,7 @@ export const ChallengeDetailsModal: React.FC<ChallengeDetailsModalProps> = ({
       ? Math.round((completedCount / (completedCount + failedCount)) * 100)
       : 100;
 
-  const projectedVictoryXp = targetDays * 50 + targetDays * 30;
+  const { totalPossibleXp, dailyXp } = getChallengeReward(challenge);
 
   return (
     <Modal
@@ -221,35 +222,76 @@ export const ChallengeDetailsModal: React.FC<ChallengeDetailsModalProps> = ({
         </div>
 
         {/* 3. PROGRESS BAR & VICTORY BONUS TRACKER */}
-        <div className="p-4 bg-surface-card border border-hairline rounded-2xl space-y-2.5">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-bold text-ink flex items-center gap-1.5">
-              <Award size={15} className="text-amber-500" />
-              Challenge Completion Trajectory
-            </span>
-            <span className="font-mono font-bold text-primary">
-              Full Reward: +{projectedVictoryXp} XP & Full ❤️ Heal
-            </span>
+        <div className="p-4 sm:p-5 bg-surface-card border border-hairline rounded-3xl space-y-3.5 shadow-2xs">
+          {/* Header & Reward Pill */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="w-7 h-7 rounded-full bg-amber-500/15 text-amber-600 flex items-center justify-center shrink-0">
+                <Award size={15} />
+              </span>
+              <div>
+                <h4 className="font-display font-bold text-sm text-ink leading-tight">
+                  Completion Trajectory
+                </h4>
+                <span className="text-[11px] text-charcoal font-medium">
+                  {completedCount} of {targetDays} days completed ({completionPct}%)
+                </span>
+              </div>
+            </div>
+
+            <div className="inline-flex items-center gap-1.5 text-xs font-mono font-bold px-3 py-1 rounded-full bg-amber-500/10 text-amber-800 border border-amber-300/70 w-fit self-start sm:self-auto">
+              <Zap size={12} className="fill-amber-500 text-amber-500 shrink-0" />
+              <span>+{totalPossibleXp} XP</span>
+              <span className="text-amber-400">•</span>
+              <Heart size={12} className="fill-red-500 text-red-500 shrink-0" />
+              <span>Full Heal</span>
+            </div>
           </div>
 
-          <div className="w-full bg-surface-bone h-3.5 rounded-full overflow-hidden border border-hairline">
+          {/* Progress Bar with Indicator */}
+          <div className="space-y-1">
+            <div className="w-full bg-surface-bone h-3 rounded-full overflow-hidden border border-hairline/80">
+              <div
+                className="h-full rounded-full transition-all duration-500 shadow-2xs"
+                style={{
+                  width: `${completionPct}%`,
+                  backgroundColor: vibrantColor,
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Timeline & Status Footer (2 Clean Rows Instead of Squished 1 Row) */}
+          <div className="space-y-2 pt-1 border-t border-hairline/60">
+            <div className="flex items-center justify-between text-xs text-charcoal">
+              <span>
+                Start:{' '}
+                <strong className="text-ink font-mono font-bold">
+                  {format(parseISO(challenge.startDate), 'dd MMM yyyy')}
+                </strong>
+              </span>
+              <span>
+                Target End:{' '}
+                <strong className="text-ink font-mono font-bold">
+                  {format(parseISO(challenge.endDate), 'dd MMM yyyy')}
+                </strong>
+              </span>
+            </div>
+
             <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{
-                width: `${completionPct}%`,
-                backgroundColor: vibrantColor,
-              }}
-            />
-          </div>
-
-          <div className="flex items-center justify-between text-[11px] text-charcoal">
-            <span>Start: {format(parseISO(challenge.startDate), 'dd MMM yyyy')}</span>
-            <span>
-              {failedCount === 0
-                ? '🔥 Unbroken Zero-Excuse Record!'
-                : `⚠️ ${failedCount} day(s) penalized (-90% HP each)`}
-            </span>
-            <span>Target End: {format(parseISO(challenge.endDate), 'dd MMM yyyy')}</span>
+              className={clsx(
+                'p-2 rounded-xl text-xs font-semibold text-center border flex items-center justify-center gap-1.5',
+                failedCount === 0
+                  ? 'bg-emerald-500/10 text-emerald-800 border-emerald-300/60'
+                  : 'bg-red-500/10 text-red-800 border-red-300/60'
+              )}
+            >
+              <span>
+                {failedCount === 0
+                  ? '🔥 Unbroken Zero-Excuse Record!'
+                  : `⚠️ ${failedCount} day(s) penalized (-90% HP each)`}
+              </span>
+            </div>
           </div>
         </div>
 

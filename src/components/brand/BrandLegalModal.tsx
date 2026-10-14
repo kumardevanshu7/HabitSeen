@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
+import { APP_CONFIG } from '../../constants/appConfig';
 import {
   Mail,
   CheckCircle,
@@ -54,7 +55,7 @@ export const BrandLegalModal: React.FC<BrandLegalModalProps> = ({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [copiedEmail, setCopiedEmail] = useState(false);
 
-  const founderEmail = 'kumardevanshu3001@gmail.com';
+  const founderEmail = APP_CONFIG.supportEmail;
 
   const handleCopyEmail = () => {
     navigator.clipboard.writeText(founderEmail);
@@ -123,7 +124,7 @@ Sent from HabitsSeen contact form
       setIsSent(true);
     } catch (err: any) {
       setSubmitError(
-        'Could not transmit automatically. You can copy the message and email kumardevanshu3001@gmail.com directly.'
+        `Could not transmit automatically. You can copy the message and email ${founderEmail} directly.`
       );
     } finally {
       setIsSubmitting(false);
@@ -330,7 +331,7 @@ Sent from HabitsSeen contact form
                   <strong>HabitsSeen</strong>. If you have questions regarding this privacy
                   policy, you can reach out directly to{' '}
                   <span className="font-mono text-primary font-bold">
-                    kumardevanshu3001@gmail.com
+                    {founderEmail}
                   </span>
                   .
                 </p>
@@ -416,7 +417,7 @@ Sent from HabitsSeen contact form
                 <p>
                   Direct privacy inquiries to Kumar Devanshu at{' '}
                   <span className="font-mono text-primary font-bold">
-                    kumardevanshu3001@gmail.com
+                    {founderEmail}
                   </span>
                   .
                 </p>
@@ -513,7 +514,7 @@ Sent from HabitsSeen contact form
                 <p>
                   For legal notices or questions, contact{' '}
                   <span className="font-mono text-primary font-bold">
-                    kumardevanshu3001@gmail.com
+                    {founderEmail}
                   </span>
                   .
                 </p>

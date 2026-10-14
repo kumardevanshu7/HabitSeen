@@ -186,10 +186,10 @@ export const LogMissedModal: React.FC<LogMissedModalProps> = ({
               </p>
               <div className="flex items-center gap-3 text-[11px] font-semibold text-blue-600 mt-2">
                 <span className="flex items-center gap-1">
-                  <Zap size={12} /> 0 XP Penalty (Constant)
+                  <Zap size={12} /> {MISS_PENALTIES.GENUINE_REASON.xpPenalty} XP Penalty (Preserved)
                 </span>
                 <span className="flex items-center gap-1">
-                  <Heart size={12} className="fill-blue-500" /> 0 Hearts Lost
+                  <Heart size={12} className="fill-blue-500" /> {MISS_PENALTIES.GENUINE_REASON.heartsLost} Hearts Lost
                 </span>
               </div>
             </div>
@@ -231,10 +231,10 @@ export const LogMissedModal: React.FC<LogMissedModalProps> = ({
               </p>
               <div className="flex items-center gap-3 text-[11px] font-semibold text-amber-700 mt-2">
                 <span className="flex items-center gap-1">
-                  <Zap size={12} /> -10 XP Penalty
+                  <Zap size={12} /> -{MISS_PENALTIES.FORGOT_ACCIDENTAL.xpPenalty} XP Penalty
                 </span>
                 <span className="flex items-center gap-1 text-red-600">
-                  <Heart size={12} className="fill-red-500" /> -1 Heart Lost
+                  <Heart size={12} className="fill-red-500" /> -{MISS_PENALTIES.FORGOT_ACCIDENTAL.heartsLost} Heart Lost
                 </span>
               </div>
             </div>
@@ -276,10 +276,10 @@ export const LogMissedModal: React.FC<LogMissedModalProps> = ({
               </p>
               <div className="flex items-center gap-3 text-[11px] font-semibold text-red-700 mt-2">
                 <span className="flex items-center gap-1">
-                  <Zap size={12} /> -25 XP Penalty
+                  <Zap size={12} /> -{MISS_PENALTIES.INTENTIONAL_MISS.xpPenalty} XP Penalty
                 </span>
                 <span className="flex items-center gap-1 text-red-600">
-                  <Heart size={12} className="fill-red-500" /> -2 Hearts Lost
+                  <Heart size={12} className="fill-red-500" /> -{MISS_PENALTIES.INTENTIONAL_MISS.heartsLost} Heart Lost
                 </span>
               </div>
             </div>

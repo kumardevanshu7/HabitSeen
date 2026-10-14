@@ -27,9 +27,12 @@ export function CustomSelect<T extends string | number>({
   placeholder = 'Select an option',
 }: CustomSelectProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
-  const selectedOption = options.find((opt) => opt.value === value);
+  const selectedIndex = options.findIndex((opt) => opt.value === value);
+  const selectedOption = selectedIndex >= 0 ? options[selectedIndex] : undefined;
 
   // Close on outside click
   useEffect(() => {
@@ -42,8 +45,49 @@ export function CustomSelect<T extends string | number>({
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
 
+  // Sync highlighted index when opened
+  useEffect(() => {
+    if (isOpen) {
+      setHighlightedIndex(selectedIndex >= 0 ? selectedIndex : 0);
+    }
+  }, [isOpen, selectedIndex]);
+
+  // Keyboard navigation
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!isOpen) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        setIsOpen(true);
+      }
+      return;
+    }
+
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setIsOpen(false);
+      triggerRef.current?.focus();
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightedIndex((prev) => (prev + 1 < options.length ? prev + 1 : 0));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightedIndex((prev) => (prev - 1 >= 0 ? prev - 1 : options.length - 1));
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (highlightedIndex >= 0 && highlightedIndex < options.length) {
+        onChange(options[highlightedIndex].value);
+        setIsOpen(false);
+        triggerRef.current?.focus();
+      }
+    }
+  };
+
   return (
-    <div className={clsx('relative w-full', className)} ref={containerRef}>
+    <div
+      className={clsx('relative w-full', className)}
+      ref={containerRef}
+      onKeyDown={handleKeyDown}
+    >
       {label && (
         <label className="block text-xs font-semibold uppercase tracking-wider text-charcoal mb-1.5 ml-1">
           {label}
@@ -52,8 +96,11 @@ export function CustomSelect<T extends string | number>({
 
       {/* Trigger Button */}
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setIsOpen(!isOpen)}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
         className={clsx(
           'w-full bg-surface-card text-ink text-sm px-4 py-2.5 h-11 rounded-full border border-hairline',
           'flex items-center justify-between transition-all select-none',
@@ -83,21 +130,32 @@ export function CustomSelect<T extends string | number>({
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-surface-card border border-hairline rounded-2xl shadow-xl overflow-hidden py-1.5 max-h-60 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-150">
-          {options.map((opt) => {
+        <div
+          role="listbox"
+          tabIndex={-1}
+          className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-surface-card border border-hairline rounded-2xl shadow-xl overflow-hidden py-1.5 max-h-60 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-150"
+        >
+          {options.map((opt, idx) => {
             const isSelected = opt.value === value;
+            const isHighlighted = idx === highlightedIndex;
             return (
               <button
                 type="button"
+                role="option"
+                aria-selected={isSelected}
                 key={String(opt.value)}
                 onClick={() => {
                   onChange(opt.value);
                   setIsOpen(false);
+                  triggerRef.current?.focus();
                 }}
+                onMouseEnter={() => setHighlightedIndex(idx)}
                 className={clsx(
                   'w-full px-4 py-2.5 text-xs sm:text-sm text-left flex items-center justify-between transition-colors',
                   isSelected
                     ? 'bg-surface-bone font-semibold text-ink'
+                    : isHighlighted
+                    ? 'bg-canvas text-ink'
                     : 'text-body hover:bg-canvas hover:text-ink'
                 )}
               >

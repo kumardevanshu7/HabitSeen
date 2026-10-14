@@ -35,7 +35,7 @@ export interface HabitConfig {
     operator: NumericOperator;
     goal: number;
     unit: string;
-    suffix: 'a day';
+    suffix?: 'a day' | 'a week' | 'a month' | string;
   };
   timer?: {
     operator: TimerOperator;
@@ -170,7 +170,9 @@ export interface Challenge {
 
 export interface UserSecurityConfig {
   question: string;
-  answer: string; // Stored trimmed and in lowercase for case-insensitive verification
+  answerHash?: string; // Hex-encoded PBKDF2/SHA-256 hash
+  salt?: string;       // Hex-encoded random per-user salt
+  answer?: string;     // Legacy fallback for plain text answer (auto-migrated)
 }
 
 export interface UserProfile {
@@ -188,6 +190,7 @@ export interface UserProfile {
     hearts: number;           // Default 5 ❤️
     maxHearts: number;        // Default 5
     perfectDaysCompleted?: string[]; // Dates (YYYY-MM-DD) where 100% perfect day bonus was awarded
+    lastDeathAt?: string;     // ISO timestamp of last zero-vitality death / soft reset
   };
 }
 

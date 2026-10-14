@@ -45,6 +45,10 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
 }) => {
   const { categories, logs, deleteHabit } = useAppStore();
   const [currentCalendarMonth, setCurrentCalendarMonth] = useState(new Date());
+  const [pendingSecurityAction, setPendingSecurityAction] = useState<{
+    type: 'edit' | 'delete';
+    title: string;
+  } | null>(null);
 
   if (!habit) return null;
 
@@ -83,11 +87,6 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
   const monthStart = startOfMonth(currentCalendarMonth);
   const monthEnd = endOfMonth(currentCalendarMonth);
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
-
-  const [pendingSecurityAction, setPendingSecurityAction] = useState<{
-    type: 'edit' | 'delete';
-    title: string;
-  } | null>(null);
 
   const handleRequestEdit = () => {
     setPendingSecurityAction({
@@ -348,7 +347,7 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
             {daysInMonth.map((day) => {
               const dateKey = format(day, 'yyyy-MM-dd');
               const logKey = `${habit.id}_${dateKey}`;
-              const dayLog = logs[logKey];
+              const dayLog = logs?.[logKey];
               const isCompleted = dayLog?.status === 'COMPLETED';
               const isExcused = dayLog?.status === 'EXCUSED';
               const isMissed = dayLog?.status === 'MISSED' || dayLog?.status === 'FAILED';

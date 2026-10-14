@@ -27,8 +27,11 @@ import {
   getUsedExcusesInMonth,
 } from '../utils/streakEngine';
 import { WILL_HABIT_TIERS, MISS_PENALTIES, levelFromXp, calculateMaxHearts } from '../constants/gamification';
+import { hashSecurityAnswer } from '../utils/cryptoUtils';
+import { doc, getDoc } from 'firebase/firestore';
 import {
   FirebaseUser,
+  db,
 } from '../services/firebase';
 import {
   saveUserProfileToDb,
@@ -58,10 +61,13 @@ interface AppState {
   // User Profile
   user: UserProfile | null;
   profileLoading: boolean;
+  profileStatus: 'loading' | 'exists' | 'missing' | 'unknown';
   syncError: string | null;
   setUser: (profile: UserProfile | null) => void;
   setProfileLoading: (loading: boolean) => void;
+  setProfileStatus: (status: 'loading' | 'exists' | 'missing' | 'unknown') => void;
   setSyncError: (error: string | null) => void;
+  softResetAccount: () => Promise<void>;
   completeOnboarding: (data: {
     name: string;
     age: number;
@@ -170,6 +176,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
   user: null,
   profileLoading: true,
+  profileStatus: 'loading',
   syncError: null,
   setUser: (profile) => {
     if (profile && profile.gamification) {
@@ -181,9 +188,15 @@ export const useAppStore = create<AppState>()((set, get) => ({
         profile.gamification.hearts = Math.min(calculatedMax, Math.max(0, profile.gamification.hearts));
       }
     }
-    set({ user: profile, profileLoading: false, syncError: null });
+    set({
+      user: profile,
+      profileLoading: false,
+      profileStatus: profile ? 'exists' : 'missing',
+      syncError: null,
+    });
   },
   setProfileLoading: (loading) => set({ profileLoading: loading }),
+  setProfileStatus: (profileStatus) => set({ profileStatus }),
   setSyncError: (syncError) => set({ syncError }),
 
   selectedDate: getTodayKey(),
@@ -277,29 +290,54 @@ export const useAppStore = create<AppState>()((set, get) => ({
   completeOnboarding: async (data) => {
     const { currentUser, user } = get();
     if (!currentUser) return;
-    // Guard against overwriting an existing onboarded profile
+    // Guard against overwriting an existing onboarded profile in memory
     if (user && user.isOnboarded) return;
 
+    // Read the server doc first before writing to prevent accidental overwrite of existing gamification/profile
+    let existingDocData: Partial<UserProfile> | null = null;
+    try {
+      const userRef = doc(db, 'users', currentUser.uid);
+      const snap = await getDoc(userRef);
+      if (snap.exists()) {
+        existingDocData = snap.data() as UserProfile;
+        if (existingDocData.isOnboarded) {
+          set({
+            user: existingDocData as UserProfile,
+            profileLoading: false,
+            profileStatus: 'exists',
+          });
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('Could not read existing doc during onboarding check:', e);
+    }
+
     const tier = WILL_HABIT_TIERS[0];
+    const existingGamification = existingDocData?.gamification || user?.gamification;
+
     const newProfile: UserProfile = {
       name: data.name,
       age: data.age,
       relationStatus: data.relationStatus,
       gender: data.gender,
       isOnboarded: true,
-      gamification: {
-        level: tier.level,
-        levelTitle: tier.title,
-        totalXp: 150, // Welcome XP
-        consistencyScore: 100,
-        hearts: 5,
-        maxHearts: 5,
-      },
+      gamification:
+        existingGamification && typeof existingGamification.totalXp === 'number'
+          ? existingGamification
+          : {
+              level: tier.level,
+              levelTitle: tier.title,
+              totalXp: 150, // Welcome XP
+              consistencyScore: 100,
+              hearts: 5,
+              maxHearts: 5,
+            },
     };
 
     // Save directly to Firestore (no localStorage)
     await saveUserProfileToDb(currentUser.uid, newProfile);
-    set({ user: newProfile, profileLoading: false });
+    set({ user: newProfile, profileLoading: false, profileStatus: 'exists' });
 
     // Also initialize default "Others" category in Firestore if empty
     await addCategoryToDb(currentUser.uid, DEFAULT_CATEGORY);
@@ -554,7 +592,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
       try {
         const parsedDate = parseISO(dateKey);
         const dueHabits = state.habits.filter(
-          (h) => !h.isArchived && isHabitDueOnDate(h, parsedDate)
+          (h) => !h.isArchived && isHabitDueOnDate(h, parsedDate, updatedLogs)
         );
 
         if (dueHabits.length > 0) {
@@ -694,15 +732,9 @@ export const useAppStore = create<AppState>()((set, get) => ({
     // Revert previously earned XP if user is now skipping a previously completed habit
     if (state.user && xpDelta !== 0) {
       const newTotalXp = Math.max(0, state.user.gamification.totalXp + xpDelta);
-      let newLevel = state.user.gamification.level;
-      let newLevelTitle = state.user.gamification.levelTitle;
-
-      for (const tier of WILL_HABIT_TIERS) {
-        if (newTotalXp >= tier.minXp) {
-          newLevel = tier.level;
-          newLevelTitle = tier.title;
-        }
-      }
+      const lvlInfo = levelFromXp(newTotalXp);
+      const newLevel = lvlInfo.level;
+      const newLevelTitle = lvlInfo.title;
 
       const newMaxHearts = calculateMaxHearts(newTotalXp);
       const currentHearts = state.user.gamification.hearts ?? 5;
@@ -821,14 +853,9 @@ export const useAppStore = create<AppState>()((set, get) => ({
       const newHearts = Math.max(0, currentHearts - heartLoss);
       const newTotalXp = Math.max(0, state.user.gamification.totalXp + xpDelta);
 
-      let newLevel = state.user.gamification.level;
-      let newLevelTitle = state.user.gamification.levelTitle;
-      for (const tier of WILL_HABIT_TIERS) {
-        if (newTotalXp >= tier.minXp) {
-          newLevel = tier.level;
-          newLevelTitle = tier.title;
-        }
-      }
+      const lvlInfo = levelFromXp(newTotalXp);
+      const newLevel = lvlInfo.level;
+      const newLevelTitle = lvlInfo.title;
 
       const newMaxHearts = calculateMaxHearts(newTotalXp);
 
@@ -1177,11 +1204,34 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const { currentUser, user } = get();
     if (!currentUser || !user) return;
     const normalizedAnswer = answer.trim().toLowerCase();
+    const { hash, salt } = await hashSecurityAnswer(normalizedAnswer);
     const updatedUser: UserProfile = {
       ...user,
       security: {
         question: question.trim(),
-        answer: normalizedAnswer,
+        answerHash: hash,
+        salt,
+      },
+    };
+    await saveUserProfileToDb(currentUser.uid, updatedUser);
+    set({ user: updatedUser });
+  },
+
+  softResetAccount: async () => {
+    const { currentUser, user } = get();
+    if (!currentUser || !user) return;
+    const currentXp = user.gamification?.totalXp ?? 0;
+    const xpPenalty = Math.min(100, currentXp);
+    const newXp = Math.max(0, currentXp - xpPenalty);
+    const maxH = calculateMaxHearts(newXp);
+    const updatedUser: UserProfile = {
+      ...user,
+      gamification: {
+        ...user.gamification,
+        hearts: maxH,
+        maxHearts: maxH,
+        totalXp: newXp,
+        lastDeathAt: new Date().toISOString(),
       },
     };
     await saveUserProfileToDb(currentUser.uid, updatedUser);
@@ -1222,6 +1272,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
       authLoading: false,
       user: null,
       profileLoading: false,
+      profileStatus: 'loading',
       syncError: null,
       categories: [DEFAULT_CATEGORY],
       habits: [],

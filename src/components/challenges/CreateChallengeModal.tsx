@@ -142,7 +142,7 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
     <>
       {/* STEP 1: CHALLENGE CONFIGURATION MODAL */}
       <Modal
-        isOpen={isOpen}
+        isOpen={isOpen && !isRulesModalOpen}
         onClose={onClose}
         title="Add New Hardcore Challenge"
         subtitle="Configure name, icon, color, and duration (7, 9, 11, or Custom days)"
@@ -342,12 +342,24 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
           </div>
 
           {/* FOOTER */}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-hairline">
-            <Button type="button" variant="ghost" onClick={onClose}>
-              Cancel
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2.5 pt-3 border-t border-hairline">
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              className="w-full sm:w-auto justify-center gap-2 shadow-sm font-bold order-1 sm:order-2"
+            >
+              <ShieldAlert size={17} />
+              <span>Review Rules &amp; Create Challenge</span>
             </Button>
-            <Button type="submit" variant="primary" size="lg" className="gap-1.5">
-              <ShieldAlert size={17} /> Review Rules & Create Challenge
+            <Button
+              type="button"
+              variant="outline"
+              size="md"
+              onClick={onClose}
+              className="w-full sm:w-auto justify-center order-2 sm:order-1"
+            >
+              Cancel
             </Button>
           </div>
         </form>
@@ -448,26 +460,27 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
           </div>
 
           {/* CONFIRMATION ACTIONS */}
-          <div className="flex items-center justify-between gap-3 pt-3 border-t border-hairline">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setIsRulesModalOpen(false)}
-              disabled={isSubmitting}
-            >
-              Back to Edit
-            </Button>
-
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2.5 pt-3 border-t border-hairline">
             <Button
               type="button"
               variant="primary"
               size="lg"
               onClick={handleConfirmRulesAndCreate}
               disabled={isSubmitting}
-              className="gap-2 bg-red-600 hover:bg-red-700 text-white shadow-md"
+              className="w-full sm:w-auto justify-center gap-2 bg-red-600 hover:bg-red-700 text-white shadow-md font-bold order-1 sm:order-2"
             >
               <CheckCircle2 size={18} />
-              <span>{isSubmitting ? 'Launching...' : 'I Accept Rules & Confirm Challenge'}</span>
+              <span>{isSubmitting ? 'Launching Challenge...' : 'I Accept Rules & Confirm Challenge'}</span>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="md"
+              onClick={() => setIsRulesModalOpen(false)}
+              disabled={isSubmitting}
+              className="w-full sm:w-auto justify-center order-2 sm:order-1"
+            >
+              Back to Edit
             </Button>
           </div>
         </div>

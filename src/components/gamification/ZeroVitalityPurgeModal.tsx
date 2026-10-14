@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppStore } from '../../stores/useAppStore';
-import { Skull, AlertTriangle, Flame, ShieldAlert, RefreshCw } from 'lucide-react';
+import { Skull, AlertTriangle, ShieldAlert, RefreshCw, HeartPulse, Trash2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { SecurityModal } from '../security/SecurityModal';
 
 export const ZeroVitalityPurgeModal: React.FC = () => {
-  const { user, currentUser, resetEntireAccount } = useAppStore();
+  const { user, currentUser, softResetAccount, resetEntireAccount } = useAppStore();
 
   const hearts = user?.gamification?.hearts;
   const isZeroLives =
@@ -15,13 +16,16 @@ export const ZeroVitalityPurgeModal: React.FC = () => {
     hearts <= 0;
 
   const [secondsLeft, setSecondsLeft] = useState(10);
-  const [isPurging, setIsPurging] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isFullWipeSecurityOpen, setIsFullWipeSecurityOpen] = useState(false);
   const hasTriggeredRef = useRef(false);
 
   useEffect(() => {
     if (!isZeroLives) {
       setSecondsLeft(10);
-      setIsPurging(false);
+      setIsProcessing(false);
+      setError(null);
       hasTriggeredRef.current = false;
       return;
     }
@@ -42,7 +46,6 @@ export const ZeroVitalityPurgeModal: React.FC = () => {
       setSecondsLeft((prev) => {
         if (prev <= 1) {
           clearInterval(interval);
-          handleExecutePurge();
           return 0;
         }
         return prev - 1;
@@ -52,18 +55,31 @@ export const ZeroVitalityPurgeModal: React.FC = () => {
     return () => clearInterval(interval);
   }, [isZeroLives]);
 
-  const handleExecutePurge = async () => {
+  // Separate effect for triggering when countdown hits 0 (avoids stale closures and updater side effects)
+  useEffect(() => {
+    if (isZeroLives && secondsLeft === 0 && !hasTriggeredRef.current && !error) {
+      handleSoftReset();
+    }
+  }, [secondsLeft, isZeroLives, error]);
+
+  const handleSoftReset = async () => {
     if (hasTriggeredRef.current) return;
     hasTriggeredRef.current = true;
-    setIsPurging(true);
+    setIsProcessing(true);
+    setError(null);
 
     try {
-      await resetEntireAccount();
-    } catch (err) {
-      console.error('Failed to purge account:', err);
-      setIsPurging(false);
-      hasTriggeredRef.current = false;
+      await softResetAccount();
+    } catch (err: any) {
+      console.error('Failed to revive account vitality:', err);
+      setIsProcessing(false);
+      setError(err?.message || 'Failed to revive vitality. Please check your connection and retry.');
     }
+  };
+
+  const handleRetry = () => {
+    hasTriggeredRef.current = false;
+    handleSoftReset();
   };
 
   if (!isZeroLives) return null;
@@ -78,7 +94,7 @@ export const ZeroVitalityPurgeModal: React.FC = () => {
       <div className="absolute inset-0 bg-radial from-red-600/20 via-transparent to-black pointer-events-none" />
       <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-600 via-amber-500 to-red-600 animate-pulse" />
 
-      {/* Main Purge Container */}
+      {/* Main Revival Container */}
       <div className="relative z-10 w-full max-w-lg bg-[#180a0a] border-2 border-red-600/60 rounded-3xl p-6 sm:p-8 shadow-[0_0_60px_rgba(234,40,4,0.35)] text-center space-y-6">
         {/* Pulsing Skull Icon */}
         <div className="flex justify-center">
@@ -96,21 +112,21 @@ export const ZeroVitalityPurgeModal: React.FC = () => {
         <div className="space-y-2">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-mono font-bold uppercase tracking-wider">
             <AlertTriangle size={13} className="text-red-500 shrink-0" />
-            <span>0 Vitality &bull; System Purge</span>
+            <span>0 Vitality &bull; Disciplinary Revival</span>
           </div>
 
           <h2 className="font-display font-extrabold text-2xl sm:text-3xl text-white tracking-tight uppercase">
             Discipline Broken
           </h2>
           <p className="text-stone text-xs sm:text-sm max-w-sm mx-auto leading-relaxed">
-            All your hearts have reached <strong className="text-red-400">0</strong>. As per the Hardcore Protocol, an uncompromising clean wipe begins now.
+            All your hearts have reached <strong className="text-red-400">0</strong>. A disciplinary Soft Reset will revive your vitality so you can get back on track.
           </p>
         </div>
 
         {/* 10-Second Digital Countdown Display */}
         <div className="p-5 bg-black/60 border border-red-900/60 rounded-2xl space-y-3">
           <span className="text-[11px] font-bold uppercase tracking-widest text-red-400 block">
-            Complete Account Wipe & Fresh Start In
+            Automatic Revival In
           </span>
 
           <div className="font-mono font-black text-6xl sm:text-7xl text-red-500 tracking-tight flex items-center justify-center gap-1 drop-shadow-[0_0_20px_rgba(234,40,4,0.6)]">
@@ -131,40 +147,79 @@ export const ZeroVitalityPurgeModal: React.FC = () => {
         <div className="text-[11px] text-stone/80 text-left bg-red-950/20 border border-red-900/40 rounded-xl p-3 space-y-1">
           <p className="font-bold text-red-300 flex items-center gap-1.5">
             <ShieldAlert size={14} className="text-red-500 shrink-0" />
-            <span>What happens during this purge?</span>
+            <span>Soft Reset Protocol:</span>
           </p>
           <ul className="list-disc list-inside space-y-0.5 text-stone/90 pl-1">
-            <li>All active habits & logs are permanently deleted from Firestore.</li>
-            <li>All streak records & habit break stopwatches are wiped clean.</li>
-            <li>Your account returns to Onboarding for a fresh, rebirth start.</li>
+            <li>Your habits, categories, and logs remain completely safe.</li>
+            <li>Hearts are restored to full vitality (5/5).</li>
+            <li>A 100 XP penalty is applied for broken discipline.</li>
           </ul>
         </div>
 
-        {/* Immediate Purge Action Button */}
-        <div>
+        {/* Error Alert with Retry Button */}
+        {error && (
+          <div className="p-3 bg-red-950/80 border border-red-500 rounded-xl text-left space-y-2">
+            <p className="text-xs text-red-300 flex items-center gap-1.5 font-bold">
+              <AlertTriangle size={14} className="text-red-400 shrink-0" />
+              <span>{error}</span>
+            </p>
+            <button
+              type="button"
+              onClick={handleRetry}
+              className="px-4 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
+            >
+              Retry Revival
+            </button>
+          </div>
+        )}
+
+        {/* Immediate Revival Action Button */}
+        <div className="space-y-3">
           <button
             type="button"
-            onClick={handleExecutePurge}
-            disabled={isPurging}
-            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-bold text-sm h-12 px-6 rounded-full shadow-lg transition-all active:scale-98 disabled:opacity-50 cursor-pointer"
+            onClick={handleSoftReset}
+            disabled={isProcessing}
+            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-bold text-sm h-12 px-6 rounded-full shadow-lg transition-all active:scale-98 disabled:opacity-50 cursor-pointer"
           >
-            {isPurging ? (
+            {isProcessing ? (
               <>
                 <RefreshCw size={16} className="animate-spin" />
-                <span>Purging All Data & Restarting...</span>
+                <span>Restoring Vitality...</span>
               </>
             ) : (
               <>
-                <Flame size={16} />
-                <span>Wipe Data Now (Skip Countdown)</span>
+                <HeartPulse size={16} />
+                <span>Revive Now (Skip Countdown)</span>
               </>
             )}
           </button>
-          <p className="text-[10px] text-stone/50 mt-2">
-            No recovery. No undo. True discipline requires real stakes.
-          </p>
+
+          {/* Optional Full Account Wipe behind Security Check */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setIsFullWipeSecurityOpen(true)}
+              className="text-stone/60 hover:text-red-400 text-xs font-medium underline-offset-2 hover:underline transition-colors cursor-pointer inline-flex items-center gap-1.5"
+            >
+              <Trash2 size={12} />
+              <span>Want a fresh start? Perform full account wipe</span>
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Security Modal Guard for Full Account Wipe */}
+      <SecurityModal
+        isOpen={isFullWipeSecurityOpen}
+        onClose={() => setIsFullWipeSecurityOpen(false)}
+        title="Authorize Full Account Wipe"
+        actionTitle="Permanently Delete All Habits, History, and Reset to Onboarding"
+        isDanger
+        onSuccess={async () => {
+          setIsProcessing(true);
+          await resetEntireAccount();
+        }}
+      />
     </div>
   );
 

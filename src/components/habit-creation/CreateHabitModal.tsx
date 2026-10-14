@@ -201,6 +201,7 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
       setIntervalDays(2);
       setStartDate(getTodayKey());
       setEndDate('');
+      setNewItemText('');
       setPriority(50);
       setNameError('');
       setWizardStep(1); // Start at category when creating new habit

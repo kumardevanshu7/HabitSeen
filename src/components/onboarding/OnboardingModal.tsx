@@ -22,7 +22,7 @@ const RELATION_OPTIONS: SelectOption<UserProfile['relationStatus']>[] = [
 ];
 
 export const OnboardingModal: React.FC = () => {
-  const { user, currentUser, profileLoading, completeOnboarding } = useAppStore();
+  const { user, currentUser, profileStatus, completeOnboarding } = useAppStore();
 
   const [step, setStep] = useState<1 | 2>(1);
   const [name, setName] = useState(currentUser?.displayName || '');
@@ -33,15 +33,30 @@ export const OnboardingModal: React.FC = () => {
 
   const [nameError, setNameError] = useState('');
 
-  // If user is not authenticated, profile is still loading, or user is already onboarded, don't show
-  if (!currentUser || profileLoading || (user && user.isOnboarded)) {
+  // Show onboarding ONLY when profileStatus is explicitly confirmed missing on server,
+  // or exists but isOnboarded is false. Never show if loading, unknown (offline), or already onboarded.
+  const shouldShow =
+    Boolean(currentUser) &&
+    (profileStatus === 'missing' || (profileStatus === 'exists' && user?.isOnboarded === false));
+
+  if (!shouldShow) {
     return null;
   }
 
   const handleStep1Submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) {
+    const trimmed = name.trim();
+    if (!trimmed) {
       setNameError('Please tell us your name');
+      return;
+    }
+    if (trimmed.length < 2) {
+      setNameError('Name must be at least 2 characters long');
+      return;
+    }
+    const parsedAge = Number(age);
+    if (!Number.isFinite(parsedAge) || parsedAge < 10 || parsedAge > 120) {
+      setNameError('Please enter a valid age between 10 and 120');
       return;
     }
     setNameError('');

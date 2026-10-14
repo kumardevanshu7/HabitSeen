@@ -50,8 +50,10 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* DESKTOP NAV TABS */}
-        <nav className="hidden md:flex items-center gap-1 bg-surface-card p-1 rounded-full border border-hairline shadow-2xs">
+        <nav aria-label="Main Navigation" className="hidden md:flex items-center gap-1 bg-surface-card p-1 rounded-full border border-hairline shadow-2xs">
           <button
+            type="button"
+            aria-current={activeTab === 'habits' ? 'page' : undefined}
             onClick={() => onSelectTab('habits')}
             className={clsx(
               'px-4 py-1.5 rounded-full text-xs font-semibold transition-all',
@@ -63,6 +65,8 @@ export const Navbar: React.FC<NavbarProps> = ({
             Daily Habits
           </button>
           <button
+            type="button"
+            aria-current={activeTab === 'challenges' ? 'page' : undefined}
             onClick={() => onSelectTab('challenges')}
             className={clsx(
               'px-4 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-1.5',
@@ -87,6 +91,8 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </button>
           <button
+            type="button"
+            aria-current={activeTab === 'breaks' ? 'page' : undefined}
             onClick={() => onSelectTab('breaks')}
             className={clsx(
               'px-4 py-1.5 rounded-full text-xs font-semibold transition-all',
@@ -98,6 +104,8 @@ export const Navbar: React.FC<NavbarProps> = ({
             Timer Habit Break
           </button>
           <button
+            type="button"
+            aria-current={activeTab === 'analytics' ? 'page' : undefined}
             onClick={() => onSelectTab('analytics')}
             className={clsx(
               'px-4 py-1.5 rounded-full text-xs font-semibold transition-all',

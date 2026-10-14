@@ -22,6 +22,14 @@ export const InstallPromptBanner: React.FC = () => {
       return;
     }
 
+    const dismissedAt = localStorage.getItem('habitsseen_install_prompt_dismissed');
+    if (dismissedAt) {
+      const diffDays = (Date.now() - Number(dismissedAt)) / (1000 * 60 * 60 * 24);
+      if (diffDays < 7) {
+        return;
+      }
+    }
+
     // 2. Check for iOS device
     const userAgent = window.navigator.userAgent.toLowerCase();
     const isIosDevice = /iphone|ipad|ipod/.test(userAgent);
@@ -100,7 +108,12 @@ export const InstallPromptBanner: React.FC = () => {
               Install
             </button>
             <button
-              onClick={() => setShowBanner(false)}
+              onClick={() => {
+                setShowBanner(false);
+                try {
+                  localStorage.setItem('habitsseen_install_prompt_dismissed', String(Date.now()));
+                } catch {}
+              }}
               className="p-1 text-stone hover:text-white rounded-full transition-colors"
               title="Dismiss"
             >
