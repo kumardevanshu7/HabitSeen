@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -13,21 +13,37 @@ import { Check } from 'lucide-react';
 interface CreateCategoryModalProps {
   isOpen: boolean;
   onClose: () => void;
+  categoryToEdit?: Category | null;
   onCategoryCreated?: (newCategory: Category) => void;
 }
 
 export const CreateCategoryModal: React.FC<CreateCategoryModalProps> = ({
   isOpen,
   onClose,
+  categoryToEdit,
   onCategoryCreated,
 }) => {
-  const { categories, addCategory } = useAppStore();
+  const { categories, addCategory, updateCategory } = useAppStore();
 
   const [name, setName] = useState('');
   const [selectedIcon, setSelectedIcon] = useState('flame');
   const [selectedColor, setSelectedColor] = useState(CATEGORY_COLORS[0].hex);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (categoryToEdit && isOpen) {
+      setName(categoryToEdit.name);
+      setSelectedIcon(categoryToEdit.icon || 'flame');
+      setSelectedColor(categoryToEdit.color || CATEGORY_COLORS[0].hex);
+      setError('');
+    } else if (isOpen) {
+      setName('');
+      setSelectedIcon('flame');
+      setSelectedColor(CATEGORY_COLORS[0].hex);
+      setError('');
+    }
+  }, [categoryToEdit, isOpen]);
 
   const vibrantColor = boostVibrancy(selectedColor);
 
@@ -40,7 +56,9 @@ export const CreateCategoryModal: React.FC<CreateCategoryModalProps> = ({
     }
 
     const alreadyExists = categories.some(
-      (c) => c.name.trim().toLowerCase() === trimmed.toLowerCase()
+      (c) =>
+        c.id !== categoryToEdit?.id &&
+        c.name.trim().toLowerCase() === trimmed.toLowerCase()
     );
     if (alreadyExists) {
       setError(`A category named "${trimmed}" already exists.`);
@@ -51,20 +69,31 @@ export const CreateCategoryModal: React.FC<CreateCategoryModalProps> = ({
     setIsSubmitting(true);
 
     try {
-      const newCat = await addCategory({
-        name: name.trim(),
-        icon: selectedIcon,
-        color: vibrantColor,
-        isDefault: false,
-      });
+      if (categoryToEdit) {
+        const updatedCat: Category = {
+          ...categoryToEdit,
+          name: trimmed,
+          icon: selectedIcon,
+          color: vibrantColor,
+        };
+        await updateCategory(updatedCat);
+        onClose();
+      } else {
+        const newCat = await addCategory({
+          name: trimmed,
+          icon: selectedIcon,
+          color: vibrantColor,
+          isDefault: false,
+        });
 
-      setName('');
-      setSelectedIcon('flame');
-      setSelectedColor(CATEGORY_COLORS[0].hex);
-      if (onCategoryCreated) onCategoryCreated(newCat);
-      onClose();
+        setName('');
+        setSelectedIcon('flame');
+        setSelectedColor(CATEGORY_COLORS[0].hex);
+        if (onCategoryCreated) onCategoryCreated(newCat);
+        onClose();
+      }
     } catch (err: any) {
-      console.error('Failed to create category:', err);
+      console.error('Failed to save category:', err);
       setError(err.message || 'Failed to save category');
     } finally {
       setIsSubmitting(false);
@@ -78,8 +107,12 @@ export const CreateCategoryModal: React.FC<CreateCategoryModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Create New Category"
-      subtitle="Organize habits into custom behavioral domains"
+      title={categoryToEdit ? 'Edit & Rename Category' : 'Create New Category'}
+      subtitle={
+        categoryToEdit
+          ? `Update domain name, icon, and visual color theme for "${categoryToEdit.name}"`
+          : 'Organize habits into custom behavioral domains'
+      }
       maxWidth="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -163,7 +196,7 @@ export const CreateCategoryModal: React.FC<CreateCategoryModalProps> = ({
             Cancel
           </Button>
           <Button type="submit" variant="primary" disabled={isSubmitting}>
-            {isSubmitting ? 'Saving...' : 'Save Category'}
+            {isSubmitting ? 'Saving...' : categoryToEdit ? 'Save Changes' : 'Save Category'}
           </Button>
         </div>
       </form>

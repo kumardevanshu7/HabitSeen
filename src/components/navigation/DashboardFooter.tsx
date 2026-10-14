@@ -172,13 +172,6 @@ export const DashboardFooter: React.FC<DashboardFooterProps> = ({
             >
               Disclaimer
             </button>
-            <button
-              type="button"
-              onClick={() => onOpenBrandLegal('contact')}
-              className="hover:text-primary transition-colors"
-            >
-              Contact
-            </button>
           </nav>
         </div>
 

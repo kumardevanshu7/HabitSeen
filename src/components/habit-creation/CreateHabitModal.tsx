@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -37,6 +37,7 @@ import {
   Flame,
   ArrowRight,
   ArrowLeft,
+  Sparkles,
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -51,7 +52,7 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
   onClose,
   habitToEdit,
 }) => {
-  const { categories, addHabit, updateHabit } = useAppStore();
+  const { categories, addHabit, updateHabit, habits, challenges } = useAppStore();
 
   // Wizard Step: 1 = Category, 2 = Habit & Target, 3 = Schedule & Priority
   const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1);
@@ -232,6 +233,62 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
         it.id === id ? { ...it, isStarred: !it.isStarred } : it
       )
     );
+  };
+
+  // Gather previous tasks from other checklist habits & challenges
+  const previousChecklistTasks = useMemo(() => {
+    const set = new Set<string>();
+    const list: string[] = [];
+
+    // 1. From other habits
+    habits.forEach((h) => {
+      if (h.id === habitToEdit?.id) return;
+      h.config?.checklist?.items?.forEach((item) => {
+        const trimmed = item.text.trim();
+        if (trimmed && !set.has(trimmed.toLowerCase())) {
+          set.add(trimmed.toLowerCase());
+          list.push(trimmed);
+        }
+      });
+    });
+
+    // 2. From challenges
+    challenges.forEach((c) => {
+      c.tasks?.forEach((t) => {
+        const trimmed = t.text.trim();
+        if (trimmed && !set.has(trimmed.toLowerCase())) {
+          set.add(trimmed.toLowerCase());
+          list.push(trimmed);
+        }
+      });
+    });
+
+    return list;
+  }, [habits, challenges, habitToEdit]);
+
+  const availablePreviousChecklistTasks = useMemo(() => {
+    const current = new Set(checklistItems.map((it) => it.text.trim().toLowerCase()));
+    return previousChecklistTasks.filter((t) => !current.has(t.toLowerCase()));
+  }, [previousChecklistTasks, checklistItems]);
+
+  const handleAddPreviousChecklistTask = (taskText: string) => {
+    setChecklistItems((prev) => [
+      ...prev,
+      {
+        id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+        text: taskText,
+        isStarred: false,
+      },
+    ]);
+  };
+
+  const handleAddAllPreviousChecklistTasks = () => {
+    const toAdd = availablePreviousChecklistTasks.map((text, idx) => ({
+      id: `item-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 5)}`,
+      text,
+      isStarred: false,
+    }));
+    setChecklistItems((prev) => [...prev, ...toAdd]);
   };
 
   const toggleDayOfWeek = (day: number) => {
@@ -922,6 +979,41 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
                         <Plus size={14} /> Add Item
                       </Button>
                     </div>
+
+                    {/* QUICK-ADD FROM PREVIOUS TASKS */}
+                    {availablePreviousChecklistTasks.length > 0 && (
+                      <div className="pt-2 border-t border-hairline space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-bold text-charcoal flex items-center gap-1.5">
+                            <Sparkles size={13} className="text-amber-500 shrink-0" />
+                            <span>Quick Add Previous Tasks ({availablePreviousChecklistTasks.length})</span>
+                          </span>
+                          {availablePreviousChecklistTasks.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={handleAddAllPreviousChecklistTasks}
+                              className="text-[10px] font-bold text-primary hover:underline cursor-pointer"
+                            >
+                              + Add All
+                            </button>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto no-scrollbar py-0.5">
+                          {availablePreviousChecklistTasks.map((prevText) => (
+                            <button
+                              key={prevText}
+                              type="button"
+                              onClick={() => handleAddPreviousChecklistTask(prevText)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-bone hover:bg-primary/10 text-charcoal hover:text-primary border border-hairline hover:border-primary/30 text-[11px] font-medium transition-all active:scale-95 text-left shrink-0 cursor-pointer"
+                              title={`Tap to add "${prevText}"`}
+                            >
+                              <Plus size={11} className="text-primary shrink-0" />
+                              <span className="truncate max-w-[200px]">{prevText}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1123,15 +1215,23 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
                 {/* Slider + Number Input */}
                 <div className="flex items-center gap-3 pt-1">
                   <input
-                    type="number"
-                    min={0}
-                    max={100}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={priority}
-                    onChange={(e) =>
-                      setPriority(
-                        Math.min(100, Math.max(0, parseInt(e.target.value, 10) || 0))
-                      )
-                    }
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => {
+                      const cleaned = e.target.value.replace(/[^0-9]/g, '');
+                      if (!cleaned) {
+                        setPriority(0);
+                        return;
+                      }
+                      const num = parseInt(cleaned, 10);
+                      setPriority(Math.min(100, Math.max(0, isNaN(num) ? 0 : num)));
+                    }}
+                    onBlur={() => {
+                      setPriority((prev) => Number(prev) || 0);
+                    }}
                     className="w-20 text-center font-mono font-extrabold text-lg py-2 rounded-xl border-2 border-hairline bg-surface-bone text-ink focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                   />
 

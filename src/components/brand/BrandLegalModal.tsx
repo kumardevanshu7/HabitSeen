@@ -3,16 +3,12 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { APP_CONFIG } from '../../constants/appConfig';
 import {
-  Mail,
-  CheckCircle,
-  Copy,
   ExternalLink,
   ShieldCheck,
   FileText,
   AlertTriangle,
   Info,
   Compass,
-  Send,
   Sparkles,
 } from 'lucide-react';
 import clsx from 'clsx';
@@ -22,8 +18,7 @@ export type BrandLegalTab =
   | 'about'
   | 'privacy'
   | 'terms'
-  | 'disclaimer'
-  | 'contact';
+  | 'disclaimer';
 
 interface BrandLegalModalProps {
   isOpen: boolean;
@@ -36,100 +31,20 @@ export const BrandLegalModal: React.FC<BrandLegalModalProps> = ({
   onClose,
   initialTab = 'explore',
 }) => {
-  const [activeTab, setActiveTab] = useState<BrandLegalTab>(initialTab);
+  const [activeTab, setActiveTab] = useState<BrandLegalTab>(
+    initialTab === ('contact' as any) ? 'about' : initialTab
+  );
 
   // Sync initialTab when modal opens or initialTab changes
   React.useEffect(() => {
     if (isOpen) {
-      setActiveTab(initialTab);
+      setActiveTab(initialTab === ('contact' as any) ? 'about' : initialTab);
     }
   }, [isOpen, initialTab]);
 
-  // Contact Form State
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [subject, setSubject] = useState('');
-  const [message, setMessage] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSent, setIsSent] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [copiedEmail, setCopiedEmail] = useState(false);
+
 
   const founderEmail = APP_CONFIG.supportEmail;
-
-  const handleCopyEmail = () => {
-    navigator.clipboard.writeText(founderEmail);
-    setCopiedEmail(true);
-    setTimeout(() => setCopiedEmail(false), 2000);
-  };
-
-  const handleContactSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setSubmitError(null);
-
-    const formattedBody = `━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  ARIGATO LABS · CONTACT
-  Product: HabitsSeen
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-From:     ${name}
-Email:    ${email}
-Subject:  ${subject}
-
-Message
--------
-${message}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Sent from HabitsSeen contact form
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
-
-    try {
-      const apiKey = (import.meta as any).env?.VITE_WEB3FORMS_KEY;
-
-      if (apiKey) {
-        const response = await fetch('https://api.web3forms.com/submit', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-          },
-          body: JSON.stringify({
-            access_key: apiKey,
-            name,
-            email,
-            subject: `[HabitsSeen Contact] ${subject}`,
-            message: formattedBody,
-            from_name: 'Arigato Labs · HabitsSeen',
-          }),
-        });
-
-        const data = await response.json();
-        if (data.success) {
-          setIsSent(true);
-          setName('');
-          setEmail('');
-          setSubject('');
-          setMessage('');
-          return;
-        }
-      }
-
-      // Fallback: Trigger direct mailto with structured body
-      const mailtoUrl = `mailto:${founderEmail}?subject=${encodeURIComponent(
-        `[HabitsSeen] ${subject}`
-      )}&body=${encodeURIComponent(formattedBody)}`;
-      window.open(mailtoUrl, '_blank');
-      setIsSent(true);
-    } catch (err: any) {
-      setSubmitError(
-        `Could not transmit automatically. You can copy the message and email ${founderEmail} directly.`
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const tabs: { key: BrandLegalTab; label: string; icon: React.ReactNode }[] = [
     {
@@ -147,7 +62,6 @@ Sent from HabitsSeen contact form
     { key: 'privacy', label: 'Privacy Policy', icon: <ShieldCheck size={14} /> },
     { key: 'terms', label: 'Terms & Conditions', icon: <FileText size={14} /> },
     { key: 'disclaimer', label: 'Disclaimer', icon: <AlertTriangle size={14} /> },
-    { key: 'contact', label: 'Contact', icon: <Mail size={14} /> },
   ];
 
   return (
@@ -155,7 +69,7 @@ Sent from HabitsSeen contact form
       isOpen={isOpen}
       onClose={onClose}
       title="Arigato Labs"
-      subtitle="Corporate identity, legal disclosures & developer contact"
+      subtitle="Corporate identity & legal disclosures"
       maxWidth="2xl"
     >
       <div className="space-y-6">
@@ -167,11 +81,7 @@ Sent from HabitsSeen contact form
               <button
                 key={t.key}
                 type="button"
-                onClick={() => {
-                  setActiveTab(t.key);
-                  setIsSent(false);
-                  setSubmitError(null);
-                }}
+                onClick={() => setActiveTab(t.key)}
                 className={clsx(
                   'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all shrink-0',
                   isActive
@@ -262,14 +172,6 @@ Sent from HabitsSeen contact form
                 >
                   Disclaimer
                 </button>
-                <span>·</span>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('contact')}
-                  className="hover:text-primary transition-colors underline"
-                >
-                  Contact
-                </button>
               </div>
             </div>
           </div>
@@ -297,16 +199,6 @@ Sent from HabitsSeen contact form
                 HabitsSeen is engineered to provide uncompromising discipline gamification,
                 vitality mechanics, milestone tracking, and seamless cloud synchronization.
               </p>
-              <div className="pt-2">
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => setActiveTab('contact')}
-                  className="gap-2 text-xs"
-                >
-                  <Mail size={14} /> Send a message to Founder
-                </Button>
-              </div>
             </div>
 
             <div className="text-center text-xs text-stone pt-2">
@@ -560,156 +452,6 @@ Sent from HabitsSeen contact form
             <div className="text-center text-xs text-stone pt-2">
               Copyright © 2026 Arigato Labs. All Rights Reserved.
             </div>
-          </div>
-        )}
-
-        {/* TAB 6: CONTACT (PER SECTION 6 OF IMPORTANT INTEGRATION.MD) */}
-        {activeTab === 'contact' && (
-          <div className="space-y-5 animate-in fade-in duration-200">
-            <div>
-              <h3 className="font-display font-bold text-lg text-ink">
-                Contact Arigato Labs
-              </h3>
-              <p className="text-xs text-charcoal mt-0.5">
-                Questions about HabitsSeen or Arigato Labs? Send a message — it goes directly to the
-                founder.
-              </p>
-            </div>
-
-            {/* DIRECT EMAIL CARD */}
-            <div className="flex items-center justify-between p-3.5 bg-surface-card rounded-xl border border-hairline">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                  <Mail size={16} />
-                </div>
-                <div>
-                  <span className="text-[10px] text-stone uppercase tracking-wider font-semibold block">
-                    Direct Email
-                  </span>
-                  <span className="font-mono text-xs font-bold text-ink">{founderEmail}</span>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleCopyEmail}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-surface-bone hover:bg-hairline text-xs font-semibold text-charcoal transition-colors"
-              >
-                {copiedEmail ? (
-                  <>
-                    <CheckCircle size={13} className="text-emerald-600" />
-                    <span className="text-emerald-600">Copied</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy size={13} />
-                    <span>Copy</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            {isSent ? (
-              <div className="p-6 bg-emerald-50 border border-emerald-200 rounded-2xl text-center space-y-2">
-                <CheckCircle size={32} className="mx-auto text-emerald-600" />
-                <h4 className="font-display font-bold text-base text-ink">
-                  Message Sent
-                </h4>
-                <p className="text-xs text-charcoal">
-                  Thank you! Your message has been received. We’ll get back to you by email.
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsSent(false)}
-                  className="mt-2 text-xs"
-                >
-                  Send another message
-                </Button>
-              </div>
-            ) : (
-              <form onSubmit={handleContactSubmit} className="space-y-3.5">
-                {submitError && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600">
-                    {submitError}
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-ink mb-1">
-                      Your Name <span className="text-primary">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Alex Smith"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="w-full px-3 py-2 text-xs bg-surface-card border border-hairline rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-ink mb-1">
-                      Your Email (reply-to) <span className="text-primary">*</span>
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      placeholder="e.g. alex@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full px-3 py-2 text-xs bg-surface-card border border-hairline rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-ink mb-1">
-                    Subject <span className="text-primary">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Feedback on HabitsSeen / Partnership"
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-surface-card border border-hairline rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-ink mb-1">
-                    Message <span className="text-primary">*</span>
-                  </label>
-                  <textarea
-                    required
-                    rows={4}
-                    placeholder="Write your message here..."
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-surface-card border border-hairline rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-y"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between pt-1">
-                  <span className="text-[11px] text-stone">
-                    Delivers straight to Kumar Devanshu
-                  </span>
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    size="md"
-                    disabled={isSubmitting}
-                    className="gap-1.5 text-xs font-bold"
-                  >
-                    <Send size={13} />
-                    <span>{isSubmitting ? 'Sending...' : 'Send message'}</span>
-                  </Button>
-                </div>
-              </form>
-            )}
           </div>
         )}
       </div>

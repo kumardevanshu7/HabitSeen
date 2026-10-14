@@ -291,7 +291,7 @@ export const ChallengesView: React.FC = () => {
                             {targetDays} Days
                           </span>
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200 whitespace-nowrap">
-                            ⚠️ -90% ❤️ Stake
+                            ⚠️ -90% Stake
                           </span>
                           {c.status === 'COMPLETED' && (
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 whitespace-nowrap">
@@ -447,11 +447,14 @@ export const ChallengesView: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => handleTriggerFailPenalty(c, activeDateKey)}
-                        className="px-3 py-2 rounded-full bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+                        className="px-3 py-2 rounded-full bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer whitespace-nowrap shrink-0"
                         title="No excuses allowed. Deducts 90% of your current Health!"
                       >
                         <ShieldAlert size={14} className="text-red-600 shrink-0" />
-                        <span>Missed (-90% ❤️)</span>
+                        <span>Missed</span>
+                        <span className="text-[10px] font-mono font-extrabold px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200">
+                          -90%
+                        </span>
                       </button>
 
                       {/* COMPLETE TODAY BUTTON */}
@@ -460,10 +463,13 @@ export const ChallengesView: React.FC = () => {
                         onClick={() =>
                           logChallengeDay(c.id, activeDateKey, undefined, true)
                         }
-                        className="px-4 py-2 rounded-full bg-badge-success hover:bg-emerald-600 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer"
+                        className="px-3.5 sm:px-4 py-2 rounded-full bg-badge-success hover:bg-emerald-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer whitespace-nowrap flex-1 min-w-0"
                       >
-                        <Check size={15} className="stroke-[3]" />
-                        <span>Complete Day (+50 XP &amp; ❤️)</span>
+                        <Check size={15} className="stroke-[3] shrink-0" />
+                        <span className="truncate">Complete Day</span>
+                        <span className="hidden xs:inline-flex items-center text-[10px] font-mono font-black px-1.5 py-0.5 rounded-full bg-white/20 text-white shrink-0">
+                          +50 XP
+                        </span>
                       </button>
                     </>
                   )}

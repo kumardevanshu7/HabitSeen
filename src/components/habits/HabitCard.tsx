@@ -25,6 +25,7 @@ import {
   MoreVertical,
   Archive,
   ArchiveRestore,
+  Flag,
 } from 'lucide-react';
 import clsx from 'clsx';
 import confetti from 'canvas-confetti';
@@ -236,6 +237,20 @@ export const HabitCard: React.FC<HabitCardProps> = ({
   const currentLoggedSeconds = dayLog?.valueTimerSeconds ?? 0;
   const formattedLoggedHMS = formatSecondsToHMS(currentLoggedSeconds).formatted;
 
+  const formatCompactDuration = (totalSeconds: number): string => {
+    const s = Math.max(0, Math.floor(totalSeconds || 0));
+    const hours = Math.floor(s / 3600);
+    const minutes = Math.floor((s % 3600) / 60);
+    if (hours > 0) {
+      return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+    }
+    if (minutes > 0) return `${minutes}m`;
+    return `${s}s`;
+  };
+
+  const compactTargetTime = formatCompactDuration(targetSeconds);
+  const compactLoggedTime = formatCompactDuration(currentLoggedSeconds);
+
   // =========================================================================
   // HOLD / LONG-PRESS HANDLERS FOR HABIT CARD (DELETE / DUPLICATE)
   // =========================================================================
@@ -360,7 +375,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
         borderLeftColor: vibrantColor,
       }}
     >
-      <div className="p-2.5 sm:p-3 flex items-center justify-between gap-2.5 sm:gap-3.5">
+      <div className="p-3 sm:p-3.5 flex items-center justify-between gap-2.5 sm:gap-3.5">
         {/* LEFT: Category Icon + Habit Title & Meta */}
         <div
           onClick={(e) => {
@@ -379,7 +394,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
             <CategoryIcon size={16} strokeWidth={2.5} />
           </span>
 
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 pr-1">
             <h4
               className={clsx(
                 'font-display font-bold text-sm sm:text-base text-ink tracking-tight truncate hover:text-primary transition-colors',
@@ -388,13 +403,17 @@ export const HabitCard: React.FC<HabitCardProps> = ({
             >
               {habit.name}
             </h4>
-            <div className="flex items-center gap-1.5 flex-wrap text-[10px] text-charcoal mt-0.5">
+            <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-charcoal mt-0.5 truncate whitespace-nowrap">
               <span className="font-semibold uppercase tracking-wider">
                 {category?.name || 'Category'}
               </span>
               <span>•</span>
-              <span className="font-mono font-medium">
-                Pri {habit.schedule.priority ?? 50}
+              <span
+                className="inline-flex items-center gap-0.5 font-mono font-medium text-stone"
+                title={`Priority: ${habit.schedule.priority ?? 50}`}
+              >
+                <Flag size={9} className="shrink-0 text-stone" />
+                <span>{habit.schedule.priority ?? 50}</span>
               </span>
               {currentStreak > 0 && (
                 <>
@@ -480,9 +499,12 @@ export const HabitCard: React.FC<HabitCardProps> = ({
 
           {/* TIMER */}
           {habit.type === 'TIMER' && (
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-[11px] font-bold text-charcoal bg-surface-bone px-2 py-0.5 rounded-full border border-hairline">
-                {formattedLoggedHMS} / {formattedTargetHMS}
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <span
+                className="font-mono text-[10px] sm:text-[11px] font-bold text-charcoal bg-surface-bone px-2 py-0.5 rounded-full border border-hairline whitespace-nowrap shrink-0"
+                title={`${formattedLoggedHMS} / ${formattedTargetHMS}`}
+              >
+                {compactLoggedTime} / {compactTargetTime}
               </span>
               {!isCompleted ? (
                 <button
@@ -491,7 +513,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                     e.stopPropagation();
                     handleSaveTimer(undefined, true);
                   }}
-                  className="w-8 h-8 rounded-full border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500 flex items-center justify-center transition-all active:scale-90"
+                  className="w-8 h-8 rounded-full border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500 flex items-center justify-center transition-all active:scale-90 shrink-0"
                   title="Tap to mark complete"
                 >
                   <Check size={16} className="stroke-[2.5]" />
@@ -504,7 +526,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                     setShowLockedNotice(true);
                     setTimeout(() => setShowLockedNotice(false), 3000);
                   }}
-                  className="w-8 h-8 rounded-full bg-badge-success border-2 border-badge-success text-white flex items-center justify-center transition-all cursor-default"
+                  className="w-8 h-8 rounded-full bg-badge-success border-2 border-badge-success text-white flex items-center justify-center transition-all cursor-default shrink-0"
                   title="Completed & Locked for today! Tap (Unlock) to edit"
                 >
                   <Check size={16} className="stroke-[3]" />
@@ -580,11 +602,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                 e.stopPropagation();
                 setIsMissedModalOpen(true);
               }}
-              className="text-[11px] font-semibold text-charcoal hover:text-red-600 bg-surface-bone hover:bg-red-50 border border-hairline px-2 py-1 rounded-full flex items-center gap-1 transition-colors whitespace-nowrap shrink-0"
+              className="p-1.5 text-charcoal hover:text-red-600 bg-surface-bone hover:bg-red-50 border border-hairline rounded-full flex items-center justify-center transition-colors shrink-0 cursor-pointer"
               title="Log missed habit with reason"
             >
-              <ShieldAlert size={12} />
-              <span className="hidden xs:inline">Missed</span>
+              <ShieldAlert size={13} />
             </button>
           )}
 
@@ -712,10 +733,12 @@ export const HabitCard: React.FC<HabitCardProps> = ({
               {category?.name || 'Category'}
             </span>
             <span
-              className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full border bg-surface-bone text-charcoal border-hairline whitespace-nowrap shrink-0"
-              title="Priority Rank (0 - 100)"
+              className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full border bg-surface-bone text-charcoal border-hairline whitespace-nowrap shrink-0"
+              title={`Priority: ${habit.schedule.priority ?? 50}`}
             >
-              Pri {habit.schedule.priority ?? 50}
+              <Flag size={9} className="text-stone shrink-0" />
+              <span className="hidden sm:inline text-stone">Pri</span>
+              <span>{habit.schedule.priority ?? 50}</span>
             </span>
           </div>
 
@@ -729,7 +752,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
               >
                 <Lock size={10} className="shrink-0" />
                 <span>Locked</span>
-                <span className="text-primary underline font-semibold">(Unlock)</span>
+                <span className="hidden xs:inline text-primary underline font-semibold">(Unlock)</span>
               </button>
             ) : isExcused ? (
               <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold border border-blue-200 whitespace-nowrap shrink-0">

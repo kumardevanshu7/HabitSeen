@@ -2,12 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
 import { HabitCard } from './HabitCard';
 import { DayStrip } from './DayStrip';
-import { Habit } from '../../types/habit';
+import { Habit, Category } from '../../types/habit';
 import { isHabitDueOnDate, getTodayKey } from '../../utils/dateMath';
 import { CATEGORY_ICONS } from '../../constants/iconsAndColors';
 import { boostVibrancy, getContrastIconColor } from '../../utils/colorUtils';
 import { CreateCategoryModal } from '../categories/CreateCategoryModal';
 import { CreateChallengeModal } from '../challenges/CreateChallengeModal';
+import { Modal } from '../ui/Modal';
+import { SecurityModal } from '../security/SecurityModal';
 import { Button } from '../ui/Button';
 import { parseISO, format } from 'date-fns';
 import { useDragScroll } from '../../hooks/useDragScroll';
@@ -23,6 +25,8 @@ import {
   Archive,
   Flame,
   Zap,
+  Edit2,
+  Trash2,
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -49,6 +53,7 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
     selectedDate,
     setSelectedDate,
     reorderCategories,
+    deleteCategory,
   } = useAppStore();
 
   const [internalCatFilter, setInternalCatFilter] = useState<string>('all');
@@ -64,8 +69,17 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
   const [isReorderMode, setIsReorderMode] = useState(false);
   const [draggedCatId, setDraggedCatId] = useState<string | null>(null);
 
+  // Category hold menu & security verification state
+  const [categoryForOptions, setCategoryForOptions] = useState<Category | null>(null);
+  const [categoryToEdit, setCategoryToEdit] = useState<Category | null>(null);
+  const [categoryForSecurity, setCategoryForSecurity] = useState<{
+    action: 'EDIT' | 'DELETE';
+    category: Category;
+  } | null>(null);
+
   const catHoldTimerRef = useRef<NodeJS.Timeout | null>(null);
   const catTouchStartPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const isHoldingRef = useRef(false);
 
   const { ref: categoriesScrollRef, isDragging: isCatDragging, events: catScrollEvents } =
     useDragScroll<HTMLDivElement>();
@@ -181,13 +195,16 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
     setDraggedCatId(null);
   };
 
-  const handleCatTouchStart = (e: React.TouchEvent) => {
+  const handleCatTouchStart = (cat: Category, e: React.TouchEvent) => {
+    isHoldingRef.current = false;
     const touch = e.touches[0];
     catTouchStartPos.current = { x: touch.clientX, y: touch.clientY };
+    if (catHoldTimerRef.current) clearTimeout(catHoldTimerRef.current);
     catHoldTimerRef.current = setTimeout(() => {
-      navigator.vibrate?.(35);
-      setIsReorderMode(true);
-    }, 400);
+      isHoldingRef.current = true;
+      navigator.vibrate?.(40);
+      setCategoryForOptions(cat);
+    }, 450);
   };
 
   const handleCatTouchMove = (e: React.TouchEvent) => {
@@ -203,11 +220,14 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
     if (catHoldTimerRef.current) clearTimeout(catHoldTimerRef.current);
   };
 
-  const handleCatMouseDown = (e: React.MouseEvent) => {
+  const handleCatMouseDown = (cat: Category, e: React.MouseEvent) => {
     if (e.button !== 0) return;
+    isHoldingRef.current = false;
+    if (catHoldTimerRef.current) clearTimeout(catHoldTimerRef.current);
     catHoldTimerRef.current = setTimeout(() => {
-      setIsReorderMode(true);
-    }, 400);
+      isHoldingRef.current = true;
+      setCategoryForOptions(cat);
+    }, 450);
   };
 
   const handleCatMouseUp = () => {
@@ -240,7 +260,7 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
         </div>
       )}
 
-      {/* 2. CATEGORY PILLS FILTER BAR (HOLD TO REORDER / ALIGN) */}
+      {/* 2. CATEGORY PILLS FILTER BAR (HOLD TO EDIT / RENAME / DELETE) */}
       <div
         ref={categoriesScrollRef}
         {...catScrollEvents}
@@ -273,12 +293,16 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
           return (
             <div
               key={cat.id}
-              onTouchStart={handleCatTouchStart}
+              onTouchStart={(e) => handleCatTouchStart(cat, e)}
               onTouchEnd={handleCatTouchEnd}
               onTouchMove={handleCatTouchMove}
-              onMouseDown={handleCatMouseDown}
+              onMouseDown={(e) => handleCatMouseDown(cat, e)}
               onMouseUp={handleCatMouseUp}
               onMouseLeave={handleCatMouseUp}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setCategoryForOptions(cat);
+              }}
               draggable={isReorderMode}
               onDragStart={() => handleDragStart(cat.id)}
               onDragOver={(e) => handleDragOver(e, cat.id)}
@@ -290,8 +314,14 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
             >
               <button
                 type="button"
-                onClick={() => setSelectedCatFilter(cat.id)}
-                title="Hold to align & reorder"
+                onClick={() => {
+                  if (isHoldingRef.current) {
+                    isHoldingRef.current = false;
+                    return;
+                  }
+                  setSelectedCatFilter(cat.id);
+                }}
+                title="Tap to filter · Hold for edit / rename / delete"
                 className={clsx(
                   'flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all border-2 shrink-0',
                   isSelected
@@ -377,7 +407,10 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
         </button>
 
         <button
-          onClick={() => setIsCategoryModalOpen(true)}
+          onClick={() => {
+            setCategoryToEdit(null);
+            setIsCategoryModalOpen(true);
+          }}
           className="text-xs font-semibold text-primary hover:text-primary-deep bg-surface-card border border-dashed border-primary/40 px-3 py-1.5 rounded-full whitespace-nowrap flex items-center gap-1 transition-colors shrink-0"
         >
           <Plus size={13} /> New Category
@@ -551,7 +584,7 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
           className={clsx(
             viewMode === 'grid'
               ? 'columns-1 md:columns-2 gap-3.5'
-              : 'flex flex-col gap-2.5'
+              : 'flex flex-col gap-3 sm:gap-3.5'
           )}
         >
           {dueHabits.map((habit) => (
@@ -570,11 +603,174 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
         </div>
       )}
 
-      {/* Create Category Modal */}
+      {/* CATEGORY HOLD OPTIONS MODAL (EDIT / RENAME / REORDER / DELETE) */}
+      <Modal
+        isOpen={Boolean(categoryForOptions)}
+        onClose={() => setCategoryForOptions(null)}
+        title="Category Options"
+        subtitle={categoryForOptions ? `Manage "${categoryForOptions.name}"` : undefined}
+        maxWidth="md"
+      >
+        {categoryForOptions && (() => {
+          const cat = categoryForOptions;
+          const Icon =
+            CATEGORY_ICONS.find((i) => i.id === cat.icon)?.icon ||
+            CATEGORY_ICONS[0].icon;
+          const vibrantColor = boostVibrancy(cat.color);
+          const iconColor = getContrastIconColor(vibrantColor);
+          const isProtected = cat.isDefault || cat.id === 'cat-others';
+
+          return (
+            <div className="space-y-4">
+              {/* Category Preview Header */}
+              <div
+                className="p-3.5 rounded-2xl flex items-center gap-3 border-2"
+                style={{
+                  backgroundColor: `${vibrantColor}15`,
+                  borderColor: vibrantColor,
+                }}
+              >
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-2xs"
+                  style={{ backgroundColor: vibrantColor, color: iconColor }}
+                >
+                  <Icon size={20} strokeWidth={2.5} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-sm text-ink truncate">
+                    {cat.name}
+                  </div>
+                  <div className="text-[11px] text-charcoal">
+                    {habits.filter((h) => h.categoryId === cat.id).length} Habits assigned
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const target = categoryForOptions;
+                    setCategoryForOptions(null);
+                    setCategoryForSecurity({ action: 'EDIT', category: target });
+                  }}
+                  className="w-full flex items-center justify-between p-3 rounded-xl border border-hairline hover:border-primary/50 hover:bg-primary/5 text-ink text-left transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      <Edit2 size={16} />
+                    </span>
+                    <div>
+                      <div className="text-xs font-bold text-ink">Edit &amp; Rename Category</div>
+                      <div className="text-[11px] text-charcoal">Change name, icon, and accent color</div>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-semibold text-primary">Password Protected</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCategoryForOptions(null);
+                    setIsReorderMode(true);
+                  }}
+                  className="w-full flex items-center justify-between p-3 rounded-xl border border-hairline hover:border-ink/30 hover:bg-surface-bone text-ink text-left transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="w-8 h-8 rounded-lg bg-ink/10 text-ink flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      <ArrowLeftRight size={16} />
+                    </span>
+                    <div>
+                      <div className="text-xs font-bold text-ink">Reorder &amp; Align Positions</div>
+                      <div className="text-[11px] text-charcoal">Shift category left or right in filter bar</div>
+                    </div>
+                  </div>
+                </button>
+
+                {!isProtected ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const target = categoryForOptions;
+                      setCategoryForOptions(null);
+                      setCategoryForSecurity({ action: 'DELETE', category: target });
+                    }}
+                    className="w-full flex items-center justify-between p-3 rounded-xl border border-rose-200 hover:border-rose-400 hover:bg-rose-50 text-left transition-all group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="w-8 h-8 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                        <Trash2 size={16} />
+                      </span>
+                      <div>
+                        <div className="text-xs font-bold text-rose-600">Delete Category</div>
+                        <div className="text-[11px] text-rose-500/80">Habits will be moved to &quot;Others&quot;</div>
+                      </div>
+                    </div>
+                    <span className="text-[11px] font-semibold text-rose-600">Password Protected</span>
+                  </button>
+                ) : (
+                  <div className="p-2.5 rounded-xl bg-surface-bone text-charcoal text-[11px] text-center">
+                    Default system categories cannot be deleted.
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-2">
+                <Button
+                  variant="ghost"
+                  size="md"
+                  className="w-full"
+                  onClick={() => setCategoryForOptions(null)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          );
+        })()}
+      </Modal>
+
+      {/* Security Verification Modal for Category Actions */}
+      {categoryForSecurity && (
+        <SecurityModal
+          isOpen={Boolean(categoryForSecurity)}
+          onClose={() => setCategoryForSecurity(null)}
+          title="Security Verification"
+          actionTitle={
+            categoryForSecurity.action === 'EDIT'
+              ? `Edit Category: "${categoryForSecurity.category.name}"`
+              : `Delete Category: "${categoryForSecurity.category.name}"`
+          }
+          isDanger={categoryForSecurity.action === 'DELETE'}
+          onSuccess={async () => {
+            const target = categoryForSecurity;
+            setCategoryForSecurity(null);
+            if (target.action === 'EDIT') {
+              setCategoryToEdit(target.category);
+              setIsCategoryModalOpen(true);
+            } else {
+              await deleteCategory(target.category.id);
+              if (selectedCatFilter === target.category.id) {
+                setSelectedCatFilter('all');
+              }
+            }
+          }}
+        />
+      )}
+
+      {/* Create / Edit Category Modal */}
       <CreateCategoryModal
         isOpen={isCategoryModalOpen}
-        onClose={() => setIsCategoryModalOpen(false)}
-        onCategoryCreated={(newCat) => setSelectedCatFilter(newCat.id)}
+        onClose={() => {
+          setIsCategoryModalOpen(false);
+          setCategoryToEdit(null);
+        }}
+        categoryToEdit={categoryToEdit}
+        onCategoryCreated={(newCat) => {
+          setSelectedCatFilter(newCat.id);
+          setCategoryToEdit(null);
+        }}
       />
 
       {/* Create Hardcore Challenge Modal */}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -19,6 +19,8 @@ import {
   Calendar,
   Award,
   CheckCircle2,
+  Sparkles,
+  Clock,
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -33,7 +35,7 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
   onClose,
   onChallengeCreated,
 }) => {
-  const { addChallenge, user } = useAppStore();
+  const { addChallenge, user, challenges, habits } = useAppStore();
 
   const [name, setName] = useState('');
   const [selectedIcon, setSelectedIcon] = useState('flame');
@@ -44,6 +46,67 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
   // Optional sub-tasks inside the challenge
   const [tasks, setTasks] = useState<ChallengeTask[]>([]);
   const [newTaskText, setNewTaskText] = useState('');
+
+  // Extract unique previous tasks across all challenges & checklist habits
+  const previousTasks = useMemo(() => {
+    const set = new Set<string>();
+    const list: string[] = [];
+
+    // 1. From existing challenges
+    challenges.forEach((c) => {
+      c.tasks?.forEach((t) => {
+        const trimmed = t.text.trim();
+        if (trimmed && !set.has(trimmed.toLowerCase())) {
+          set.add(trimmed.toLowerCase());
+          list.push(trimmed);
+        }
+      });
+    });
+
+    // 2. From checklist habits
+    habits.forEach((h) => {
+      h.config?.checklist?.items?.forEach((item) => {
+        const trimmed = item.text.trim();
+        if (trimmed && !set.has(trimmed.toLowerCase())) {
+          set.add(trimmed.toLowerCase());
+          list.push(trimmed);
+        }
+      });
+    });
+
+    return list;
+  }, [challenges, habits]);
+
+  // Tasks available to add (not yet in the current challenge tasks)
+  const availablePreviousTasks = useMemo(() => {
+    const currentTaskTexts = new Set(tasks.map((t) => t.text.trim().toLowerCase()));
+    return previousTasks.filter((pt) => !currentTaskTexts.has(pt.toLowerCase()));
+  }, [previousTasks, tasks]);
+
+  // Tasks filtered by current text input query
+  const displayedPreviousTasks = useMemo(() => {
+    if (!newTaskText.trim()) return availablePreviousTasks;
+    const query = newTaskText.trim().toLowerCase();
+    return availablePreviousTasks.filter((pt) => pt.toLowerCase().includes(query));
+  }, [availablePreviousTasks, newTaskText]);
+
+  const handleAddPreviousTask = (taskText: string) => {
+    setTasks((prev) => [
+      ...prev,
+      {
+        id: `ctask-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+        text: taskText,
+      },
+    ]);
+  };
+
+  const handleAddAllPreviousTasks = () => {
+    const toAdd = availablePreviousTasks.map((text, idx) => ({
+      id: `ctask-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 5)}`,
+      text,
+    }));
+    setTasks((prev) => [...prev, ...toAdd]);
+  };
 
   // Step 2: Rules Disclaimer Popup
   const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
@@ -339,6 +402,41 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
                 <Plus size={14} /> Add Task
               </Button>
             </div>
+
+            {/* QUICK-ADD FROM PREVIOUS TASKS */}
+            {availablePreviousTasks.length > 0 && (
+              <div className="pt-2 border-t border-hairline space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-charcoal flex items-center gap-1.5">
+                    <Sparkles size={13} className="text-amber-500 shrink-0" />
+                    <span>Quick Add Previous Tasks ({availablePreviousTasks.length})</span>
+                  </span>
+                  {availablePreviousTasks.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={handleAddAllPreviousTasks}
+                      className="text-[10px] font-bold text-primary hover:underline cursor-pointer"
+                    >
+                      + Add All
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto no-scrollbar py-0.5">
+                  {displayedPreviousTasks.map((prevText) => (
+                    <button
+                      key={prevText}
+                      type="button"
+                      onClick={() => handleAddPreviousTask(prevText)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-bone hover:bg-primary/10 text-charcoal hover:text-primary border border-hairline hover:border-primary/30 text-[11px] font-medium transition-all active:scale-95 text-left shrink-0 cursor-pointer"
+                      title={`Tap to add "${prevText}"`}
+                    >
+                      <Plus size={11} className="text-primary shrink-0" />
+                      <span className="truncate max-w-[220px]">{prevText}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* FOOTER */}

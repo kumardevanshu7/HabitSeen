@@ -36,6 +36,7 @@ import {
 import {
   saveUserProfileToDb,
   addCategoryToDb,
+  updateCategoryInDb,
   deleteCategoryFromDb,
   saveCategoriesOrderToDb,
   addHabitToDb,
@@ -84,6 +85,7 @@ interface AppState {
   setCategories: (cats: Category[]) => void;
   reorderCategories: (ordered: Category[]) => Promise<void>;
   addCategory: (cat: Omit<Category, 'id' | 'createdAt'>) => Promise<Category>;
+  updateCategory: (category: Category) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
 
   // Habits
@@ -431,6 +433,16 @@ export const useAppStore = create<AppState>()((set, get) => ({
     }
     set((s) => ({ categories: [...s.categories, newCat] }));
     return newCat;
+  },
+
+  updateCategory: async (updated) => {
+    const { currentUser } = get();
+    if (currentUser) {
+      await updateCategoryInDb(currentUser.uid, updated);
+    }
+    set((s) => ({
+      categories: s.categories.map((c) => (c.id === updated.id ? updated : c)),
+    }));
   },
 
   deleteCategory: async (id) => {

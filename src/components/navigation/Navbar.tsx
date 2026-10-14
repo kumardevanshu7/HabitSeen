@@ -2,7 +2,7 @@ import React from 'react';
 import { useAppStore } from '../../stores/useAppStore';
 import { Button } from '../ui/Button';
 import { logOut } from '../../services/firebase';
-import { Plus, Award, LogOut, Heart, Zap, Flame } from 'lucide-react';
+import { Plus, Award, LogOut, Heart, Zap, Flame, CheckSquare, Clock, BarChart2 } from 'lucide-react';
 import clsx from 'clsx';
 
 interface NavbarProps {
@@ -34,7 +34,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <header className="sticky top-0 z-40 bg-canvas/90 backdrop-blur-md border-b border-hairline">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
         {/* LOGO & BRAND */}
         <div className="flex items-center gap-2.5 shrink-0">
           <img
@@ -49,30 +49,31 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
 
-        {/* DESKTOP NAV TABS */}
-        <nav aria-label="Main Navigation" className="hidden md:flex items-center gap-1 bg-surface-card p-1 rounded-full border border-hairline shadow-2xs">
+        {/* DESKTOP NAV TABS - DECONGESTED SINGLE-LINE CAPSULE */}
+        <nav aria-label="Main Navigation" className="hidden md:flex items-center gap-1 bg-surface-card p-1 rounded-full border border-hairline shadow-2xs shrink-0">
           <button
             type="button"
             aria-current={activeTab === 'habits' ? 'page' : undefined}
             onClick={() => onSelectTab('habits')}
             className={clsx(
-              'px-4 py-1.5 rounded-full text-xs font-semibold transition-all',
+              'px-3.5 lg:px-4 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-1.5',
               activeTab === 'habits'
                 ? 'bg-ink text-white shadow-xs'
-                : 'text-charcoal hover:text-ink'
+                : 'text-charcoal hover:text-ink hover:bg-surface-bone'
             )}
           >
-            Daily Habits
+            <CheckSquare size={13} />
+            <span>Daily Habits</span>
           </button>
           <button
             type="button"
             aria-current={activeTab === 'challenges' ? 'page' : undefined}
             onClick={() => onSelectTab('challenges')}
             className={clsx(
-              'px-4 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-1.5',
+              'px-3.5 lg:px-4 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-1.5',
               activeTab === 'challenges'
                 ? 'bg-rose-600 text-white shadow-xs'
-                : 'text-charcoal hover:text-ink'
+                : 'text-charcoal hover:text-ink hover:bg-surface-bone'
             )}
           >
             <Flame size={13} className={activeTab === 'challenges' ? 'fill-white' : 'text-rose-500'} />
@@ -95,26 +96,28 @@ export const Navbar: React.FC<NavbarProps> = ({
             aria-current={activeTab === 'breaks' ? 'page' : undefined}
             onClick={() => onSelectTab('breaks')}
             className={clsx(
-              'px-4 py-1.5 rounded-full text-xs font-semibold transition-all',
+              'px-3.5 lg:px-4 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-1.5',
               activeTab === 'breaks'
                 ? 'bg-ink text-white shadow-xs'
-                : 'text-charcoal hover:text-ink'
+                : 'text-charcoal hover:text-ink hover:bg-surface-bone'
             )}
           >
-            Timer Habit Break
+            <Clock size={13} />
+            <span>Quit Breaks</span>
           </button>
           <button
             type="button"
             aria-current={activeTab === 'analytics' ? 'page' : undefined}
             onClick={() => onSelectTab('analytics')}
             className={clsx(
-              'px-4 py-1.5 rounded-full text-xs font-semibold transition-all',
+              'px-3.5 lg:px-4 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-1.5',
               activeTab === 'analytics'
                 ? 'bg-ink text-white shadow-xs'
-                : 'text-charcoal hover:text-ink'
+                : 'text-charcoal hover:text-ink hover:bg-surface-bone'
             )}
           >
-            Overall Analytics
+            <BarChart2 size={13} />
+            <span>Analytics</span>
           </button>
         </nav>
 
@@ -125,7 +128,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               onClick={onOpenProfile}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-full border border-red-200 text-xs font-bold shadow-2xs transition-all active:scale-95"
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-full border border-red-200 text-xs font-bold shadow-2xs transition-all active:scale-95 shrink-0"
               title={`${hearts}/${maxHearts} Hearts (Click to open profile)`}
             >
               <Heart size={14} className="fill-red-500 text-red-500" />
@@ -139,12 +142,12 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               onClick={onOpenProfile}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-card hover:bg-surface-bone rounded-full border border-hairline text-xs font-medium text-ink shadow-2xs transition-all active:scale-95"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-card hover:bg-surface-bone rounded-full border border-hairline text-xs font-medium text-ink shadow-2xs transition-all active:scale-95 shrink-0"
               title={`${levelTitle} — ${totalXp} Total XP (Click to open profile)`}
             >
-              <Zap size={14} className="text-amber-500 fill-amber-500" />
-              <span className="font-semibold hidden sm:inline">{levelTitle}</span>
-              <span className="text-stone font-mono font-bold text-xs">{totalXp} XP</span>
+              <Zap size={14} className="text-amber-500 fill-amber-500 shrink-0" />
+              <span className="font-semibold hidden lg:inline max-w-[130px] truncate">{levelTitle}</span>
+              <span className="text-stone font-mono font-bold text-xs whitespace-nowrap">{totalXp} XP</span>
             </button>
           )}
 

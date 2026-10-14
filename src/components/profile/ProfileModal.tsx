@@ -25,12 +25,13 @@ import { verifySecurityAnswer } from '../../utils/cryptoUtils';
 import clsx from 'clsx';
 
 import { Trophy, ChevronRight } from 'lucide-react';
+import { BrandLegalTab } from '../brand/BrandLegalModal';
 
 interface ProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
   onOpenAchievements?: () => void;
-  onOpenBrandLegal?: (tab: 'explore' | 'about' | 'privacy' | 'terms' | 'disclaimer' | 'contact') => void;
+  onOpenBrandLegal?: (tab: BrandLegalTab) => void;
 }
 
 const PRESET_QUESTIONS = [

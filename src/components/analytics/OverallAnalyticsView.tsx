@@ -24,6 +24,15 @@ import {
   Trophy,
   BarChart2,
   ChevronRight,
+  Sun,
+  Sunset,
+  Moon,
+  Activity,
+  ArrowUpRight,
+  ArrowDownRight,
+  Compass,
+  Hourglass,
+  RotateCcw,
 } from 'lucide-react';
 import {
   eachDayOfInterval,
@@ -122,6 +131,110 @@ export const OverallAnalyticsView: React.FC<OverallAnalyticsViewProps> = ({
     start: subDays(now, 119),
     end: now,
   });
+
+  // --- DEEP ANALYTICS METRICS ---
+  // 1. Circadian / Peak Discipline Execution Window
+  const timeBuckets = {
+    morning: 0,   // 05:00 - 11:59
+    afternoon: 0, // 12:00 - 16:59
+    evening: 0,   // 17:00 - 21:59
+    night: 0,     // 22:00 - 04:59
+  };
+  let timestampedCount = 0;
+
+  allLogsArray.forEach((l) => {
+    if (l.status !== 'COMPLETED') return;
+    const t = l.loggedAt || (l as any).completedAt;
+    if (t) {
+      try {
+        const parsed = parseISO(t);
+        const h = parsed.getHours();
+        if (h >= 5 && h < 12) timeBuckets.morning++;
+        else if (h >= 12 && h < 17) timeBuckets.afternoon++;
+        else if (h >= 17 && h < 22) timeBuckets.evening++;
+        else timeBuckets.night++;
+        timestampedCount++;
+      } catch {
+        // ignore parsing error
+      }
+    }
+  });
+
+  const getBucketPct = (count: number) =>
+    timestampedCount > 0 ? Math.round((count / timestampedCount) * 100) : 0;
+
+  const bucketEntries = [
+    { key: 'Morning', sub: '5 AM - 12 PM', count: timeBuckets.morning, pct: getBucketPct(timeBuckets.morning) },
+    { key: 'Afternoon', sub: '12 PM - 5 PM', count: timeBuckets.afternoon, pct: getBucketPct(timeBuckets.afternoon) },
+    { key: 'Evening', sub: '5 PM - 10 PM', count: timeBuckets.evening, pct: getBucketPct(timeBuckets.evening) },
+    { key: 'Night', sub: '10 PM - 5 AM', count: timeBuckets.night, pct: getBucketPct(timeBuckets.night) },
+  ];
+  const peakBucket = bucketEntries.reduce((prev, curr) => (curr.count > prev.count ? curr : prev), bucketEntries[0]);
+
+  // 2. Perfect Days Velocity & Willpower Ledger
+  const perfectDaysList = user?.gamification?.perfectDaysCompleted || [];
+  const totalPerfectDays = perfectDaysList.length;
+  const thirtyDaysAgoKey = format(subDays(now, 30), 'yyyy-MM-dd');
+  const past30dPerfectDays = perfectDaysList.filter((k) => k >= thirtyDaysAgoKey).length;
+  const perfectDaysXpGenerated = totalPerfectDays * 25;
+
+  // 3. Habit Streak Health Quadrants
+  const activeHabitsList = habits.filter((h) => !h.isArchived);
+  const masteryHabitsCount = activeHabitsList.filter((h) => h.stats.currentStreak >= 30).length;
+  const momentumHabitsCount = activeHabitsList.filter(
+    (h) => h.stats.currentStreak >= 7 && h.stats.currentStreak < 30
+  ).length;
+  const formingHabitsCount = activeHabitsList.filter(
+    (h) => h.stats.currentStreak >= 1 && h.stats.currentStreak < 7
+  ).length;
+  const atRiskHabitsCount = activeHabitsList.filter((h) => h.stats.currentStreak === 0).length;
+  const excusedShieldCount = allLogsArray.filter((l) => l.status === 'EXCUSED').length;
+
+  // 4. Focus Hours & Sobriety Ledger
+  const totalTimerSeconds = allLogsArray.reduce((acc, l) => acc + (l.valueTimerSeconds || 0), 0);
+  const focusHours = Math.floor(totalTimerSeconds / 3600);
+  const focusMins = Math.floor((totalTimerSeconds % 3600) / 60);
+
+  const activeHabitBreaks = habitBreaks.filter((b) => !b.isArchived);
+  let totalSobrietyHours = 0;
+  activeHabitBreaks.forEach((hb) => {
+    try {
+      const s = parseISO(hb.startedAt);
+      const diffMs = now.getTime() - s.getTime();
+      if (diffMs > 0) totalSobrietyHours += Math.floor(diffMs / (1000 * 60 * 60));
+    } catch {
+      // ignore
+    }
+  });
+  const totalSobrietyDays = Math.floor(totalSobrietyHours / 24);
+
+  // 5. 4-Week Rolling Consistency Velocity
+  const fourWeeks = [3, 2, 1, 0].map((weeksAgo) => {
+    const targetDate = subDays(now, weeksAgo * 7);
+    const wStart = startOfWeek(targetDate, { weekStartsOn: 1 });
+    const wEnd = endOfWeek(targetDate, { weekStartsOn: 1 });
+    const weekLogs = allLogsArray.filter((l) => {
+      try {
+        const d = parseISO(l.date);
+        return isWithinInterval(d, { start: wStart, end: wEnd });
+      } catch {
+        return false;
+      }
+    });
+    const completed = weekLogs.filter((l) => l.status === 'COMPLETED').length;
+    const rate = weekLogs.length > 0 ? Math.round((completed / weekLogs.length) * 100) : 0;
+    const label =
+      weeksAgo === 0
+        ? 'Current Wk'
+        : weeksAgo === 1
+        ? 'Last Wk'
+        : `${weeksAgo}w Ago`;
+    return { label, completed, total: weekLogs.length, rate };
+  });
+
+  const currentWkRate = fourWeeks[3].rate;
+  const prevWkRate = fourWeeks[2].rate;
+  const velocityDiff = currentWkRate - prevWkRate;
 
   return (
     <div className="space-y-6">
@@ -639,7 +752,295 @@ export const OverallAnalyticsView: React.FC<OverallAnalyticsViewProps> = ({
         </div>
       </div>
 
-      {/* 5. ACTIVITY HEATMAP (120 DAYS) */}
+      {/* 6. DEEP ANALYTICS: PEAK CHRONO-WINDOW & 4-WEEK ROLLING VELOCITY */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Circadian Execution Window */}
+        <div className="p-5 bg-surface-card border border-hairline rounded-3xl">
+          <div className="flex items-center justify-between mb-1">
+            <h4 className="font-display font-bold text-base text-ink flex items-center gap-2">
+              <Compass size={17} className="text-primary" /> Peak Execution Chrono-Window
+            </h4>
+            {timestampedCount > 0 && (
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                Peak: {peakBucket.key}
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-charcoal mb-4">
+            Analysis of the exact time of day you check off your daily habits.
+          </p>
+
+          <div className="space-y-3">
+            {bucketEntries.map((b) => {
+              const isPeak = b.key === peakBucket.key && timestampedCount > 0;
+              return (
+                <div key={b.key} className="p-3 bg-canvas rounded-2xl border border-hairline">
+                  <div className="flex items-center justify-between text-xs mb-1.5">
+                    <div className="flex items-center gap-2">
+                      {b.key === 'Morning' && <Sun size={15} className="text-amber-500" />}
+                      {b.key === 'Afternoon' && <Sun size={15} className="text-orange-500" />}
+                      {b.key === 'Evening' && <Sunset size={15} className="text-rose-500" />}
+                      {b.key === 'Night' && <Moon size={15} className="text-indigo-400" />}
+                      <span className="font-bold text-ink">{b.key}</span>
+                      <span className="text-[10px] text-stone">({b.sub})</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-bold text-ink">{b.pct}%</span>
+                      <span className="text-[10px] text-stone font-mono">({b.count})</span>
+                    </div>
+                  </div>
+                  <div className="w-full bg-surface-bone h-2 rounded-full overflow-hidden">
+                    <div
+                      className={clsx(
+                        'h-full rounded-full transition-all duration-500',
+                        isPeak ? 'bg-primary' : 'bg-charcoal/40'
+                      )}
+                      style={{ width: `${b.pct}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 4-Week Rolling Consistency Velocity */}
+        <div className="p-5 bg-surface-card border border-hairline rounded-3xl">
+          <div className="flex items-center justify-between mb-1">
+            <h4 className="font-display font-bold text-base text-ink flex items-center gap-2">
+              <Activity size={17} className="text-primary" /> 4-Week Momentum Velocity
+            </h4>
+            <span
+              className={clsx(
+                'text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full flex items-center gap-0.5 border',
+                velocityDiff >= 0
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : 'bg-rose-50 text-rose-700 border-rose-200'
+              )}
+            >
+              {velocityDiff >= 0 ? (
+                <>
+                  <ArrowUpRight size={12} /> +{velocityDiff}% Momentum
+                </>
+              ) : (
+                <>
+                  <ArrowDownRight size={12} /> {velocityDiff}% Momentum
+                </>
+              )}
+            </span>
+          </div>
+          <p className="text-xs text-charcoal mb-4">
+            Rolling weekly consistency to measure habit acceleration over time.
+          </p>
+
+          <div className="grid grid-cols-4 gap-2">
+            {fourWeeks.map((w, idx) => {
+              const isCurrent = idx === 3;
+              return (
+                <div
+                  key={w.label}
+                  className={clsx(
+                    'p-3 rounded-2xl border flex flex-col items-center justify-between h-36 transition-all',
+                    isCurrent
+                      ? 'bg-ink text-white border-ink shadow-xs ring-1 ring-primary/40'
+                      : 'bg-canvas text-charcoal border-hairline'
+                  )}
+                >
+                  <span
+                    className={clsx(
+                      'text-[10px] font-bold uppercase tracking-wider',
+                      isCurrent ? 'text-primary-pink' : 'text-stone'
+                    )}
+                  >
+                    {w.label}
+                  </span>
+
+                  <div className="flex flex-col items-center my-1">
+                    <span
+                      className={clsx(
+                        'font-mono text-lg font-black',
+                        isCurrent ? 'text-white' : 'text-ink'
+                      )}
+                    >
+                      {w.rate}%
+                    </span>
+                    <span
+                      className={clsx(
+                        'text-[9px] font-mono',
+                        isCurrent ? 'text-white/60' : 'text-stone'
+                      )}
+                    >
+                      {w.completed} logs
+                    </span>
+                  </div>
+
+                  <div className="w-full bg-surface-bone/30 h-1.5 rounded-full overflow-hidden">
+                    <div
+                      className={clsx(
+                        'h-full rounded-full transition-all',
+                        isCurrent
+                          ? 'bg-primary'
+                          : w.rate >= 80
+                          ? 'bg-emerald-500'
+                          : w.rate >= 50
+                          ? 'bg-amber-500'
+                          : 'bg-stone'
+                      )}
+                      style={{ width: `${w.rate}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-3 p-2.5 bg-surface-bone rounded-2xl border border-hairline flex items-center justify-between text-xs text-charcoal">
+            <span className="font-semibold text-ink">30-Day Perfect Days:</span>
+            <span className="font-mono font-bold text-primary">
+              {past30dPerfectDays} / 30 Days ({((past30dPerfectDays / 30) * 100).toFixed(0)}%)
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* 7. DEEP ANALYTICS: HABIT STREAK QUADRANTS & DEEP FOCUS / SOBRIETY LEDGER */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Habit Streak Longevity Quadrants */}
+        <div className="p-5 bg-surface-card border border-hairline rounded-3xl">
+          <div className="flex items-center justify-between mb-1">
+            <h4 className="font-display font-bold text-base text-ink flex items-center gap-2">
+              <ShieldCheck size={17} className="text-primary" /> Habit Longevity Quadrant
+            </h4>
+            <span className="text-[10px] font-bold text-stone">
+              {activeHabitsList.length} Active Habits
+            </span>
+          </div>
+          <p className="text-xs text-charcoal mb-4">
+            Streak stability breakdown across habit neuro-pathway formation.
+          </p>
+
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="p-3 bg-canvas rounded-2xl border border-hairline">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 mb-0.5">
+                <Trophy size={14} /> Mastery (30d+)
+              </div>
+              <span className="font-mono text-xl font-black text-ink">{masteryHabitsCount}</span>
+              <p className="text-[10px] text-stone mt-0.5">Automated routines</p>
+            </div>
+
+            <div className="p-3 bg-canvas rounded-2xl border border-hairline">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-primary mb-0.5">
+                <Flame size={14} /> Momentum (7-29d)
+              </div>
+              <span className="font-mono text-xl font-black text-ink">{momentumHabitsCount}</span>
+              <p className="text-[10px] text-stone mt-0.5">Strong habit groove</p>
+            </div>
+
+            <div className="p-3 bg-canvas rounded-2xl border border-hairline">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-blue-600 mb-0.5">
+                <Sparkles size={14} /> Forming (1-6d)
+              </div>
+              <span className="font-mono text-xl font-black text-ink">{formingHabitsCount}</span>
+              <p className="text-[10px] text-stone mt-0.5">Willpower building</p>
+            </div>
+
+            <div className="p-3 bg-canvas rounded-2xl border border-hairline">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-stone mb-0.5">
+                <RotateCcw size={14} /> At Risk (0d)
+              </div>
+              <span className="font-mono text-xl font-black text-ink">{atRiskHabitsCount}</span>
+              <p className="text-[10px] text-stone mt-0.5">Needs focus today</p>
+            </div>
+          </div>
+
+          {excusedShieldCount > 0 && (
+            <div className="mt-3 p-2.5 bg-blue-50/70 border border-blue-200/60 rounded-2xl flex items-center justify-between text-xs text-blue-900">
+              <span className="flex items-center gap-1.5 font-semibold">
+                <ShieldCheck size={14} className="text-blue-600" /> Life Shields Used:
+              </span>
+              <span className="font-mono font-bold">{excusedShieldCount} days preserved</span>
+            </div>
+          )}
+        </div>
+
+        {/* Deep Focus & Sobriety Accumulation */}
+        <div className="p-5 bg-surface-card border border-hairline rounded-3xl">
+          <div className="flex items-center justify-between mb-1">
+            <h4 className="font-display font-bold text-base text-ink flex items-center gap-2">
+              <Hourglass size={17} className="text-primary" /> Willpower & Focus Ledger
+            </h4>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-charcoal">
+              Discipline Assets
+            </span>
+          </div>
+          <p className="text-xs text-charcoal mb-4">
+            Total accumulated hours of deep focus, clean sobriety, and 100% days.
+          </p>
+
+          <div className="space-y-2.5">
+            {/* Timer Focus Hours */}
+            <div className="p-3 bg-canvas rounded-2xl border border-hairline flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center">
+                  <Clock size={20} />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-ink block">Deep Timer Focus</span>
+                  <span className="text-[11px] text-stone">Accumulated in session habits</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="font-mono text-lg font-black text-ink">
+                  {focusHours}h {focusMins}m
+                </span>
+                <span className="text-[9px] uppercase tracking-wider text-stone block">Total Logged</span>
+              </div>
+            </div>
+
+            {/* Sobriety Days */}
+            <div className="p-3 bg-canvas rounded-2xl border border-hairline flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+                  <ShieldCheck size={20} />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-ink block">Sobriety Clean Time</span>
+                  <span className="text-[11px] text-stone">Across active quit breaks</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="font-mono text-lg font-black text-ink">
+                  {totalSobrietyDays}d <span className="text-xs font-semibold text-stone">({totalSobrietyHours}h)</span>
+                </span>
+                <span className="text-[9px] uppercase tracking-wider text-stone block">Clean Time</span>
+              </div>
+            </div>
+
+            {/* Perfect Days XP Generated */}
+            <div className="p-3 bg-canvas rounded-2xl border border-hairline flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                  <Sparkles size={20} />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-ink block">All-Time Perfect Days</span>
+                  <span className="text-[11px] text-stone">100% daily task execution</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="font-mono text-lg font-black text-primary">
+                  {totalPerfectDays} Days
+                </span>
+                <span className="text-[9px] font-mono font-bold text-emerald-600 block">
+                  +{perfectDaysXpGenerated} XP Earned
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 8. ACTIVITY HEATMAP (120 DAYS) */}
       <div className="p-5 bg-surface-card border border-hairline rounded-3xl">
         <div className="flex items-center justify-between mb-4">
           <div>

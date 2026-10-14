@@ -20,6 +20,7 @@ import {
   FileText,
   Calendar,
   CheckCircle2,
+  Zap,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import clsx from 'clsx';
@@ -360,19 +361,19 @@ export const HabitBreakHub: React.FC = () => {
             onChange={(val) => setCategoryId(val)}
           />
 
-          {/* START DATE & CUSTOM TIME SELECTOR (1ST PIC ENHANCEMENT) */}
-          <div className="p-3.5 bg-surface-card rounded-2xl border border-hairline space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          {/* START DATE & CUSTOM TIME SELECTOR */}
+          <div className="p-4 sm:p-5 bg-surface-card rounded-2xl border border-hairline space-y-3.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-charcoal ml-0.5">
-                  When do you want to start? (Start Date & Time)
+                <label className="block text-xs font-bold uppercase tracking-wider text-charcoal">
+                  Start Date & Time
                 </label>
-                <span className="text-[11px] text-charcoal ml-0.5">
-                  Launch right now or set a custom start date & exact time
-                </span>
+                <p className="text-[11px] text-stone mt-0.5">
+                  Launch immediately or specify when your streak began
+                </p>
               </div>
 
-              <div className="flex items-center bg-surface-bone p-1 rounded-full border border-hairline self-start sm:self-auto shrink-0">
+              <div className="flex items-center bg-surface-bone p-1 rounded-full border border-hairline self-start sm:self-auto shrink-0 gap-1">
                 <button
                   type="button"
                   onClick={() => {
@@ -382,62 +383,83 @@ export const HabitBreakHub: React.FC = () => {
                     setStartMode('now');
                   }}
                   className={clsx(
-                    'px-3 py-1 rounded-full text-xs font-bold transition-all whitespace-nowrap',
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap',
                     startMode === 'now'
                       ? 'bg-ink text-white shadow-2xs'
                       : 'text-charcoal hover:text-ink'
                   )}
                 >
-                  ⚡ Right Now
+                  <Zap size={13} className={startMode === 'now' ? 'text-amber-300' : 'text-charcoal'} />
+                  <span>Right Now</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setStartMode('custom')}
                   className={clsx(
-                    'px-3 py-1 rounded-full text-xs font-bold transition-all whitespace-nowrap',
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap',
                     startMode === 'custom'
                       ? 'bg-primary text-white shadow-2xs'
                       : 'text-charcoal hover:text-ink'
                   )}
                 >
-                  📅 Custom Date & Time
+                  <Calendar size={13} className={startMode === 'custom' ? 'text-white' : 'text-charcoal'} />
+                  <span>Custom Time</span>
                 </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-charcoal mb-1 ml-1 flex items-center gap-1">
-                  <Calendar size={12} className="text-primary" /> Start Date
-                </label>
-                <input
-                  type="date"
-                  value={customStartDate}
-                  onChange={(e) => {
-                    setCustomStartDate(e.target.value);
-                    setStartMode('custom');
-                  }}
-                  className="w-full bg-surface-bone text-ink text-sm font-mono font-bold px-3.5 py-2.5 h-11 rounded-full border border-hairline focus:outline-none focus:ring-2 focus:ring-primary"
-                  required
-                />
+            {startMode === 'now' ? (
+              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-surface-bone/70 border border-hairline text-charcoal text-xs">
+                <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
+                  <Zap size={14} />
+                </div>
+                <div>
+                  <span className="font-semibold text-ink">Streak starts right now:</span>{' '}
+                  <span className="font-mono text-stone">
+                    {format(new Date(), 'h:mm a, d MMM yyyy')}
+                  </span>
+                </div>
               </div>
+            ) : (
+              <div className="space-y-2 pt-1 animate-in fade-in duration-150">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-charcoal mb-1.5 ml-0.5 flex items-center gap-1.5">
+                      <Calendar size={12} className="text-primary" /> Start Date
+                    </label>
+                    <input
+                      type="date"
+                      value={customStartDate}
+                      onChange={(e) => {
+                        setCustomStartDate(e.target.value);
+                        setStartMode('custom');
+                      }}
+                      className="w-full bg-surface-bone text-ink text-sm font-mono font-bold px-3.5 py-2.5 h-11 rounded-xl border border-hairline focus:outline-none focus:ring-2 focus:ring-primary transition-all"
+                      required
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-charcoal mb-1 ml-1 flex items-center gap-1">
-                  <Clock size={12} className="text-primary" /> Custom Start Time
-                </label>
-                <input
-                  type="time"
-                  value={customStartTime}
-                  onChange={(e) => {
-                    setCustomStartTime(e.target.value);
-                    setStartMode('custom');
-                  }}
-                  className="w-full bg-surface-bone text-ink text-sm font-mono font-bold px-3.5 py-2.5 h-11 rounded-full border border-hairline focus:outline-none focus:ring-2 focus:ring-primary"
-                  required
-                />
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-charcoal mb-1.5 ml-0.5 flex items-center gap-1.5">
+                      <Clock size={12} className="text-primary" /> Start Time
+                    </label>
+                    <input
+                      type="time"
+                      value={customStartTime}
+                      onChange={(e) => {
+                        setCustomStartTime(e.target.value);
+                        setStartMode('custom');
+                      }}
+                      className="w-full bg-surface-bone text-ink text-sm font-mono font-bold px-3.5 py-2.5 h-11 rounded-xl border border-hairline focus:outline-none focus:ring-2 focus:ring-primary transition-all"
+                      required
+                    />
+                  </div>
+                </div>
+                <p className="text-[11px] text-stone ml-1">
+                  Helpful if you began your abstinence period earlier today or on a past date.
+                </p>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Icon Selector */}

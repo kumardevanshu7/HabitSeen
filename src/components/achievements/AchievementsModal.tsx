@@ -138,20 +138,20 @@ export const AchievementsModal: React.FC<AchievementsModalProps> = ({
         {/* OVERALL PROGRESS HERO BANNER */}
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-500/10 via-primary/5 to-purple-500/10 border border-amber-200/60 p-5 sm:p-6 shadow-xs">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3.5">
-              <div className="w-13 h-13 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-md shadow-amber-500/25 shrink-0">
-                <Trophy size={26} strokeWidth={2.2} />
+            <div className="flex items-center gap-3.5 min-w-0 flex-1">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-white flex items-center justify-center shadow-md shadow-amber-500/25 shrink-0">
+                <Trophy className="w-6 h-6 sm:w-7 sm:h-7" strokeWidth={2.2} />
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h4 className="font-display font-bold text-xl text-ink">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="font-display font-bold text-lg sm:text-xl text-ink">
                     Mastery Hall
                   </h4>
-                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300 whitespace-nowrap">
                     {unlockedCount} / {totalCount} Unlocked
                   </span>
                 </div>
-                <p className="text-xs text-charcoal mt-0.5">
+                <p className="text-xs text-charcoal mt-1 line-clamp-2 sm:line-clamp-none">
                   Unlock achievements by building streaks, gaining Willpower XP, leveling up, and maintaining vitality.
                 </p>
               </div>
