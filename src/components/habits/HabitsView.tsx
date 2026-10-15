@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
 import { HabitCard } from './HabitCard';
 import { DayStrip } from './DayStrip';
-import { Habit, Category } from '../../types/habit';
+import { Habit, Category, FrequencyType } from '../../types/habit';
 import { isHabitDueOnDate, getTodayKey } from '../../utils/dateMath';
 import { CATEGORY_ICONS } from '../../constants/iconsAndColors';
 import { boostVibrancy, getContrastIconColor } from '../../utils/colorUtils';
@@ -27,11 +27,13 @@ import {
   Zap,
   Edit2,
   Trash2,
+  Calendar,
 } from 'lucide-react';
 import clsx from 'clsx';
 
 interface HabitsViewProps {
   onOpenCreateHabit: () => void;
+  onOpenCreateHabitWithFrequency?: (freq: FrequencyType) => void;
   onOpenHabitDetails: (habit: Habit) => void;
   selectedCategory?: string;
   onSelectCategory?: (catId: string) => void;
@@ -40,6 +42,7 @@ interface HabitsViewProps {
 
 export const HabitsView: React.FC<HabitsViewProps> = ({
   onOpenCreateHabit,
+  onOpenCreateHabitWithFrequency,
   onOpenHabitDetails,
   selectedCategory,
   onSelectCategory,
@@ -117,6 +120,28 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
     prevAllCompletedRef.current = isAllCompletedToday;
   }, [isAllCompletedToday]);
 
+  // Check if a habit is completed/excused on the currently selected date
+  const isHabitCompletedOnSelectedDate = (h: Habit): boolean => {
+    const l = logs[`${h.id}_${selectedDate}`];
+    return l?.status === 'COMPLETED' || l?.status === 'EXCUSED';
+  };
+
+  // Sort habits: pending/uncompleted tasks always stay on TOP, completed tasks move to the BOTTOM!
+  const sortHabitsWithPendingOnTop = (habitList: Habit[]): Habit[] => {
+    return [...habitList].sort((a, b) => {
+      const aDone = isHabitCompletedOnSelectedDate(a) ? 1 : 0;
+      const bDone = isHabitCompletedOnSelectedDate(b) ? 1 : 0;
+      // Pending tasks (0) appear before completed tasks (1)
+      if (aDone !== bDone) {
+        return aDone - bDone;
+      }
+      // Within the same completion status, sort by priority (100 = highest)
+      const pA = typeof a.schedule.priority === 'number' ? a.schedule.priority : 50;
+      const pB = typeof b.schedule.priority === 'number' ? b.schedule.priority : 50;
+      return pB - pA;
+    });
+  };
+
   // Habits that belong in the "Archived" category (finished duration or manually archived)
   const archivedHabits = habits
     .filter((h) => isHabitArchived(h))
@@ -129,29 +154,33 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
   // Active (not archived / ended) habits
   const activeHabits = habits.filter((h) => !isHabitArchived(h));
 
+  // Active Just Tracking habits
+  const justTrackingHabits = habits.filter(
+    (h) => !isHabitArchived(h) && h.frequency?.type === 'JUST_TRACKING'
+  );
+
   // If currently selected category was deleted, safely fallback to 'all'
   const isSelectedCategoryValid =
     selectedCatFilter === 'all' ||
     selectedCatFilter === 'cat-archived' ||
+    selectedCatFilter === 'cat-just-tracking' ||
     categories.some((c) => c.id === selectedCatFilter);
   const effectiveCatFilter = isSelectedCategoryValid ? selectedCatFilter : 'all';
 
-  // Filter habits to display based on whether "Archived" or an active category is selected
+  // Filter habits to display based on whether "Archived", "Just Tracking", or an active category is selected
   const dueHabits =
     effectiveCatFilter === 'cat-archived'
       ? archivedHabits
-      : activeHabits
-          .filter((h) => {
+      : effectiveCatFilter === 'cat-just-tracking'
+      ? sortHabitsWithPendingOnTop(justTrackingHabits)
+      : sortHabitsWithPendingOnTop(
+          activeHabits.filter((h) => {
             if (effectiveCatFilter !== 'all' && h.categoryId !== effectiveCatFilter) {
               return false;
             }
             return isHabitDueOnDate(h, selectedDateTime, logs);
           })
-          .sort((a, b) => {
-            const pA = typeof a.schedule.priority === 'number' ? a.schedule.priority : 50;
-            const pB = typeof b.schedule.priority === 'number' ? b.schedule.priority : 50;
-            return pB - pA; // Higher priority on top!
-          });
+        );
 
   // Unique categories list in order
   const uniqueCategories = Array.from(
@@ -374,6 +403,29 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
           );
         })}
 
+        {/* JUST TRACKING CATEGORY PILL (FLEXIBLE LOG ANYTIME) */}
+        <button
+          type="button"
+          onClick={() => setSelectedCatFilter('cat-just-tracking')}
+          className={clsx(
+            'flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all border-2 shrink-0',
+            effectiveCatFilter === 'cat-just-tracking'
+              ? 'bg-purple-600 text-white border-purple-700 shadow-xs'
+              : 'bg-purple-500/10 text-purple-800 border-purple-500/40 hover:bg-purple-500/20'
+          )}
+          title="View flexible Just Tracking habits (log anytime without streak breaks or penalties)"
+        >
+          <Sparkles
+            size={13}
+            className={
+              effectiveCatFilter === 'cat-just-tracking'
+                ? 'text-amber-300'
+                : 'text-purple-600'
+            }
+          />
+          <span>Just Tracking ({justTrackingHabits.length})</span>
+        </button>
+
         {/* ARCHIVED CATEGORY PILL (COMPLETED & ARCHIVED HABITS) */}
         <button
           type="button"
@@ -473,8 +525,17 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
               <Archive size={13} className="text-emerald-600" />
               <span>Archived Habits ({dueHabits.length})</span>
             </>
+          ) : effectiveCatFilter === 'cat-just-tracking' ? (
+            <>
+              <Sparkles size={13} className="text-purple-600" />
+              <span>Just Tracking Habits ({dueHabits.length})</span>
+            </>
+          ) : effectiveCatFilter === 'all' ? (
+            <span>All Habits ({dueHabits.length})</span>
           ) : (
-            <span>Scheduled Habits ({dueHabits.length})</span>
+            <span>
+              {categories.find((c) => c.id === effectiveCatFilter)?.name || 'Category'} Habits ({dueHabits.length})
+            </span>
           )}
         </span>
 
@@ -518,6 +579,8 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
           <div className="w-14 h-14 rounded-full bg-surface-bone flex items-center justify-center text-charcoal mx-auto mb-3">
             {effectiveCatFilter === 'cat-archived' ? (
               <Archive size={28} className="text-emerald-600" />
+            ) : effectiveCatFilter === 'cat-just-tracking' ? (
+              <Sparkles size={28} className="text-purple-600" />
             ) : (
               <CheckCheck size={28} />
             )}
@@ -525,13 +588,17 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
           <h3 className="font-display font-bold text-lg text-ink">
             {effectiveCatFilter === 'cat-archived'
               ? 'No Archived Habits Yet'
+              : effectiveCatFilter === 'cat-just-tracking'
+              ? 'No Just Tracking Habits Yet'
               : habits.length === 0
                 ? 'No Habits Created Yet'
-                : `No scheduled habits for ${format(selectedDateTime, 'EEEE, dd MMMM yyyy')}`}
+                : `No habits for ${format(selectedDateTime, 'EEEE, dd MMMM yyyy')}`}
           </h3>
           <p className="text-charcoal text-xs sm:text-sm mt-1 max-w-md mx-auto">
             {effectiveCatFilter === 'cat-archived'
               ? 'Habits that reach their end date or are manually archived will appear here.'
+              : effectiveCatFilter === 'cat-just-tracking'
+              ? 'Just Tracking habits are flexible habits you can log anytime with no streak breaks, missed penalties, or lost hearts.'
               : habits.length === 0
                 ? 'Start small. Click the button below to configure your first daily habit target.'
                 : `You have ${activeHabits.length} active habit(s).`}
@@ -548,35 +615,54 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
               </Button>
             )}
 
-            {effectiveCatFilter !== 'cat-archived' && archivedHabits.length > 0 && (
+            {effectiveCatFilter === 'cat-just-tracking' ? (
               <Button
-                variant="outline"
+                onClick={() => {
+                  if (onOpenCreateHabitWithFrequency) {
+                    onOpenCreateHabitWithFrequency('JUST_TRACKING');
+                  } else {
+                    onOpenCreateHabit();
+                  }
+                }}
+                variant="primary"
                 size="md"
-                onClick={() => setSelectedCatFilter('cat-archived')}
-                className="gap-1.5 border-emerald-500/40 text-emerald-700 hover:bg-emerald-50"
+                className="gap-1.5"
               >
-                <Archive size={15} /> View Archived ({archivedHabits.length})
+                <Plus size={16} /> Create Just Tracking Habit
               </Button>
-            )}
+            ) : (
+              <>
+                {effectiveCatFilter !== 'cat-archived' && archivedHabits.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="md"
+                    onClick={() => setSelectedCatFilter('cat-archived')}
+                    className="gap-1.5 border-emerald-500/40 text-emerald-700 hover:bg-emerald-50"
+                  >
+                    <Archive size={15} /> View Archived ({archivedHabits.length})
+                  </Button>
+                )}
 
-            {selectedDate !== getTodayKey() && (
-              <Button
-                variant="outline"
-                size="md"
-                onClick={() => setSelectedDate(getTodayKey())}
-              >
-                Jump to Today
-              </Button>
-            )}
+                {selectedDate !== getTodayKey() && (
+                  <Button
+                    variant="outline"
+                    size="md"
+                    onClick={() => setSelectedDate(getTodayKey())}
+                  >
+                    Jump to Today
+                  </Button>
+                )}
 
-            <Button
-              onClick={onOpenCreateHabit}
-              variant="primary"
-              size="md"
-              className="gap-1.5"
-            >
-              <Plus size={16} /> Create Habit Now
-            </Button>
+                <Button
+                  onClick={onOpenCreateHabit}
+                  variant="primary"
+                  size="md"
+                  className="gap-1.5"
+                >
+                  <Plus size={16} /> Create Habit Now
+                </Button>
+              </>
+            )}
           </div>
         </div>
       ) : (

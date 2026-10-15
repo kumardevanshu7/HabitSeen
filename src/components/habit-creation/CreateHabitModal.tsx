@@ -45,12 +45,14 @@ interface CreateHabitModalProps {
   isOpen: boolean;
   onClose: () => void;
   habitToEdit?: Habit | null;
+  initialFrequencyType?: FrequencyType;
 }
 
 export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
   isOpen,
   onClose,
   habitToEdit,
+  initialFrequencyType,
 }) => {
   const { categories, addHabit, updateHabit, habits, challenges } = useAppStore();
 
@@ -75,9 +77,9 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
 
   // 2. Timer Fields (00:00:00 Hours, Minutes, Seconds)
   const [timerOp, setTimerOp] = useState<TimerOperator>('AT_LEAST');
-  const [timerHours, setTimerHours] = useState<number>(0);
-  const [timerMinutes, setTimerMinutes] = useState<number>(25);
-  const [timerSecs, setTimerSecs] = useState<number>(0);
+  const [timerHours, setTimerHours] = useState<string>('00');
+  const [timerMinutes, setTimerMinutes] = useState<string>('25');
+  const [timerSecs, setTimerSecs] = useState<string>('00');
 
   // 3. Checklist Fields
   const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([
@@ -91,7 +93,9 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
   const [customMinCount, setCustomMinCount] = useState<number>(1);
 
   // Frequency ("How often do you want to do it")
-  const [frequencyType, setFrequencyType] = useState<FrequencyType>('EVERYDAY');
+  const [frequencyType, setFrequencyType] = useState<FrequencyType>(
+    initialFrequencyType || 'EVERYDAY'
+  );
   const [daysOfWeek, setDaysOfWeek] = useState<number[]>([1, 2, 3, 4, 5]); // Mon-Fri default
   const [daysOfMonthStr, setDaysOfMonthStr] = useState<string>('1, 15, 30');
   const [daysOfYearStr, setDaysOfYearStr] = useState<string>('01-01, 12-25');
@@ -132,14 +136,14 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
       if (habitToEdit.config?.timer) {
         const hms = formatSecondsToHMS(habitToEdit.config.timer.targetSeconds || 1500);
         setTimerOp(habitToEdit.config.timer.operator || 'AT_LEAST');
-        setTimerHours(hms.hours);
-        setTimerMinutes(hms.minutes);
-        setTimerSecs(hms.seconds);
+        setTimerHours(String(hms.hours).padStart(2, '0'));
+        setTimerMinutes(String(hms.minutes).padStart(2, '0'));
+        setTimerSecs(String(hms.seconds).padStart(2, '0'));
       } else {
         setTimerOp('AT_LEAST');
-        setTimerHours(0);
-        setTimerMinutes(25);
-        setTimerSecs(0);
+        setTimerHours('00');
+        setTimerMinutes('25');
+        setTimerSecs('00');
       }
 
       // 3. Checklist
@@ -184,16 +188,16 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
       setNumericGoal(8);
       setNumericUnit('glasses');
       setTimerOp('AT_LEAST');
-      setTimerHours(0);
-      setTimerMinutes(25);
-      setTimerSecs(0);
+      setTimerHours('00');
+      setTimerMinutes('25');
+      setTimerSecs('00');
       setChecklistItems([
         { id: 'item-1', text: 'Brush teeth & drink water', isStarred: true },
         { id: 'item-2', text: '10 minutes deep stretching', isStarred: false },
       ]);
       setChecklistCondition('ALL_MANDATORY');
       setCustomMinCount(1);
-      setFrequencyType('EVERYDAY');
+      setFrequencyType(initialFrequencyType || 'EVERYDAY');
       setDaysOfWeek([1, 2, 3, 4, 5]);
       setDaysOfMonthStr('1, 15, 30');
       setDaysOfYearStr('01-01, 12-25');
@@ -207,7 +211,7 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
       setNameError('');
       setWizardStep(1); // Start at category when creating new habit
     }
-  }, [habitToEdit, isOpen, categories]);
+  }, [habitToEdit, isOpen, categories, initialFrequencyType]);
 
   // Checklist Helpers
   const addChecklistItem = () => {
@@ -324,7 +328,12 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
           suffix: 'a day',
         };
       } else if (type === 'TIMER') {
-        const totalSecs = parseHMSToSeconds(timerHours, timerMinutes, timerSecs) || 60;
+        const totalSecs =
+          parseHMSToSeconds(
+            Number(timerHours) || 0,
+            Number(timerMinutes) || 0,
+            Number(timerSecs) || 0
+          ) || 60;
         config.timer = {
           operator: timerOp,
           targetSeconds: totalSecs,
@@ -421,7 +430,11 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
   const activeVibrantColor = boostVibrancy(activeCategory?.color);
 
   // Formatted preview of 00:00:00 duration
-  const timerTotalSeconds = parseHMSToSeconds(timerHours, timerMinutes, timerSecs);
+  const timerTotalSeconds = parseHMSToSeconds(
+    Number(timerHours) || 0,
+    Number(timerMinutes) || 0,
+    Number(timerSecs) || 0
+  );
   const formattedTimerPreview = formatSecondsToHMS(timerTotalSeconds).formatted;
 
   return (
@@ -809,15 +822,23 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
                             Hours (HH)
                           </span>
                           <input
-                            type="number"
-                            min={0}
-                            max={23}
+                            type="text"
+                            inputMode="numeric"
                             value={timerHours}
-                            onChange={(e) =>
-                              setTimerHours(
-                                Math.max(0, parseInt(e.target.value, 10) || 0)
-                              )
-                            }
+                            onFocus={(e) => e.target.select()}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/\D/g, '');
+                              if (val === '') {
+                                setTimerHours('');
+                                return;
+                              }
+                              const num = parseInt(val, 10);
+                              setTimerHours(String(Math.min(23, num)));
+                            }}
+                            onBlur={() => {
+                              const num = parseInt(timerHours, 10) || 0;
+                              setTimerHours(String(Math.max(0, num)).padStart(2, '0'));
+                            }}
                             placeholder="00"
                             className="w-full text-center font-mono font-bold text-xl py-1 bg-transparent text-ink focus:outline-none"
                           />
@@ -828,18 +849,25 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
                             Minutes (MM)
                           </span>
                           <input
-                            type="number"
-                            min={0}
-                            max={59}
+                            type="text"
+                            inputMode="numeric"
                             value={timerMinutes}
-                            onChange={(e) =>
+                            onFocus={(e) => e.target.select()}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/\D/g, '');
+                              if (val === '') {
+                                setTimerMinutes('');
+                                return;
+                              }
+                              const num = parseInt(val, 10);
+                              setTimerMinutes(String(Math.min(59, num)));
+                            }}
+                            onBlur={() => {
+                              const num = parseInt(timerMinutes, 10) || 0;
                               setTimerMinutes(
-                                Math.max(
-                                  0,
-                                  Math.min(59, parseInt(e.target.value, 10) || 0)
-                                )
-                              )
-                            }
+                                String(Math.max(0, Math.min(59, num))).padStart(2, '0')
+                              );
+                            }}
                             placeholder="25"
                             className="w-full text-center font-mono font-bold text-xl py-1 bg-transparent text-ink focus:outline-none"
                           />
@@ -850,18 +878,25 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
                             Seconds (SS)
                           </span>
                           <input
-                            type="number"
-                            min={0}
-                            max={59}
+                            type="text"
+                            inputMode="numeric"
                             value={timerSecs}
-                            onChange={(e) =>
+                            onFocus={(e) => e.target.select()}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/\D/g, '');
+                              if (val === '') {
+                                setTimerSecs('');
+                                return;
+                              }
+                              const num = parseInt(val, 10);
+                              setTimerSecs(String(Math.min(59, num)));
+                            }}
+                            onBlur={() => {
+                              const num = parseInt(timerSecs, 10) || 0;
                               setTimerSecs(
-                                Math.max(
-                                  0,
-                                  Math.min(59, parseInt(e.target.value, 10) || 0)
-                                )
-                              )
-                            }
+                                String(Math.max(0, Math.min(59, num))).padStart(2, '0')
+                              );
+                            }}
                             placeholder="00"
                             className="w-full text-center font-mono font-bold text-xl py-1 bg-transparent text-ink focus:outline-none"
                           />
@@ -884,15 +919,15 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
                             type="button"
                             key={preset.label}
                             onClick={() => {
-                              setTimerHours(preset.h);
-                              setTimerMinutes(preset.m);
-                              setTimerSecs(preset.s);
+                              setTimerHours(String(preset.h).padStart(2, '0'));
+                              setTimerMinutes(String(preset.m).padStart(2, '0'));
+                              setTimerSecs(String(preset.s).padStart(2, '0'));
                             }}
                             className={clsx(
                               'px-2.5 py-1 text-xs font-mono font-bold rounded-full border transition-all',
-                              timerHours === preset.h &&
-                                timerMinutes === preset.m &&
-                                timerSecs === preset.s
+                              Number(timerHours) === preset.h &&
+                                Number(timerMinutes) === preset.m &&
+                                Number(timerSecs) === preset.s
                                 ? 'bg-ink text-white border-ink'
                                 : 'bg-surface-bone text-charcoal hover:text-ink border-hairline hover:bg-stone/20'
                             )}

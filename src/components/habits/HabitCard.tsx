@@ -104,9 +104,15 @@ export const HabitCard: React.FC<HabitCardProps> = ({
   const initialLoggedSeconds = dayLog?.valueTimerSeconds ?? 0;
   const initialHMS = formatSecondsToHMS(initialLoggedSeconds);
 
-  const [inputHours, setInputHours] = useState<number>(initialHMS.hours);
-  const [inputMinutes, setInputMinutes] = useState<number>(initialHMS.minutes);
-  const [inputSecs, setInputSecs] = useState<number>(initialHMS.seconds);
+  const [inputHours, setInputHours] = useState<string>(
+    String(initialHMS.hours).padStart(2, '0')
+  );
+  const [inputMinutes, setInputMinutes] = useState<string>(
+    String(initialHMS.minutes).padStart(2, '0')
+  );
+  const [inputSecs, setInputSecs] = useState<string>(
+    String(initialHMS.seconds).padStart(2, '0')
+  );
 
   // State for Checklist
   const [completedItems, setCompletedItems] = useState<string[]>(
@@ -120,18 +126,18 @@ export const HabitCard: React.FC<HabitCardProps> = ({
       if (typeof dayLog.valueNumeric === 'number') setCurrentNum(dayLog.valueNumeric);
       if (typeof dayLog.valueTimerSeconds === 'number') {
         const hms = formatSecondsToHMS(dayLog.valueTimerSeconds);
-        setInputHours(hms.hours);
-        setInputMinutes(hms.minutes);
-        setInputSecs(hms.seconds);
+        setInputHours(String(hms.hours).padStart(2, '0'));
+        setInputMinutes(String(hms.minutes).padStart(2, '0'));
+        setInputSecs(String(hms.seconds).padStart(2, '0'));
       }
       if (Array.isArray(dayLog.valueChecklistCompletedItemIds)) {
         setCompletedItems(dayLog.valueChecklistCompletedItemIds);
       }
     } else {
       setCurrentNum(0);
-      setInputHours(0);
-      setInputMinutes(0);
-      setInputSecs(0);
+      setInputHours('00');
+      setInputMinutes('00');
+      setInputSecs('00');
       setCompletedItems([]);
     }
   }, [dayLog]);
@@ -150,15 +156,33 @@ export const HabitCard: React.FC<HabitCardProps> = ({
     logHabit(habit.id, dateKey, { valueYesNo: true });
   };
 
-  // NUMERIC HANDLERS
+  // NUMERIC HANDLERS: User can adjust counts freely with stepper buttons, then tap checkmark to lock!
   const adjustNumeric = (delta: number) => {
     const nextVal = Math.max(0, currentNum + delta);
     setCurrentNum(nextVal);
     const goal = habit.config.numeric?.goal || 1;
     if (nextVal >= goal && currentNum < goal) {
-      confetti({ particleCount: 45, spread: 60, origin: { y: 0.7 } });
+      confetti({ particleCount: 30, spread: 50, origin: { y: 0.7 } });
     }
-    logHabit(habit.id, dateKey, { valueNumeric: nextVal });
+    // Maintain PARTIAL status while user adjusts count; lock as COMPLETED when they click the checkmark
+    logHabit(habit.id, dateKey, { valueNumeric: nextVal, forceStatus: 'PARTIAL' });
+  };
+
+  // NUMERIC TOGGLE / LOCK HANDLER (tap checkmark to lock with entered value or goal)
+  const handleToggleNumericComplete = () => {
+    if (isCompleted) {
+      if (isJustTracking) return; // Just Tracking habits lock permanently once marked done
+      handleUnlock();
+      return;
+    }
+    const goal = habit.config.numeric?.goal || 1;
+    const finalVal = currentNum > 0 ? currentNum : goal;
+    setCurrentNum(finalVal);
+    confetti({ particleCount: 45, spread: 60, origin: { y: 0.7 } });
+    logHabit(habit.id, dateKey, {
+      valueNumeric: finalVal,
+      forceStatus: 'COMPLETED',
+    });
   };
 
   // MANUAL TIMER LOGGING (User writes their time, no auto-start stopwatch)
@@ -166,15 +190,19 @@ export const HabitCard: React.FC<HabitCardProps> = ({
     let totalSecs =
       overrideSeconds !== undefined
         ? overrideSeconds
-        : parseHMSToSeconds(inputHours, inputMinutes, inputSecs);
+        : parseHMSToSeconds(
+            Number(inputHours) || 0,
+            Number(inputMinutes) || 0,
+            Number(inputSecs) || 0
+          );
 
     // If inputs are 0 and user ticked the completion circle, auto-fill targetSeconds
     if (totalSecs === 0 && markComplete) {
       totalSecs = targetSeconds;
       const hms = formatSecondsToHMS(targetSeconds);
-      setInputHours(hms.hours);
-      setInputMinutes(hms.minutes);
-      setInputSecs(hms.seconds);
+      setInputHours(String(hms.hours).padStart(2, '0'));
+      setInputMinutes(String(hms.minutes).padStart(2, '0'));
+      setInputSecs(String(hms.seconds).padStart(2, '0'));
     }
 
     if (markComplete || totalSecs >= targetSeconds) {
@@ -188,9 +216,9 @@ export const HabitCard: React.FC<HabitCardProps> = ({
 
   const handleMatchTargetTimer = () => {
     const hms = formatSecondsToHMS(targetSeconds);
-    setInputHours(hms.hours);
-    setInputMinutes(hms.minutes);
-    setInputSecs(hms.seconds);
+    setInputHours(String(hms.hours).padStart(2, '0'));
+    setInputMinutes(String(hms.minutes).padStart(2, '0'));
+    setInputSecs(String(hms.seconds).padStart(2, '0'));
   };
 
   // CHECKLIST HANDLERS
@@ -229,15 +257,15 @@ export const HabitCard: React.FC<HabitCardProps> = ({
       logHabit(habit.id, dateKey, { valueYesNo: false });
     } else if (habit.type === 'NUMERIC') {
       const goal = habit.config.numeric?.goal || 1;
-      const lower = Math.max(0, goal - 1);
+      const lower = Math.max(0, currentNum >= goal ? goal - 1 : currentNum);
       setCurrentNum(lower);
-      logHabit(habit.id, dateKey, { valueNumeric: lower });
+      logHabit(habit.id, dateKey, { valueNumeric: lower, forceStatus: 'PARTIAL' });
     } else if (habit.type === 'TIMER') {
       const lower = Math.max(0, targetSeconds - 60);
       const hms = formatSecondsToHMS(lower);
-      setInputHours(hms.hours);
-      setInputMinutes(hms.minutes);
-      setInputSecs(hms.seconds);
+      setInputHours(String(hms.hours).padStart(2, '0'));
+      setInputMinutes(String(hms.minutes).padStart(2, '0'));
+      setInputSecs(String(hms.seconds).padStart(2, '0'));
       logHabit(habit.id, dateKey, { valueTimerSeconds: lower });
     } else if (habit.type === 'CHECKLIST') {
       logHabit(habit.id, dateKey, {
@@ -520,28 +548,69 @@ export const HabitCard: React.FC<HabitCardProps> = ({
               </div>
               {!isExcused && !isMissed && (
                 <div className="flex items-center gap-1">
+                  {!isCompleted && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          adjustNumeric(-1);
+                        }}
+                        className="w-7 h-7 rounded-full bg-surface-bone hover:bg-stone/20 flex items-center justify-center text-ink border border-hairline transition-all active:scale-90 cursor-pointer"
+                        title="Decrease count"
+                      >
+                        <Minus size={12} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          adjustNumeric(1);
+                        }}
+                        className="w-7 h-7 rounded-full bg-surface-bone hover:bg-stone/20 flex items-center justify-center text-ink border border-hairline transition-all active:scale-90 cursor-pointer"
+                        title="Increase count"
+                      >
+                        <Plus size={12} />
+                      </button>
+                    </>
+                  )}
+                  {/* RED CIRCLE -> GREEN TICK TOGGLE */}
                   <button
                     type="button"
+                    disabled={isJustTracking && isCompleted}
                     onClick={(e) => {
                       e.stopPropagation();
-                      adjustNumeric(-1);
+                      handleToggleNumericComplete();
                     }}
-                    className="w-7 h-7 rounded-full bg-surface-bone hover:bg-stone/20 flex items-center justify-center text-ink border border-hairline transition-all active:scale-90 cursor-pointer"
-                    title="Decrease count"
+                    className={clsx(
+                      'w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0',
+                      isCompleted
+                        ? clsx(
+                            'bg-badge-success border-2 border-badge-success text-white',
+                            isJustTracking
+                              ? 'cursor-default ring-2 ring-badge-success/30'
+                              : 'active:scale-90 cursor-pointer'
+                          )
+                        : 'border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500 active:scale-90 cursor-pointer'
+                    )}
+                    title={
+                      isCompleted
+                        ? isJustTracking
+                          ? 'Completed & Locked'
+                          : 'Completed! Click to unlock'
+                        : 'Tap to mark complete & lock'
+                    }
                   >
-                    <Minus size={12} />
+                    <Check
+                      size={16}
+                      className={clsx(isCompleted ? 'stroke-[3]' : 'stroke-[2.5]')}
+                    />
                   </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      adjustNumeric(1);
-                    }}
-                    className="w-7 h-7 rounded-full bg-surface-bone hover:bg-stone/20 flex items-center justify-center text-ink border border-hairline transition-all active:scale-90 cursor-pointer"
-                    title="Increase count"
-                  >
-                    <Plus size={12} />
-                  </button>
+                  {isJustTracking && isCompleted && (
+                    <span className="hidden xs:inline-flex items-center gap-0.5 text-[10px] font-bold text-badge-success bg-badge-success/10 px-1.5 py-0.5 rounded-full border border-badge-success/20">
+                      <Lock size={9} /> Locked
+                    </span>
+                  )}
                 </div>
               )}
             </div>
@@ -1026,40 +1095,79 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                   {!isExcused && !isMissed ? (
                     <div className="flex items-center gap-2 self-end sm:self-auto">
                       {!isCompleted && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setIsMissedModalOpen(true)}
+                            className="text-xs font-semibold text-charcoal hover:text-red-600 bg-surface-bone hover:bg-red-50 border border-hairline px-2.5 py-1.5 rounded-full flex items-center gap-1 transition-colors cursor-pointer"
+                            title="Log missed habit with reason"
+                          >
+                            <ShieldAlert size={13} className="text-charcoal" />
+                            <span>Missed</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => adjustNumeric(-1)}
+                            className="w-9 h-9 rounded-full bg-surface-bone hover:bg-stone/20 flex items-center justify-center text-ink border border-hairline transition-all active:scale-90 cursor-pointer"
+                            title="Decrease count"
+                          >
+                            <Minus size={15} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => adjustNumeric(1)}
+                            className="w-9 h-9 rounded-full bg-surface-bone hover:bg-stone/20 flex items-center justify-center text-ink border border-hairline transition-all active:scale-90 cursor-pointer"
+                            title="Increase count"
+                          >
+                            <Plus size={15} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => adjustNumeric(5)}
+                            className="px-2.5 h-9 rounded-full bg-surface-bone hover:bg-stone/20 flex items-center justify-center text-xs font-mono font-bold text-ink border border-hairline transition-all active:scale-90 cursor-pointer"
+                            title="Add 5"
+                          >
+                            +5
+                          </button>
+                        </>
+                      )}
+
+                      {/* RED CIRCLE -> GREEN TICK TOGGLE */}
+                      <div className="flex items-center gap-1.5">
                         <button
                           type="button"
-                          onClick={() => setIsMissedModalOpen(true)}
-                          className="text-xs font-semibold text-charcoal hover:text-red-600 bg-surface-bone hover:bg-red-50 border border-hairline px-2.5 py-1.5 rounded-full flex items-center gap-1 transition-colors cursor-pointer"
-                          title="Log missed habit with reason"
+                          disabled={isJustTracking && isCompleted}
+                          onClick={handleToggleNumericComplete}
+                          className={clsx(
+                            'w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0',
+                            isCompleted
+                              ? clsx(
+                                  'bg-badge-success border-2 border-badge-success text-white shadow-md',
+                                  isJustTracking
+                                    ? 'cursor-default ring-2 ring-badge-success/30'
+                                    : 'active:scale-90 cursor-pointer'
+                                )
+                              : 'border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500 active:scale-90 cursor-pointer'
+                          )}
+                          title={
+                            isCompleted
+                              ? isJustTracking
+                                ? 'Completed & Locked: Just Tracking habits cannot be unchecked once marked done'
+                                : 'Completed! Click to unlock & edit count'
+                              : 'Tap to mark complete & lock'
+                          }
                         >
-                          <ShieldAlert size={13} className="text-charcoal" />
-                          <span>Missed</span>
+                          <Check
+                            size={20}
+                            className={clsx(isCompleted ? 'stroke-[3]' : 'stroke-[2.5]')}
+                          />
                         </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => adjustNumeric(-1)}
-                        className="w-9 h-9 rounded-full bg-surface-bone hover:bg-stone/20 flex items-center justify-center text-ink border border-hairline transition-all active:scale-90 cursor-pointer"
-                        title="Decrease count"
-                      >
-                        <Minus size={15} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => adjustNumeric(1)}
-                        className="w-9 h-9 rounded-full bg-surface-bone hover:bg-stone/20 flex items-center justify-center text-ink border border-hairline transition-all active:scale-90 cursor-pointer"
-                        title="Increase count"
-                      >
-                        <Plus size={15} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => adjustNumeric(5)}
-                        className="px-2.5 h-9 rounded-full bg-surface-bone hover:bg-stone/20 flex items-center justify-center text-xs font-mono font-bold text-ink border border-hairline transition-all active:scale-90 cursor-pointer"
-                        title="Add 5"
-                      >
-                        +5
-                      </button>
+                        {isJustTracking && isCompleted && (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-badge-success bg-badge-success/10 px-2 py-0.5 rounded-full border border-badge-success/20">
+                            <Lock size={11} /> Locked
+                          </span>
+                        )}
+                      </div>
                     </div>
                   ) : (
                     <span className="text-xs font-bold text-charcoal">
@@ -1109,13 +1217,23 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                         <div className="flex-1 text-center bg-surface-card rounded-xl py-1 px-1 border border-hairline">
                           <span className="text-[8px] text-charcoal uppercase font-bold block leading-none mb-0.5">Hours</span>
                           <input
-                            type="number"
-                            min={0}
-                            max={23}
+                            type="text"
+                            inputMode="numeric"
                             value={inputHours}
-                            onChange={(e) =>
-                              setInputHours(Math.max(0, parseInt(e.target.value, 10) || 0))
-                            }
+                            onFocus={(e) => e.target.select()}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/\D/g, '');
+                              if (val === '') {
+                                setInputHours('');
+                                return;
+                              }
+                              const num = parseInt(val, 10);
+                              setInputHours(String(Math.min(99, num)));
+                            }}
+                            onBlur={() => {
+                              const num = parseInt(inputHours, 10) || 0;
+                              setInputHours(String(Math.max(0, num)).padStart(2, '0'));
+                            }}
                             className="w-full text-center font-mono font-bold text-sm bg-transparent text-ink focus:outline-none"
                           />
                         </div>
@@ -1126,15 +1244,25 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                         <div className="flex-1 text-center bg-surface-card rounded-xl py-1 px-1 border border-hairline">
                           <span className="text-[8px] text-charcoal uppercase font-bold block leading-none mb-0.5">Mins</span>
                           <input
-                            type="number"
-                            min={0}
-                            max={59}
+                            type="text"
+                            inputMode="numeric"
                             value={inputMinutes}
-                            onChange={(e) =>
+                            onFocus={(e) => e.target.select()}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/\D/g, '');
+                              if (val === '') {
+                                setInputMinutes('');
+                                return;
+                              }
+                              const num = parseInt(val, 10);
+                              setInputMinutes(String(Math.min(59, num)));
+                            }}
+                            onBlur={() => {
+                              const num = parseInt(inputMinutes, 10) || 0;
                               setInputMinutes(
-                                Math.max(0, Math.min(59, parseInt(e.target.value, 10) || 0))
-                              )
-                            }
+                                String(Math.max(0, Math.min(59, num))).padStart(2, '0')
+                              );
+                            }}
                             className="w-full text-center font-mono font-bold text-sm bg-transparent text-ink focus:outline-none"
                           />
                         </div>
@@ -1145,15 +1273,25 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                         <div className="flex-1 text-center bg-surface-card rounded-xl py-1 px-1 border border-hairline">
                           <span className="text-[8px] text-charcoal uppercase font-bold block leading-none mb-0.5">Secs</span>
                           <input
-                            type="number"
-                            min={0}
-                            max={59}
+                            type="text"
+                            inputMode="numeric"
                             value={inputSecs}
-                            onChange={(e) =>
+                            onFocus={(e) => e.target.select()}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/\D/g, '');
+                              if (val === '') {
+                                setInputSecs('');
+                                return;
+                              }
+                              const num = parseInt(val, 10);
+                              setInputSecs(String(Math.min(59, num)));
+                            }}
+                            onBlur={() => {
+                              const num = parseInt(inputSecs, 10) || 0;
                               setInputSecs(
-                                Math.max(0, Math.min(59, parseInt(e.target.value, 10) || 0))
-                              )
-                            }
+                                String(Math.max(0, Math.min(59, num))).padStart(2, '0')
+                              );
+                            }}
                             className="w-full text-center font-mono font-bold text-sm bg-transparent text-ink focus:outline-none"
                           />
                         </div>
@@ -1187,9 +1325,19 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                         {/* GREEN CIRCLE WITH WHITE CHECKMARK */}
                         <button
                           type="button"
+                          disabled={isJustTracking}
                           onClick={handleUnlock}
-                          className="w-11 h-11 rounded-full bg-badge-success border-2 border-badge-success text-white flex items-center justify-center shadow-md active:scale-90 transition-all cursor-pointer shrink-0"
-                          title="Completed! Click to reset or edit"
+                          className={clsx(
+                            'w-11 h-11 rounded-full bg-badge-success border-2 border-badge-success text-white flex items-center justify-center shadow-md transition-all shrink-0',
+                            isJustTracking
+                              ? 'cursor-default ring-2 ring-badge-success/30'
+                              : 'active:scale-90 cursor-pointer'
+                          )}
+                          title={
+                            isJustTracking
+                              ? 'Completed & Locked'
+                              : 'Completed! Click to unlock & edit'
+                          }
                         >
                           <Check size={20} className="stroke-[3]" />
                         </button>
@@ -1202,13 +1350,11 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                           </span>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={handleUnlock}
-                        className="text-xs text-primary font-bold hover:underline px-2 py-1 cursor-pointer"
-                      >
-                        Edit / Reset
-                      </button>
+                      {isJustTracking && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-badge-success bg-badge-success/10 px-2 py-0.5 rounded-full border border-badge-success/20">
+                          <Lock size={11} /> Locked
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>

@@ -12,7 +12,7 @@ import { HabitBreakHub } from './components/habit-break/HabitBreakHub';
 import { OverallAnalyticsView } from './components/analytics/OverallAnalyticsView';
 import { CreateHabitModal } from './components/habit-creation/CreateHabitModal';
 import { HabitDetailsModal } from './components/analytics/HabitDetailsModal';
-import { Habit } from './types/habit';
+import { Habit, FrequencyType } from './types/habit';
 import {
   subscribeUserProfile,
   subscribeCategories,
@@ -57,6 +57,7 @@ export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AppTab>('habits');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isCreateHabitOpen, setIsCreateHabitOpen] = useState(false);
+  const [createHabitInitialFrequency, setCreateHabitInitialFrequency] = useState<FrequencyType | undefined>(undefined);
   const [inspectedHabit, setInspectedHabit] = useState<Habit | null>(null);
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -414,6 +415,12 @@ export const App: React.FC = () => {
               onOpenChallengesTab={() => handleSelectTab('challenges')}
               onOpenCreateHabit={() => {
                 setEditingHabit(null);
+                setCreateHabitInitialFrequency(undefined);
+                setIsCreateHabitOpen(true);
+              }}
+              onOpenCreateHabitWithFrequency={(freq) => {
+                setEditingHabit(null);
+                setCreateHabitInitialFrequency(freq);
                 setIsCreateHabitOpen(true);
               }}
               onOpenHabitDetails={(habit) => setInspectedHabit(habit)}
@@ -480,9 +487,11 @@ export const App: React.FC = () => {
       <CreateHabitModal
         isOpen={isCreateHabitOpen}
         habitToEdit={editingHabit}
+        initialFrequencyType={createHabitInitialFrequency}
         onClose={() => {
           setIsCreateHabitOpen(false);
           setEditingHabit(null);
+          setCreateHabitInitialFrequency(undefined);
         }}
       />
 
