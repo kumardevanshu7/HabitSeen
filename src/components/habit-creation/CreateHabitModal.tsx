@@ -362,10 +362,12 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
 
       // 3. Cleanly construct schedule with priority number (0 to 100)
       const schedule: HabitSchedule = {
-        startDate,
         totalDays: totalDays > 0 ? totalDays : 0,
         priority: Math.min(100, Math.max(0, Number(priority) || 50)),
       };
+      if (startDate) {
+        schedule.startDate = startDate;
+      }
       if (endDate) {
         schedule.endDate = endDate;
       }
@@ -1073,6 +1075,7 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
                   value={frequencyType}
                   options={[
                     { value: 'EVERYDAY', label: 'Everyday' },
+                    { value: 'JUST_TRACKING', label: 'Just Tracking (Flexible — log anytime, no streak breaks or penalties)' },
                     { value: 'SPECIFIC_DAYS_OF_WEEK', label: 'Specific days of the week (Sun - Mon)' },
                     { value: 'SPECIFIC_DAYS_OF_MONTH', label: 'Specific days of a month' },
                     { value: 'SPECIFIC_DAYS_OF_YEAR', label: 'Specific days of the year' },
@@ -1081,6 +1084,19 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
                   ]}
                   onChange={(val) => setFrequencyType(val)}
                 />
+
+                {/* Just Tracking Informational Guide */}
+                {frequencyType === 'JUST_TRACKING' && (
+                  <div className="p-3.5 bg-primary/10 border border-primary/20 rounded-xl space-y-1.5 animate-in fade-in duration-200">
+                    <div className="flex items-center gap-2 text-primary font-bold text-xs">
+                      <Sparkles size={14} className="text-primary shrink-0" />
+                      <span>Just Tracking Feature</span>
+                    </div>
+                    <p className="text-[11px] text-charcoal leading-relaxed">
+                      This habit is <strong>not mandatory every day</strong> (e.g. applying serum, deep cleaning, reading). Whenever you do it, simply tick it on your dashboard or task calendar. Completed days <strong>permanently lock</strong>, and days you skip will <strong>never count as missed</strong>, break streaks, or reduce hearts.
+                    </p>
+                  </div>
+                )}
 
                 {/* Sub-frequencies */}
                 {frequencyType === 'SPECIFIC_DAYS_OF_WEEK' && (
@@ -1165,13 +1181,24 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
               {/* 2. START DATE & END DATE */}
               <div className="p-4 bg-surface-card rounded-2xl border border-hairline space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <Input
-                    label="Start Date"
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    required
-                  />
+                  <div>
+                    <Input
+                      label={frequencyType === 'JUST_TRACKING' ? 'Start Date (Optional)' : 'Start Date'}
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      required={frequencyType !== 'JUST_TRACKING'}
+                    />
+                    {frequencyType === 'JUST_TRACKING' && startDate && (
+                      <button
+                        type="button"
+                        onClick={() => setStartDate('')}
+                        className="text-[11px] text-primary hover:underline mt-1 block"
+                      >
+                        Clear start date (track anytime without start date)
+                      </button>
+                    )}
+                  </div>
 
                   <div>
                     <Input

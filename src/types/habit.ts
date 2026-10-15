@@ -12,7 +12,8 @@ export type FrequencyType =
   | 'SPECIFIC_DAYS_OF_MONTH'
   | 'SPECIFIC_DAYS_OF_YEAR'
   | 'DAYS_PER_PERIOD'
-  | 'INTERVAL_REPEAT';
+  | 'INTERVAL_REPEAT'
+  | 'JUST_TRACKING';
 
 export interface ChecklistItem {
   id: string;
@@ -61,7 +62,7 @@ export interface HabitFrequency {
 }
 
 export interface HabitSchedule {
-  startDate: string; // YYYY-MM-DD
+  startDate?: string; // YYYY-MM-DD (optional for Just Tracking habits)
   endDate?: string;  // YYYY-MM-DD
   totalDays: number; // Duration in days
   priority: PriorityLevel;

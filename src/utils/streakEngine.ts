@@ -151,6 +151,9 @@ function hasMissedDueDay(
   toDate: Date,
   allLogs: Record<string, HabitLog>
 ): boolean {
+  if (habit.frequency.type === 'JUST_TRACKING') {
+    return false;
+  }
   const totalDays = differenceInCalendarDays(toDate, fromDate);
   if (totalDays <= 1) return false;
   // If gap is more than 365 days and habit is not yearly, it has missed due days
@@ -182,6 +185,20 @@ export function computeHabitStreaks(
   bestStreak: number;
   unlockedChallenges: number[];
 } {
+  // SPECIAL CASE: JUST_TRACKING (Flexible tracking, no broken streaks, total completed logs)
+  if (habit.frequency.type === 'JUST_TRACKING') {
+    const completedDates = Object.values(allLogs)
+      .filter((l) => l.habitId === habit.id && l.status === 'COMPLETED')
+      .map((l) => l.date);
+    const count = completedDates.length;
+    const unlocked = STREAK_CHALLENGES.filter((c) => count >= c.days).map((c) => c.days);
+    return {
+      currentStreak: count,
+      bestStreak: count,
+      unlockedChallenges: unlocked,
+    };
+  }
+
   // SPECIAL CASE: DAYS_PER_PERIOD (e.g. 3 times a week / month)
   if (habit.frequency.type === 'DAYS_PER_PERIOD' && habit.frequency.daysPerPeriod) {
     const { targetCount, period } = habit.frequency.daysPerPeriod;

@@ -21,8 +21,8 @@ export function formatDateKey(date: Date): string {
   return format(date, 'yyyy-MM-dd');
 }
 
-export function calculateDaysBetween(startDateStr: string, endDateStr?: string): number {
-  if (!endDateStr) return 0;
+export function calculateDaysBetween(startDateStr?: string, endDateStr?: string): number {
+  if (!startDateStr || !endDateStr) return 0;
   try {
     const start = parseISO(startDateStr);
     const end = parseISO(endDateStr);
@@ -42,12 +42,15 @@ export function isHabitDueOnDate(
   const { startDate, endDate } = habit.schedule;
 
   // Bound check
-  if (targetKey < startDate) return false;
+  if (startDate && targetKey < startDate) return false;
   if (endDate && targetKey > endDate) return false;
 
   const { type, daysOfWeek, daysOfMonth, daysOfYear, repeatEveryDays, daysPerPeriod } = habit.frequency;
 
   switch (type) {
+    case 'JUST_TRACKING':
+      return true;
+
     case 'EVERYDAY':
       return true;
 
@@ -113,6 +116,7 @@ export function isHabitDueOnDate(
     }
 
     case 'INTERVAL_REPEAT': {
+      if (!startDate) return true;
       const start = parseISO(startDate);
       const diff = differenceInCalendarDays(targetDate, start);
       if (diff < 0) return false;

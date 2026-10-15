@@ -1,9 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Habit, HabitLog } from '../../types/habit';
 import { useAppStore } from '../../stores/useAppStore';
 import { CATEGORY_ICONS } from '../../constants/iconsAndColors';
 import { boostVibrancy, getContrastIconColor } from '../../utils/colorUtils';
-import { formatSecondsToHMS, parseHMSToSeconds } from '../../utils/dateMath';
+import {
+  formatSecondsToHMS,
+  parseHMSToSeconds,
+  isDateInThisWeek,
+  isDateInThisMonth,
+} from '../../utils/dateMath';
 import {
   Check,
   Flame,
@@ -52,6 +57,21 @@ export const HabitCard: React.FC<HabitCardProps> = ({
 }) => {
   const { categories, logs, logHabit, skipHabit, addHabit, toggleArchiveHabit, deleteHabit, user } = useAppStore();
 
+  const isJustTracking = habit.frequency?.type === 'JUST_TRACKING';
+
+  const habitCompletedLogs = useMemo(
+    () => Object.values(logs || {}).filter((l) => l?.habitId === habit.id && l?.status === 'COMPLETED'),
+    [logs, habit.id]
+  );
+  const timesCompletedThisWeek = useMemo(
+    () => habitCompletedLogs.filter((l) => l.date && isDateInThisWeek(l.date)).length,
+    [habitCompletedLogs]
+  );
+  const timesCompletedThisMonth = useMemo(
+    () => habitCompletedLogs.filter((l) => l.date && isDateInThisMonth(l.date)).length,
+    [habitCompletedLogs]
+  );
+
   const category = categories.find((c) => c.id === habit.categoryId);
   const CategoryIcon =
     CATEGORY_ICONS.find((i) => i.id === category?.icon)?.icon || CATEGORY_ICONS[0].icon;
@@ -75,7 +95,6 @@ export const HabitCard: React.FC<HabitCardProps> = ({
   const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
   const [duplicateName, setDuplicateName] = useState('');
   const [isSecurityDeleteOpen, setIsSecurityDeleteOpen] = useState(false);
-  const [showLockedNotice, setShowLockedNotice] = useState(false);
 
   // State for Numeric Value
   const [currentNum, setCurrentNum] = useState<number>(dayLog?.valueNumeric ?? 0);
@@ -120,10 +139,11 @@ export const HabitCard: React.FC<HabitCardProps> = ({
   // YES / NO TOGGLE
   const handleToggleYesNo = () => {
     if (isCompleted) {
-      // Habit is completed and locked for today! Do not uncheck on simple tick tap.
-      // The user must explicitly use the (Unlock) button in the header.
-      setShowLockedNotice(true);
-      setTimeout(() => setShowLockedNotice(false), 3000);
+      if (isJustTracking) {
+        // Locked permanently once completed for this day! Cannot uncheck.
+        return;
+      }
+      logHabit(habit.id, dateKey, { valueYesNo: false });
       return;
     }
     confetti({ particleCount: 45, spread: 60, origin: { y: 0.7 } });
@@ -132,16 +152,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
 
   // NUMERIC HANDLERS
   const adjustNumeric = (delta: number) => {
-    if (isCompleted && delta < 0) {
-      // Locked when completed for today!
-      setShowLockedNotice(true);
-      setTimeout(() => setShowLockedNotice(false), 3000);
-      return;
-    }
     const nextVal = Math.max(0, currentNum + delta);
     setCurrentNum(nextVal);
     const goal = habit.config.numeric?.goal || 1;
-    if (nextVal >= goal && !isCompleted) {
+    if (nextVal >= goal && currentNum < goal) {
       confetti({ particleCount: 45, spread: 60, origin: { y: 0.7 } });
     }
     logHabit(habit.id, dateKey, { valueNumeric: nextVal });
@@ -181,7 +195,6 @@ export const HabitCard: React.FC<HabitCardProps> = ({
 
   // CHECKLIST HANDLERS
   const toggleChecklistItem = (itemId: string) => {
-    if (isCompleted) return;
     const exists = completedItems.includes(itemId);
     const updated = exists
       ? completedItems.filter((id) => id !== itemId)
@@ -193,8 +206,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
 
   const handleToggleChecklistComplete = () => {
     if (isCompleted) {
-      setShowLockedNotice(true);
-      setTimeout(() => setShowLockedNotice(false), 3000);
+      logHabit(habit.id, dateKey, {
+        valueChecklistCompletedItemIds: completedItems,
+        forceStatus: 'PARTIAL',
+      });
       return;
     }
     confetti({ particleCount: 45, spread: 60, origin: { y: 0.7 } });
@@ -206,7 +221,6 @@ export const HabitCard: React.FC<HabitCardProps> = ({
 
   // UNLOCK ACTION
   const handleUnlock = () => {
-    setShowLockedNotice(false);
     if (isExcused || isMissed) {
       logHabit(habit.id, dateKey, { valueYesNo: false, valueNumeric: 0, valueTimerSeconds: 0 });
       return;
@@ -360,8 +374,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
       }}
       className={clsx(
         'group relative rounded-2xl border transition-all duration-200 overflow-hidden shadow-2xs select-none w-full cursor-pointer',
-        isCompleted
-          ? 'bg-stone/10 border-stone/30 opacity-70'
+        isCompleted && habit.type === 'YES_NO'
+          ? 'bg-stone/10 border-stone/30 opacity-75'
+          : isCompleted
+          ? 'bg-emerald-50/15 border-emerald-200/50'
           : isExcused
           ? 'bg-blue-50/40 border-blue-200'
           : isMissed
@@ -375,7 +391,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
         borderLeftColor: vibrantColor,
       }}
     >
-      <div className="p-3 sm:p-3.5 flex items-center justify-between gap-2.5 sm:gap-3.5">
+      <div className="p-3 sm:p-3.5 flex items-center justify-between gap-2 sm:gap-3.5">
         {/* LEFT: Category Icon + Habit Title & Meta */}
         <div
           onClick={(e) => {
@@ -398,7 +414,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
             <h4
               className={clsx(
                 'font-display font-bold text-sm sm:text-base text-ink tracking-tight truncate hover:text-primary transition-colors',
-                isCompleted && 'line-through text-charcoal'
+                isCompleted && habit.type === 'YES_NO' && 'line-through text-charcoal'
               )}
             >
               {habit.name}
@@ -415,62 +431,94 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                 <Flag size={9} className="shrink-0 text-stone" />
                 <span>{habit.schedule.priority ?? 50}</span>
               </span>
-              {currentStreak > 0 && (
+              {isJustTracking ? (
                 <>
                   <span>•</span>
                   <span
-                    className={clsx(
-                      'inline-flex items-center gap-0.5 font-mono font-bold',
-                      currentStreak >= 7 ? 'text-orange-600' : 'text-primary'
-                    )}
+                    className="inline-flex items-center gap-1 font-mono font-bold text-primary"
+                    title={`Just Tracking: ${timesCompletedThisWeek} this week • ${timesCompletedThisMonth} this month`}
                   >
-                    <Flame size={10} className="fill-current" /> {currentStreak}d
+                    <Sparkles size={10} className="text-primary shrink-0" />
+                    <span>{timesCompletedThisWeek}w / {timesCompletedThisMonth}m</span>
                   </span>
                 </>
-              )}
-              {showLockedNotice && (
-                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 animate-pulse inline-block">
-                  🔒 Locked! Tap &apos;Locked&apos; to edit
-                </span>
+              ) : (
+                currentStreak > 0 && (
+                  <>
+                    <span>•</span>
+                    <span
+                      className={clsx(
+                        'inline-flex items-center gap-0.5 font-mono font-bold',
+                        currentStreak >= 7 ? 'text-orange-600' : 'text-primary'
+                      )}
+                    >
+                      <Flame size={10} className="fill-current" /> {currentStreak}d
+                    </span>
+                  </>
+                )
               )}
             </div>
           </div>
         </div>
 
         {/* RIGHT: Actions + Controls */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {/* YES_NO */}
           {habit.type === 'YES_NO' && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleToggleYesNo();
-              }}
-              className={clsx(
-                'w-9 h-9 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0',
-                isCompleted
-                  ? 'bg-badge-success border-2 border-badge-success text-white cursor-default'
-                  : 'border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500 active:scale-90 cursor-pointer'
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                disabled={isJustTracking && isCompleted}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleToggleYesNo();
+                }}
+                className={clsx(
+                  'w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0',
+                  isCompleted
+                    ? clsx(
+                        'bg-badge-success border-2 border-badge-success text-white',
+                        isJustTracking ? 'cursor-default ring-2 ring-badge-success/30' : 'active:scale-90 cursor-pointer'
+                      )
+                    : 'border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500 active:scale-90 cursor-pointer'
+                )}
+                title={
+                  isCompleted
+                    ? isJustTracking
+                      ? 'Completed & Locked: Just Tracking habits cannot be unchecked once marked done'
+                      : 'Completed! Tap to unmark'
+                    : 'Tap to mark done'
+                }
+              >
+                {isJustTracking && isCompleted ? (
+                  <Check size={16} className="stroke-[3]" />
+                ) : (
+                  <Check size={18} className={clsx(isCompleted ? 'stroke-[3]' : 'stroke-[2.5]')} />
+                )}
+              </button>
+              {isJustTracking && isCompleted && (
+                <span className="hidden xs:inline-flex items-center gap-0.5 text-[10px] font-bold text-badge-success bg-badge-success/10 px-1.5 py-0.5 rounded-full border border-badge-success/20">
+                  <Lock size={9} /> Locked
+                </span>
               )}
-              title={
-                isCompleted
-                  ? 'Completed & Locked for today! Tap (Unlock) above to edit'
-                  : 'Tap to mark done'
-              }
-            >
-              <Check size={18} className={clsx(isCompleted ? 'stroke-[3]' : 'stroke-[2.5]')} />
-            </button>
+            </div>
           )}
 
           {/* NUMERIC */}
           {habit.type === 'NUMERIC' && (
             <div className="flex items-center gap-1.5 sm:gap-2">
               <div className="font-mono text-xs font-bold text-ink whitespace-nowrap">
-                <span className="text-sm text-primary font-black">{currentNum}</span>
+                <span
+                  className={clsx(
+                    'text-sm font-black',
+                    isCompleted ? 'text-badge-success' : 'text-primary'
+                  )}
+                >
+                  {currentNum}
+                </span>
                 <span className="text-charcoal font-medium">/{habit.config.numeric?.goal}</span>
               </div>
-              {!isCompleted && !isExcused && !isMissed && (
+              {!isExcused && !isMissed && (
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
@@ -478,7 +526,8 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                       e.stopPropagation();
                       adjustNumeric(-1);
                     }}
-                    className="w-7 h-7 rounded-full bg-surface-bone hover:bg-stone/20 flex items-center justify-center text-ink border border-hairline transition-all active:scale-90"
+                    className="w-7 h-7 rounded-full bg-surface-bone hover:bg-stone/20 flex items-center justify-center text-ink border border-hairline transition-all active:scale-90 cursor-pointer"
+                    title="Decrease count"
                   >
                     <Minus size={12} />
                   </button>
@@ -488,7 +537,8 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                       e.stopPropagation();
                       adjustNumeric(1);
                     }}
-                    className="w-7 h-7 rounded-full bg-surface-bone hover:bg-stone/20 flex items-center justify-center text-ink border border-hairline transition-all active:scale-90"
+                    className="w-7 h-7 rounded-full bg-surface-bone hover:bg-stone/20 flex items-center justify-center text-ink border border-hairline transition-all active:scale-90 cursor-pointer"
+                    title="Increase count"
                   >
                     <Plus size={12} />
                   </button>
@@ -501,37 +551,36 @@ export const HabitCard: React.FC<HabitCardProps> = ({
           {habit.type === 'TIMER' && (
             <div className="flex items-center gap-1.5 sm:gap-2">
               <span
-                className="font-mono text-[10px] sm:text-[11px] font-bold text-charcoal bg-surface-bone px-2 py-0.5 rounded-full border border-hairline whitespace-nowrap shrink-0"
+                className={clsx(
+                  'font-mono text-[10px] sm:text-[11px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full border whitespace-nowrap shrink-0',
+                  isCompleted
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-surface-bone text-charcoal border-hairline'
+                )}
                 title={`${formattedLoggedHMS} / ${formattedTargetHMS}`}
               >
                 {compactLoggedTime} / {compactTargetTime}
               </span>
-              {!isCompleted ? (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isCompleted) {
+                    handleUnlock();
+                  } else {
                     handleSaveTimer(undefined, true);
-                  }}
-                  className="w-8 h-8 rounded-full border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500 flex items-center justify-center transition-all active:scale-90 shrink-0"
-                  title="Tap to mark complete"
-                >
-                  <Check size={16} className="stroke-[2.5]" />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowLockedNotice(true);
-                    setTimeout(() => setShowLockedNotice(false), 3000);
-                  }}
-                  className="w-8 h-8 rounded-full bg-badge-success border-2 border-badge-success text-white flex items-center justify-center transition-all cursor-default shrink-0"
-                  title="Completed & Locked for today! Tap (Unlock) to edit"
-                >
-                  <Check size={16} className="stroke-[3]" />
-                </button>
-              )}
+                  }
+                }}
+                className={clsx(
+                  'w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-90 cursor-pointer shrink-0',
+                  isCompleted
+                    ? 'bg-badge-success border-2 border-badge-success text-white'
+                    : 'border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500'
+                )}
+                title={isCompleted ? 'Completed! Tap to reset or edit' : 'Tap to mark complete'}
+              >
+                <Check size={16} className={clsx(isCompleted ? 'stroke-[3]' : 'stroke-[2.5]')} />
+              </button>
             </div>
           )}
 
@@ -544,7 +593,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                   e.stopPropagation();
                   setIsChecklistExpanded(!isChecklistExpanded);
                 }}
-                className="text-xs font-mono font-bold text-charcoal hover:text-ink bg-surface-bone px-2 py-1 rounded-full border border-hairline flex items-center gap-1"
+                className="text-xs font-mono font-bold text-charcoal hover:text-ink bg-surface-bone px-2 py-1 rounded-full border border-hairline flex items-center gap-1 cursor-pointer"
               >
                 <span>{completedItems.length}/{habit.config.checklist?.items.length || 0}</span>
                 {isChecklistExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
@@ -556,16 +605,12 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                   handleToggleChecklistComplete();
                 }}
                 className={clsx(
-                  'w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0',
+                  'w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-xs active:scale-90 cursor-pointer shrink-0',
                   isCompleted
-                    ? 'bg-badge-success border-2 border-badge-success text-white cursor-default'
-                    : 'border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500 active:scale-90 cursor-pointer'
+                    ? 'bg-badge-success border-2 border-badge-success text-white'
+                    : 'border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500'
                 )}
-                title={
-                  isCompleted
-                    ? 'Completed & Locked for today! Tap (Unlock) to edit'
-                    : 'Tap to mark done'
-                }
+                title={isCompleted ? 'Completed! Tap to undo' : 'Tap to mark done'}
               >
                 <Check size={16} className={clsx(isCompleted ? 'stroke-[3]' : 'stroke-[2.5]')} />
               </button>
@@ -573,21 +618,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
           )}
 
           {/* STATUS / MISSED BUTTON */}
-          {isCompleted ? (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleUnlock();
-              }}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-stone/20 text-charcoal text-[10px] font-bold hover:bg-stone/30 transition-colors cursor-pointer whitespace-nowrap shrink-0"
-              title="Click to unlock & edit"
-            >
-              <Lock size={10} className="shrink-0" />
-              <span>Locked</span>
-              <span className="text-primary underline ml-0.5">(Unlock)</span>
-            </button>
-          ) : isExcused ? (
+          {isExcused ? (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold whitespace-nowrap shrink-0">
               <ShieldCheck size={11} className="text-blue-600 shrink-0" /> Excused
             </span>
@@ -595,7 +626,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-800 text-[10px] font-bold whitespace-nowrap shrink-0">
               <AlertTriangle size={11} className="text-red-600 shrink-0" /> Missed
             </span>
-          ) : (
+          ) : !isCompleted && !isJustTracking && (
             <button
               type="button"
               onClick={(e) => {
@@ -609,28 +640,28 @@ export const HabitCard: React.FC<HabitCardProps> = ({
             </button>
           )}
 
-          {/* ANALYTICS BUTTON (ICON-ONLY) */}
+          {/* ANALYTICS BUTTON (DESKTOP/TABLET) */}
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               onOpenDetails(habit);
             }}
-            className="p-1.5 rounded-full bg-surface-bone hover:bg-stone/20 text-charcoal hover:text-ink border border-hairline transition-colors shrink-0 cursor-pointer"
+            className="hidden sm:inline-flex p-1.5 rounded-full bg-surface-bone hover:bg-stone/20 text-charcoal hover:text-ink border border-hairline transition-colors shrink-0 cursor-pointer"
             title="View Habit Analytics & History"
           >
             <BarChart2 size={13} className="text-primary" />
           </button>
 
-          {/* MORE OPTIONS (DELETE / DUPLICATE) */}
+          {/* MORE OPTIONS (DELETE / DUPLICATE / ARCHIVE) */}
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               setIsOptionsMenuOpen(true);
             }}
-            className="p-1.5 text-charcoal hover:text-ink hover:bg-surface-bone rounded-full transition-colors"
-            title="Habit Options (Hold card or tap: Delete / Duplicate)"
+            className="p-1.5 text-charcoal hover:text-ink hover:bg-surface-bone rounded-full transition-colors cursor-pointer shrink-0"
+            title="Habit Options (Tap to edit / duplicate / delete)"
           >
             <MoreVertical size={15} />
           </button>
@@ -695,8 +726,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
       }}
       className={clsx(
         'group relative rounded-2xl border transition-all duration-200 overflow-hidden shadow-xs hover:shadow-md h-fit w-full select-none cursor-pointer',
-        isCompleted
-          ? 'bg-stone/10 border-stone/30 opacity-65 grayscale-[35%]'
+        isCompleted && habit.type === 'YES_NO'
+          ? 'bg-stone/10 border-stone/30 opacity-75'
+          : isCompleted
+          ? 'bg-emerald-50/15 border-emerald-200/50'
           : isExcused
           ? 'bg-blue-50/40 border-blue-200 opacity-85'
           : isMissed
@@ -743,29 +776,34 @@ export const HabitCard: React.FC<HabitCardProps> = ({
           </div>
 
           <div className="flex items-center gap-1 shrink-0 ml-auto">
-            {isCompleted ? (
-              <button
-                type="button"
-                onClick={handleUnlock}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-stone/20 hover:bg-stone/30 text-charcoal text-[10px] font-bold border border-stone/30 whitespace-nowrap shrink-0 transition-colors cursor-pointer"
-                title="Unlock to edit"
-              >
-                <Lock size={10} className="shrink-0" />
-                <span>Locked</span>
-                <span className="hidden xs:inline text-primary underline font-semibold">(Unlock)</span>
-              </button>
-            ) : isExcused ? (
+            {isCompleted && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200 whitespace-nowrap shrink-0 shadow-2xs">
+                <Check size={11} className="stroke-[3]" />
+                <span>Done</span>
+              </span>
+            )}
+            {isExcused && (
               <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold border border-blue-200 whitespace-nowrap shrink-0">
                 <ShieldCheck size={11} className="text-blue-600 shrink-0" />
                 <span>Shielded</span>
               </div>
-            ) : isMissed ? (
+            )}
+            {isMissed && (
               <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-800 text-[10px] font-bold border border-red-200 whitespace-nowrap shrink-0">
                 <AlertTriangle size={11} className="text-red-600 shrink-0" />
                 <span>{dayLog?.status === 'FAILED' ? 'Skipped' : 'Missed'}</span>
               </div>
+            )}
+            {isJustTracking ? (
+              <span
+                className="inline-flex items-center gap-1 text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 whitespace-nowrap shrink-0"
+                title={`Just Tracking: ${timesCompletedThisWeek} this week • ${timesCompletedThisMonth} this month`}
+              >
+                <Sparkles size={11} className="text-primary shrink-0" />
+                <span>{timesCompletedThisWeek}w / {timesCompletedThisMonth}m</span>
+              </span>
             ) : (
-              currentStreak > 0 && (
+              !isExcused && !isMissed && currentStreak > 0 && (
                 <span
                   className={clsx(
                     'inline-flex items-center gap-1 text-[11px] font-mono font-bold px-2 py-0.5 rounded-full border whitespace-nowrap shrink-0',
@@ -823,7 +861,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
           <h3
             className={clsx(
               'font-display font-bold text-lg sm:text-xl text-ink tracking-tight group-hover/title:text-primary transition-colors',
-              isCompleted && 'line-through text-charcoal'
+              isCompleted && habit.type === 'YES_NO' && 'line-through text-charcoal'
             )}
           >
             {habit.name}
@@ -902,319 +940,341 @@ export const HabitCard: React.FC<HabitCardProps> = ({
             <>
               {/* 1. YES / NO HABIT */}
               {habit.type === 'YES_NO' && (
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex flex-col">
-                <span className="text-xs text-charcoal">
-                  {isCompleted
-                    ? '✓ Completed & Locked for today'
-                    : isSkipped
-                    ? 'Skipped for today'
-                    : 'Tap circle to mark complete:'}
-                </span>
-                {showLockedNotice && (
-                  <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md mt-1 border border-amber-200 animate-pulse">
-                    🔒 Locked for today! Tap &apos;(Unlock)&apos; above to edit
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs text-charcoal">
+                    {isCompleted
+                      ? isJustTracking
+                        ? '🔒 Locked (Completed for today)'
+                        : '✓ Completed for today'
+                      : isSkipped
+                      ? 'Skipped for today'
+                      : 'Tap circle to mark complete:'}
                   </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                {!isCompleted && !isSkipped && !isExcused && !isMissed && (
-                  <button
-                    type="button"
-                    onClick={() => setIsMissedModalOpen(true)}
-                    className="text-xs font-semibold text-charcoal hover:text-red-600 bg-surface-bone hover:bg-red-50 border border-hairline px-2.5 py-1.5 rounded-full flex items-center gap-1 transition-colors"
-                    title="Log missed habit with reason"
-                  >
-                    <ShieldAlert size={13} className="text-charcoal" />
-                    <span>Missed</span>
-                  </button>
-                )}
-                {/* RED CIRCLE -> GREEN TICK TOGGLE */}
-                <button
-                  type="button"
-                  onClick={handleToggleYesNo}
-                  className={clsx(
-                    'w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0',
-                    isCompleted
-                      ? 'bg-badge-success border-2 border-badge-success text-white shadow-md cursor-default'
-                      : 'border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500 active:scale-90 cursor-pointer'
-                  )}
-                  title={
-                    isCompleted
-                      ? 'Completed & Locked for today! Tap (Unlock) above to edit'
-                      : 'Tap to mark done'
-                  }
-                >
-                  <Check size={20} className={clsx(isCompleted ? 'stroke-[3]' : 'stroke-[2.5]')} />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* 2. NUMERIC HABIT */}
-          {habit.type === 'NUMERIC' && (
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-xl font-bold text-ink">
-                  {currentNum}
-                </span>
-                <span className="text-xs text-charcoal">
-                  / {habit.config.numeric?.goal} {habit.config.numeric?.unit} a day
-                </span>
-                {isCompleted && (
-                  <span className="text-xs font-bold text-badge-success ml-1">
-                    ✓ Goal Met
-                  </span>
-                )}
-              </div>
-
-              {!isCompleted && !isExcused && !isMissed ? (
-                <div className="flex items-center gap-2 self-end sm:self-auto">
-                  <button
-                    type="button"
-                    onClick={() => setIsMissedModalOpen(true)}
-                    className="text-xs font-semibold text-charcoal hover:text-red-600 bg-surface-bone hover:bg-red-50 border border-hairline px-2.5 py-1.5 rounded-full flex items-center gap-1 transition-colors"
-                    title="Log missed habit with reason"
-                  >
-                    <ShieldAlert size={13} className="text-charcoal" />
-                    <span>Missed</span>
-                  </button>
-                  <button
-                    onClick={() => adjustNumeric(-1)}
-                    className="w-9 h-9 rounded-full bg-surface-bone hover:bg-stone/20 flex items-center justify-center text-ink border border-hairline transition-all active:scale-90"
-                  >
-                    <Minus size={15} />
-                  </button>
-                  <button
-                    onClick={() => adjustNumeric(1)}
-                    className="w-9 h-9 rounded-full bg-surface-bone hover:bg-stone/20 flex items-center justify-center text-ink border border-hairline transition-all active:scale-90"
-                  >
-                    <Plus size={15} />
-                  </button>
-                  <button
-                    onClick={() => adjustNumeric(5)}
-                    className="px-2.5 h-9 rounded-full bg-surface-bone hover:bg-stone/20 flex items-center justify-center text-xs font-mono font-bold text-ink border border-hairline transition-all active:scale-90"
-                  >
-                    +5
-                  </button>
-                </div>
-              ) : (
-                <span className="text-xs font-bold text-charcoal">
-                  {isCompleted ? 'Locked' : isExcused ? 'Excused' : 'Missed'}
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* 3. TIMER HABIT (NO AUTO STOPWATCH - MANUAL INPUT & LOG) */}
-          {habit.type === 'TIMER' && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-mono font-bold text-charcoal">
-                  Target: <span className="text-ink font-extrabold">{formattedTargetHMS}</span>
-                </span>
-                <span className="text-xs font-mono font-bold text-charcoal">
-                  Logged:{' '}
-                  <span
-                    className={clsx(
-                      'font-extrabold',
-                      isCompleted ? 'text-badge-success' : 'text-primary'
-                    )}
-                  >
-                    {formattedLoggedHMS}
-                  </span>
-                </span>
-              </div>
-
-              {!isCompleted ? (
-                <div className="p-2.5 bg-surface-bone/80 rounded-2xl border border-hairline space-y-2">
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="font-bold text-charcoal uppercase">
-                      Time Spent:
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleMatchTargetTimer}
-                      className="font-bold text-primary hover:underline"
-                    >
-                      Fill Target Time
-                    </button>
-                  </div>
-
-                  <div className="flex items-center gap-1.5">
-                    {/* Hours */}
-                    <div className="flex-1 text-center bg-surface-card rounded-xl py-1 px-1 border border-hairline">
-                      <span className="text-[8px] text-charcoal uppercase font-bold block leading-none mb-0.5">Hours</span>
-                      <input
-                        type="number"
-                        min={0}
-                        max={23}
-                        value={inputHours}
-                        onChange={(e) =>
-                          setInputHours(Math.max(0, parseInt(e.target.value, 10) || 0))
-                        }
-                        className="w-full text-center font-mono font-bold text-sm bg-transparent text-ink focus:outline-none"
-                      />
-                    </div>
-
-                    <span className="font-mono font-bold text-stone">:</span>
-
-                    {/* Minutes */}
-                    <div className="flex-1 text-center bg-surface-card rounded-xl py-1 px-1 border border-hairline">
-                      <span className="text-[8px] text-charcoal uppercase font-bold block leading-none mb-0.5">Mins</span>
-                      <input
-                        type="number"
-                        min={0}
-                        max={59}
-                        value={inputMinutes}
-                        onChange={(e) =>
-                          setInputMinutes(
-                            Math.max(0, Math.min(59, parseInt(e.target.value, 10) || 0))
-                          )
-                        }
-                        className="w-full text-center font-mono font-bold text-sm bg-transparent text-ink focus:outline-none"
-                      />
-                    </div>
-
-                    <span className="font-mono font-bold text-stone">:</span>
-
-                    {/* Seconds */}
-                    <div className="flex-1 text-center bg-surface-card rounded-xl py-1 px-1 border border-hairline">
-                      <span className="text-[8px] text-charcoal uppercase font-bold block leading-none mb-0.5">Secs</span>
-                      <input
-                        type="number"
-                        min={0}
-                        max={59}
-                        value={inputSecs}
-                        onChange={(e) =>
-                          setInputSecs(
-                            Math.max(0, Math.min(59, parseInt(e.target.value, 10) || 0))
-                          )
-                        }
-                        className="w-full text-center font-mono font-bold text-sm bg-transparent text-ink focus:outline-none"
-                      />
-                    </div>
-
-                    {!isCompleted && !isExcused && !isMissed && (
+                  <div className="flex items-center gap-2">
+                    {!isCompleted && !isSkipped && !isExcused && !isMissed && !isJustTracking && (
                       <button
                         type="button"
                         onClick={() => setIsMissedModalOpen(true)}
-                        className="h-10 px-2.5 rounded-xl bg-surface-bone hover:bg-red-50 border border-hairline text-charcoal hover:text-red-600 flex items-center gap-1 text-xs font-semibold transition-all shrink-0"
+                        className="text-xs font-semibold text-charcoal hover:text-red-600 bg-surface-bone hover:bg-red-50 border border-hairline px-2.5 py-1.5 rounded-full flex items-center gap-1 transition-colors cursor-pointer"
                         title="Log missed habit with reason"
                       >
-                        <ShieldAlert size={13} />
+                        <ShieldAlert size={13} className="text-charcoal" />
                         <span>Missed</span>
                       </button>
                     )}
-
-                    {/* RED CIRCLE COMPLETE BUTTON */}
-                    <button
-                      type="button"
-                      onClick={() => handleSaveTimer(undefined, true)}
-                      className="w-10 h-10 rounded-full border-2 border-red-500 bg-red-50 hover:bg-red-100 flex items-center justify-center text-red-500 shadow-xs hover:shadow-sm transition-all duration-200 active:scale-90 cursor-pointer shrink-0"
-                      title="Tap to mark complete"
-                    >
-                      <Check size={20} className="stroke-[2.5]" />
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="p-3 bg-stone/15 rounded-2xl border border-stone/30 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    {/* GREEN CIRCLE WITH WHITE CHECKMARK */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowLockedNotice(true);
-                        setTimeout(() => setShowLockedNotice(false), 3000);
-                      }}
-                      className="w-12 h-12 rounded-full bg-badge-success border-2 border-badge-success text-white flex items-center justify-center shadow-md cursor-default shrink-0"
-                      title="Completed & Locked for today! Tap 'Unlock & Edit' to change"
-                    >
-                      <Check size={22} className="stroke-[3]" />
-                    </button>
-                    <div>
-                      <span className="font-bold text-ink text-xs sm:text-sm block">
-                        ✓ Completed for today!
-                      </span>
-                      <span className="text-xs font-mono text-charcoal">
-                        Time logged: {formattedLoggedHMS}
-                      </span>
+                    {/* RED CIRCLE -> GREEN TICK TOGGLE */}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        disabled={isJustTracking && isCompleted}
+                        onClick={handleToggleYesNo}
+                        className={clsx(
+                          'w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0',
+                          isCompleted
+                            ? clsx(
+                                'bg-badge-success border-2 border-badge-success text-white shadow-md',
+                                isJustTracking ? 'cursor-default ring-2 ring-badge-success/30' : 'active:scale-90 cursor-pointer'
+                              )
+                            : 'border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500 active:scale-90 cursor-pointer'
+                        )}
+                        title={
+                          isCompleted
+                            ? isJustTracking
+                              ? 'Completed & Locked: Just Tracking habits cannot be unchecked once marked done'
+                              : 'Completed! Click to unmark'
+                            : 'Tap to mark done'
+                        }
+                      >
+                        {isJustTracking && isCompleted ? (
+                          <Check size={20} className="stroke-[3]" />
+                        ) : (
+                          <Check size={20} className={clsx(isCompleted ? 'stroke-[3]' : 'stroke-[2.5]')} />
+                        )}
+                      </button>
+                      {isJustTracking && isCompleted && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-badge-success bg-badge-success/10 px-2 py-0.5 rounded-full border border-badge-success/20">
+                          <Lock size={11} /> Locked
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleUnlock}
-                    className="text-xs text-primary font-bold hover:underline px-2 py-1"
-                  >
-                    Unlock & Edit
-                  </button>
                 </div>
               )}
-            </div>
-          )}
 
-          {/* 4. CHECKLIST HABIT */}
-          {habit.type === 'CHECKLIST' && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <span className="text-xs font-semibold text-charcoal block">
-                    Progress: <span className="font-mono font-bold text-ink">{completedItems.length}</span> /{' '}
-                    {habit.config.checklist?.items.length || 0} tasks
-                  </span>
-                  {isCompleted && (
-                    <span className="text-[11px] font-bold text-badge-success">
-                      ✓ Completed for today ({completedItems.length}/{habit.config.checklist?.items.length || 0})
+              {/* 2. NUMERIC HABIT */}
+              {habit.type === 'NUMERIC' && (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={clsx(
+                        'font-mono text-xl font-bold',
+                        isCompleted ? 'text-badge-success' : 'text-ink'
+                      )}
+                    >
+                      {currentNum}
+                    </span>
+                    <span className="text-xs text-charcoal">
+                      / {habit.config.numeric?.goal} {habit.config.numeric?.unit} a day
+                    </span>
+                    {isCompleted && (
+                      <span className="text-xs font-bold text-badge-success ml-1 flex items-center gap-0.5">
+                        ✓ Goal Met
+                      </span>
+                    )}
+                  </div>
+
+                  {!isExcused && !isMissed ? (
+                    <div className="flex items-center gap-2 self-end sm:self-auto">
+                      {!isCompleted && (
+                        <button
+                          type="button"
+                          onClick={() => setIsMissedModalOpen(true)}
+                          className="text-xs font-semibold text-charcoal hover:text-red-600 bg-surface-bone hover:bg-red-50 border border-hairline px-2.5 py-1.5 rounded-full flex items-center gap-1 transition-colors cursor-pointer"
+                          title="Log missed habit with reason"
+                        >
+                          <ShieldAlert size={13} className="text-charcoal" />
+                          <span>Missed</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => adjustNumeric(-1)}
+                        className="w-9 h-9 rounded-full bg-surface-bone hover:bg-stone/20 flex items-center justify-center text-ink border border-hairline transition-all active:scale-90 cursor-pointer"
+                        title="Decrease count"
+                      >
+                        <Minus size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => adjustNumeric(1)}
+                        className="w-9 h-9 rounded-full bg-surface-bone hover:bg-stone/20 flex items-center justify-center text-ink border border-hairline transition-all active:scale-90 cursor-pointer"
+                        title="Increase count"
+                      >
+                        <Plus size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => adjustNumeric(5)}
+                        className="px-2.5 h-9 rounded-full bg-surface-bone hover:bg-stone/20 flex items-center justify-center text-xs font-mono font-bold text-ink border border-hairline transition-all active:scale-90 cursor-pointer"
+                        title="Add 5"
+                      >
+                        +5
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-xs font-bold text-charcoal">
+                      {isExcused ? 'Excused' : 'Missed'}
                     </span>
                   )}
                 </div>
+              )}
 
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsChecklistExpanded(!isChecklistExpanded)}
-                    className="text-xs text-primary font-semibold flex items-center gap-1 hover:underline mr-1"
-                  >
-                    {isChecklistExpanded ? 'Hide tasks' : 'View tasks'}
-                    {isChecklistExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  </button>
+              {/* 3. TIMER HABIT (NO AUTO STOPWATCH - MANUAL INPUT & LOG) */}
+              {habit.type === 'TIMER' && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-mono font-bold text-charcoal">
+                      Target: <span className="text-ink font-extrabold">{formattedTargetHMS}</span>
+                    </span>
+                    <span className="text-xs font-mono font-bold text-charcoal">
+                      Logged:{' '}
+                      <span
+                        className={clsx(
+                          'font-extrabold',
+                          isCompleted ? 'text-badge-success' : 'text-primary'
+                        )}
+                      >
+                        {formattedLoggedHMS}
+                      </span>
+                    </span>
+                  </div>
 
-                  {!isCompleted && !isExcused && !isMissed && (
-                    <button
-                      type="button"
-                      onClick={() => setIsMissedModalOpen(true)}
-                      className="text-xs font-semibold text-charcoal hover:text-red-600 bg-surface-bone hover:bg-red-50 border border-hairline px-2.5 py-1.5 rounded-full flex items-center gap-1 transition-colors"
-                      title="Log missed habit with reason"
-                    >
-                      <ShieldAlert size={13} className="text-charcoal" />
-                      <span>Missed</span>
-                    </button>
+                  {!isCompleted ? (
+                    <div className="p-2.5 bg-surface-bone/80 rounded-2xl border border-hairline space-y-2">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="font-bold text-charcoal uppercase">
+                          Time Spent:
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleMatchTargetTimer}
+                          className="font-bold text-primary hover:underline cursor-pointer"
+                        >
+                          Fill Target Time
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        {/* Hours */}
+                        <div className="flex-1 text-center bg-surface-card rounded-xl py-1 px-1 border border-hairline">
+                          <span className="text-[8px] text-charcoal uppercase font-bold block leading-none mb-0.5">Hours</span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={23}
+                            value={inputHours}
+                            onChange={(e) =>
+                              setInputHours(Math.max(0, parseInt(e.target.value, 10) || 0))
+                            }
+                            className="w-full text-center font-mono font-bold text-sm bg-transparent text-ink focus:outline-none"
+                          />
+                        </div>
+
+                        <span className="font-mono font-bold text-stone">:</span>
+
+                        {/* Minutes */}
+                        <div className="flex-1 text-center bg-surface-card rounded-xl py-1 px-1 border border-hairline">
+                          <span className="text-[8px] text-charcoal uppercase font-bold block leading-none mb-0.5">Mins</span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={59}
+                            value={inputMinutes}
+                            onChange={(e) =>
+                              setInputMinutes(
+                                Math.max(0, Math.min(59, parseInt(e.target.value, 10) || 0))
+                              )
+                            }
+                            className="w-full text-center font-mono font-bold text-sm bg-transparent text-ink focus:outline-none"
+                          />
+                        </div>
+
+                        <span className="font-mono font-bold text-stone">:</span>
+
+                        {/* Seconds */}
+                        <div className="flex-1 text-center bg-surface-card rounded-xl py-1 px-1 border border-hairline">
+                          <span className="text-[8px] text-charcoal uppercase font-bold block leading-none mb-0.5">Secs</span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={59}
+                            value={inputSecs}
+                            onChange={(e) =>
+                              setInputSecs(
+                                Math.max(0, Math.min(59, parseInt(e.target.value, 10) || 0))
+                              )
+                            }
+                            className="w-full text-center font-mono font-bold text-sm bg-transparent text-ink focus:outline-none"
+                          />
+                        </div>
+
+                        {!isCompleted && !isExcused && !isMissed && (
+                          <button
+                            type="button"
+                            onClick={() => setIsMissedModalOpen(true)}
+                            className="h-10 px-2.5 rounded-xl bg-surface-bone hover:bg-red-50 border border-hairline text-charcoal hover:text-red-600 flex items-center gap-1 text-xs font-semibold transition-all shrink-0 cursor-pointer"
+                            title="Log missed habit with reason"
+                          >
+                            <ShieldAlert size={13} />
+                            <span>Missed</span>
+                          </button>
+                        )}
+
+                        {/* RED CIRCLE COMPLETE BUTTON */}
+                        <button
+                          type="button"
+                          onClick={() => handleSaveTimer(undefined, true)}
+                          className="w-10 h-10 rounded-full border-2 border-red-500 bg-red-50 hover:bg-red-100 flex items-center justify-center text-red-500 shadow-xs hover:shadow-sm transition-all duration-200 active:scale-90 cursor-pointer shrink-0"
+                          title="Tap to mark complete"
+                        >
+                          <Check size={20} className="stroke-[2.5]" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-emerald-50/40 rounded-2xl border border-emerald-200/60 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        {/* GREEN CIRCLE WITH WHITE CHECKMARK */}
+                        <button
+                          type="button"
+                          onClick={handleUnlock}
+                          className="w-11 h-11 rounded-full bg-badge-success border-2 border-badge-success text-white flex items-center justify-center shadow-md active:scale-90 transition-all cursor-pointer shrink-0"
+                          title="Completed! Click to reset or edit"
+                        >
+                          <Check size={20} className="stroke-[3]" />
+                        </button>
+                        <div>
+                          <span className="font-bold text-ink text-xs sm:text-sm block">
+                            ✓ Completed for today!
+                          </span>
+                          <span className="text-xs font-mono text-charcoal">
+                            Time logged: {formattedLoggedHMS}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleUnlock}
+                        className="text-xs text-primary font-bold hover:underline px-2 py-1 cursor-pointer"
+                      >
+                        Edit / Reset
+                      </button>
+                    </div>
                   )}
-
-                  {/* RED CIRCLE -> GREEN TICK TOGGLE */}
-                  <button
-                    type="button"
-                    onClick={handleToggleChecklistComplete}
-                    className={clsx(
-                      'w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0',
-                      isCompleted
-                        ? 'bg-badge-success border-2 border-badge-success text-white shadow-md cursor-default'
-                        : 'border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500 active:scale-90 cursor-pointer'
-                    )}
-                    title={
-                      isCompleted
-                        ? 'Completed & Locked for today! Tap (Unlock) above to edit'
-                        : 'Tap to mark done for today with checked tasks'
-                    }
-                  >
-                    <Check
-                      size={20}
-                      className={clsx(isCompleted ? 'stroke-[3]' : 'stroke-[2.5]')}
-                    />
-                  </button>
                 </div>
-              </div>
+              )}
+
+              {/* 4. CHECKLIST HABIT */}
+              {habit.type === 'CHECKLIST' && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <span className="text-xs font-semibold text-charcoal block">
+                        Progress: <span className="font-mono font-bold text-ink">{completedItems.length}</span> /{' '}
+                        {habit.config.checklist?.items.length || 0} tasks
+                      </span>
+                      {isCompleted && (
+                        <span className="text-[11px] font-bold text-badge-success">
+                          ✓ Completed for today ({completedItems.length}/{habit.config.checklist?.items.length || 0})
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsChecklistExpanded(!isChecklistExpanded)}
+                        className="text-xs text-primary font-semibold flex items-center gap-1 hover:underline mr-1 cursor-pointer"
+                      >
+                        {isChecklistExpanded ? 'Hide tasks' : 'View tasks'}
+                        {isChecklistExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                      </button>
+
+                      {!isCompleted && !isExcused && !isMissed && (
+                        <button
+                          type="button"
+                          onClick={() => setIsMissedModalOpen(true)}
+                          className="text-xs font-semibold text-charcoal hover:text-red-600 bg-surface-bone hover:bg-red-50 border border-hairline px-2.5 py-1.5 rounded-full flex items-center gap-1 transition-colors cursor-pointer"
+                          title="Log missed habit with reason"
+                        >
+                          <ShieldAlert size={13} className="text-charcoal" />
+                          <span>Missed</span>
+                        </button>
+                      )}
+
+                      {/* RED CIRCLE -> GREEN TICK TOGGLE */}
+                      <button
+                        type="button"
+                        onClick={handleToggleChecklistComplete}
+                        className={clsx(
+                          'w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0 active:scale-90 cursor-pointer',
+                          isCompleted
+                            ? 'bg-badge-success border-2 border-badge-success text-white shadow-md'
+                            : 'border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500'
+                        )}
+                        title={
+                          isCompleted
+                            ? 'Completed! Click to unmark'
+                            : 'Tap to mark done for today with checked tasks'
+                        }
+                      >
+                        <Check
+                          size={20}
+                          className={clsx(isCompleted ? 'stroke-[3]' : 'stroke-[2.5]')}
+                        />
+                      </button>
+                    </div>
+                  </div>
 
               {isChecklistExpanded && (
                 <div className="space-y-2 pt-1 animate-in fade-in duration-150">

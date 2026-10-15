@@ -93,9 +93,9 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
     return false;
   };
 
-  // All habits due on selected date (for 100% Perfect Day calculation)
+  // All mandatory habits due on selected date (for 100% Perfect Day calculation)
   const allScheduledDueToday = habits.filter(
-    (h) => !isHabitArchived(h) && isHabitDueOnDate(h, selectedDateTime, logs)
+    (h) => !isHabitArchived(h) && isHabitDueOnDate(h, selectedDateTime, logs) && h.frequency?.type !== 'JUST_TRACKING'
   );
   const totalDueCount = allScheduledDueToday.length;
   const completedDueCount = allScheduledDueToday.filter((h) => {

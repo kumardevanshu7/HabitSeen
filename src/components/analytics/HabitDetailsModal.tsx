@@ -13,6 +13,8 @@ import {
   Trash2,
   Award,
   Sparkles,
+  Lock,
+  CheckCircle2,
 } from 'lucide-react';
 import {
   format,
@@ -23,11 +25,14 @@ import {
   isSameDay,
   subMonths,
   addMonths,
+  isAfter,
+  startOfDay,
 } from 'date-fns';
 import clsx from 'clsx';
+import confetti from 'canvas-confetti';
 
 import { computeHabitStreaks } from '../../utils/streakEngine';
-import { isDateInThisWeek } from '../../utils/dateMath';
+import { isDateInThisWeek, isDateInThisMonth } from '../../utils/dateMath';
 import { SecurityModal } from '../security/SecurityModal';
 
 interface HabitDetailsModalProps {
@@ -43,7 +48,7 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
   onClose,
   onEdit,
 }) => {
-  const { categories, logs, deleteHabit } = useAppStore();
+  const { categories, logs, deleteHabit, logHabit } = useAppStore();
   const [currentCalendarMonth, setCurrentCalendarMonth] = useState(new Date());
   const [pendingSecurityAction, setPendingSecurityAction] = useState<{
     type: 'edit' | 'delete';
@@ -51,6 +56,8 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
   } | null>(null);
 
   if (!habit) return null;
+
+  const isJustTracking = habit.frequency?.type === 'JUST_TRACKING';
 
   const category = categories.find((c) => c.id === habit.categoryId);
   const CategoryIcon =
@@ -78,10 +85,30 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
     : (habit.stats?.unlockedChallenges || []);
 
   const timesCompletedThisWeek = habitLogs.filter((l) => l.status === 'COMPLETED' && l.date && isDateInThisWeek(l.date)).length;
+  const timesCompletedThisMonth = habitLogs.filter((l) => l.status === 'COMPLETED' && l.date && isDateInThisMonth(l.date)).length;
   const timesCompletedAllTime = completedLogs.length || habit.stats?.timesCompletedAllTime || 0;
 
   const successRate =
     totalTracked > 0 ? Math.round((completedLogs.length / totalTracked) * 100) : 0;
+
+  const handleToggleCalendarDay = (dateKey: string, isFutureDate: boolean) => {
+    if (!habit || isFutureDate) return;
+    const logKey = `${habit.id}_${dateKey}`;
+    const dayLog = logs?.[logKey];
+    const isCompleted = dayLog?.status === 'COMPLETED';
+
+    if (isCompleted) {
+      if (isJustTracking) {
+        // Locked permanently!
+        return;
+      }
+      logHabit(habit.id, dateKey, { valueYesNo: false });
+      return;
+    }
+
+    confetti({ particleCount: 35, spread: 50, origin: { y: 0.6 } });
+    logHabit(habit.id, dateKey, { valueYesNo: true });
+  };
 
   // Calendar days
   const monthStart = startOfMonth(currentCalendarMonth);
@@ -167,75 +194,143 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
           </div>
         </div>
 
-        {/* 1. STREAK & COMPLETION METRICS GRID */}
-        <div>
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-charcoal mb-2 ml-1">
-            Streaks & Performance
-          </h4>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="p-3.5 bg-surface-card border border-hairline rounded-2xl text-center">
-              <span className="text-xs text-charcoal flex items-center justify-center gap-1">
-                <Flame size={14} className="text-primary" /> Current Streak
-              </span>
-              <p className="font-mono text-2xl font-bold text-primary mt-1">
-                {currentStreak}{' '}
-                <span className="text-xs font-sans text-charcoal">days</span>
-              </p>
+        {/* JUST TRACKING FEATURE BANNER */}
+        {isJustTracking && (
+          <div className="p-3.5 bg-primary/10 border border-primary/20 rounded-2xl flex items-center gap-2.5 animate-in fade-in duration-200">
+            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0 text-primary">
+              <Sparkles size={16} />
             </div>
-
-            <div className="p-3.5 bg-surface-card border border-hairline rounded-2xl text-center">
-              <span className="text-xs text-charcoal flex items-center justify-center gap-1">
-                <Trophy size={14} className="text-amber-500" /> Best Streak
-              </span>
-              <p className="font-mono text-2xl font-bold text-ink mt-1">
-                {bestStreak}{' '}
-                <span className="text-xs font-sans text-charcoal">days</span>
-              </p>
-            </div>
-
-            <div className="p-3.5 bg-surface-card border border-hairline rounded-2xl text-center">
-              <span className="text-xs text-charcoal">This Week</span>
-              <p className="font-mono text-2xl font-bold text-ink mt-1">
-                {timesCompletedThisWeek}
-              </p>
-            </div>
-
-            <div className="p-3.5 bg-surface-card border border-hairline rounded-2xl text-center">
-              <span className="text-xs text-charcoal">All-Time Completed</span>
-              <p className="font-mono text-2xl font-bold text-badge-success mt-1">
-                {timesCompletedAllTime}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-primary">Just Tracking Mode</span>
+                <span className="text-[10px] font-bold text-primary/80 bg-primary/15 px-2 py-0.5 rounded-full">
+                  Flexible
+                </span>
+              </div>
+              <p className="text-[11px] text-charcoal mt-0.5 leading-relaxed">
+                Not mandatory daily. Log whenever you do it. Missed days do not break streaks or reduce hearts. Completed days lock permanently.
               </p>
             </div>
           </div>
+        )}
+
+        {/* 1. STREAK & COMPLETION METRICS GRID */}
+        <div>
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-charcoal mb-2 ml-1">
+            {isJustTracking ? 'Tracking Frequency Analytics' : 'Streaks & Performance'}
+          </h4>
+          {isJustTracking ? (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-3.5 bg-surface-card border border-hairline rounded-2xl text-center">
+                <span className="text-xs text-charcoal flex items-center justify-center gap-1 font-medium">
+                  <CalendarIcon size={14} className="text-primary" /> This Week
+                </span>
+                <p className="font-mono text-2xl font-bold text-primary mt-1">
+                  {timesCompletedThisWeek}{' '}
+                  <span className="text-xs font-sans text-charcoal">times</span>
+                </p>
+              </div>
+
+              <div className="p-3.5 bg-surface-card border border-hairline rounded-2xl text-center">
+                <span className="text-xs text-charcoal flex items-center justify-center gap-1 font-medium">
+                  <CalendarIcon size={14} className="text-primary" /> This Month
+                </span>
+                <p className="font-mono text-2xl font-bold text-primary mt-1">
+                  {timesCompletedThisMonth}{' '}
+                  <span className="text-xs font-sans text-charcoal">times</span>
+                </p>
+              </div>
+
+              <div className="p-3.5 bg-surface-card border border-hairline rounded-2xl text-center">
+                <span className="text-xs text-charcoal flex items-center justify-center gap-1 font-medium">
+                  <Trophy size={14} className="text-amber-500" /> All-Time
+                </span>
+                <p className="font-mono text-2xl font-bold text-badge-success mt-1">
+                  {timesCompletedAllTime}{' '}
+                  <span className="text-xs font-sans text-charcoal">times</span>
+                </p>
+              </div>
+
+              <div className="p-3.5 bg-surface-card border border-hairline rounded-2xl text-center">
+                <span className="text-xs text-charcoal flex items-center justify-center gap-1 font-medium">
+                  <CheckCircle2 size={14} className="text-violet-500" /> Total Check-ins
+                </span>
+                <p className="font-mono text-2xl font-bold text-ink mt-1">
+                  {completedLogs.length}{' '}
+                  <span className="text-xs font-sans text-charcoal">days</span>
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-3.5 bg-surface-card border border-hairline rounded-2xl text-center">
+                <span className="text-xs text-charcoal flex items-center justify-center gap-1">
+                  <Flame size={14} className="text-primary" /> Current Streak
+                </span>
+                <p className="font-mono text-2xl font-bold text-primary mt-1">
+                  {currentStreak}{' '}
+                  <span className="text-xs font-sans text-charcoal">days</span>
+                </p>
+              </div>
+
+              <div className="p-3.5 bg-surface-card border border-hairline rounded-2xl text-center">
+                <span className="text-xs text-charcoal flex items-center justify-center gap-1">
+                  <Trophy size={14} className="text-amber-500" /> Best Streak
+                </span>
+                <p className="font-mono text-2xl font-bold text-ink mt-1">
+                  {bestStreak}{' '}
+                  <span className="text-xs font-sans text-charcoal">days</span>
+                </p>
+              </div>
+
+              <div className="p-3.5 bg-surface-card border border-hairline rounded-2xl text-center">
+                <span className="text-xs text-charcoal">This Week</span>
+                <p className="font-mono text-2xl font-bold text-ink mt-1">
+                  {timesCompletedThisWeek}
+                </p>
+              </div>
+
+              <div className="p-3.5 bg-surface-card border border-hairline rounded-2xl text-center">
+                <span className="text-xs text-charcoal">All-Time Completed</span>
+                <p className="font-mono text-2xl font-bold text-badge-success mt-1">
+                  {timesCompletedAllTime}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 2. SUCCESS VS FAILURE DISTRIBUTION */}
         <div className="p-4 bg-surface-card border border-hairline rounded-2xl">
           <div className="flex items-center justify-between gap-2 mb-3">
             <h4 className="text-xs font-semibold uppercase tracking-wider text-charcoal ml-1 truncate">
-              Consistency & Breakdown
+              {isJustTracking ? 'Consistency & Activity Summary' : 'Consistency & Breakdown'}
             </h4>
             <span className="text-xs font-mono font-bold text-ink bg-surface-bone px-2.5 py-1 rounded-full border border-hairline whitespace-nowrap shrink-0">
-              {successRate}% Success Rate
+              {isJustTracking ? `${completedLogs.length} Completed` : `${successRate}% Success Rate`}
             </span>
           </div>
 
           <div className="w-full bg-surface-bone h-3 rounded-full overflow-hidden flex">
             <div
               className="bg-badge-success transition-all duration-500"
-              style={{ width: `${totalTracked > 0 ? (completedLogs.length / totalTracked) * 100 : 0}%` }}
+              style={{ width: `${totalTracked > 0 ? (completedLogs.length / totalTracked) * 100 : isJustTracking && completedLogs.length > 0 ? 100 : 0}%` }}
               title={`Completed: ${completedLogs.length}`}
             />
-            <div
-              className="bg-blue-400 transition-all duration-500"
-              style={{ width: `${totalTracked > 0 ? (excusedLogs.length / totalTracked) * 100 : 0}%` }}
-              title={`Excused: ${excusedLogs.length}`}
-            />
-            <div
-              className="bg-red-400 transition-all duration-500"
-              style={{ width: `${totalTracked > 0 ? ((missedLogs.length + skippedLogs.length) / totalTracked) * 100 : 0}%` }}
-              title={`Missed/Skipped: ${missedLogs.length + skippedLogs.length}`}
-            />
+            {!isJustTracking && (
+              <>
+                <div
+                  className="bg-blue-400 transition-all duration-500"
+                  style={{ width: `${totalTracked > 0 ? (excusedLogs.length / totalTracked) * 100 : 0}%` }}
+                  title={`Excused: ${excusedLogs.length}`}
+                />
+                <div
+                  className="bg-red-400 transition-all duration-500"
+                  style={{ width: `${totalTracked > 0 ? ((missedLogs.length + skippedLogs.length) / totalTracked) * 100 : 0}%` }}
+                  title={`Missed/Skipped: ${missedLogs.length + skippedLogs.length}`}
+                />
+              </>
+            )}
           </div>
 
           <div className="flex items-center justify-around mt-3 text-xs text-charcoal flex-wrap gap-2">
@@ -243,14 +338,18 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
               <span className="w-2.5 h-2.5 rounded-full bg-badge-success" />
               Completed ({completedLogs.length})
             </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-blue-400" />
-              Excused ({excusedLogs.length})
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-red-400" />
-              Missed ({missedLogs.length + skippedLogs.length})
-            </span>
+            {!isJustTracking && (
+              <>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-400" />
+                  Excused ({excusedLogs.length})
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-400" />
+                  Missed ({missedLogs.length + skippedLogs.length})
+                </span>
+              </>
+            )}
             <span className="flex items-center gap-1.5 font-semibold text-ink">
               Total Logged: {totalTracked}
             </span>
@@ -350,38 +449,68 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
               const isMissed = dayLog?.status === 'MISSED' || dayLog?.status === 'FAILED';
               const isSkipped = dayLog?.status === 'SKIPPED';
               const isToday = isSameDay(day, new Date());
+              const isFuture = isAfter(startOfDay(day), startOfDay(new Date()));
 
               return (
-                <div
+                <button
                   key={dateKey}
+                  type="button"
+                  disabled={isFuture || (isCompleted && isJustTracking)}
+                  onClick={() => handleToggleCalendarDay(dateKey, isFuture)}
                   className={clsx(
-                    'h-9 rounded-xl flex flex-col items-center justify-center text-xs font-mono transition-all border',
+                    'h-9 rounded-xl flex flex-col items-center justify-center text-xs font-mono transition-all border select-none',
                     isCompleted && 'bg-badge-success text-white border-badge-success font-bold shadow-2xs',
                     isExcused && 'bg-blue-100 text-blue-700 border-blue-300 font-bold',
                     isMissed && 'bg-amber-100 text-amber-800 border-amber-300 font-semibold',
                     isSkipped && 'bg-red-100 text-red-600 border-red-200',
-                    !dayLog && 'bg-surface-bone text-charcoal border-hairline/60',
-                    isToday && 'ring-2 ring-primary ring-offset-1 font-bold'
+                    !dayLog && !isFuture && 'bg-surface-bone text-charcoal border-hairline/60 hover:bg-stone/20 hover:border-primary/50 cursor-pointer active:scale-95',
+                    isFuture && 'opacity-35 bg-surface-bone/50 text-charcoal/50 border-hairline/30 cursor-not-allowed',
+                    isToday && 'ring-2 ring-primary ring-offset-1 font-bold',
+                    isCompleted && isJustTracking && 'cursor-default ring-1 ring-badge-success/40'
                   )}
                   title={`${dateKey}: ${
                     isCompleted
-                      ? 'Completed'
+                      ? isJustTracking
+                        ? 'Completed & Locked'
+                        : 'Completed (Click to unmark)'
+                      : isFuture
+                      ? 'Future date'
                       : isExcused
                       ? `Excused: ${dayLog?.missedReasonText || 'Protected'}`
                       : isMissed
                       ? `Missed: ${dayLog?.missedReasonText || 'Uncompleted'}`
                       : isSkipped
                       ? 'Skipped'
-                      : 'No record'
+                      : isJustTracking
+                      ? 'Click to complete & lock for this day'
+                      : 'Click to mark complete'
                   }`}
                 >
                   <span>{format(day, 'd')}</span>
-                  {isCompleted && <span className="text-[8px] leading-none">✓</span>}
+                  {isCompleted && (
+                    <div className="flex items-center gap-0.5 text-[8px] leading-none">
+                      <span>✓</span>
+                      {isJustTracking && <Lock size={7} />}
+                    </div>
+                  )}
                   {isExcused && <span className="text-[8px] leading-none">🛡️</span>}
                   {isMissed && <span className="text-[8px] leading-none">!</span>}
-                </div>
+                </button>
               );
             })}
+          </div>
+
+          {/* Calendar Helper Info */}
+          <div className="mt-3 pt-2.5 border-t border-hairline/70 flex items-center justify-between text-[11px] text-charcoal flex-wrap gap-2">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-badge-success shrink-0" /> Completed
+              {isJustTracking && <span className="inline-flex items-center gap-0.5 text-[10px] text-primary font-bold">(Locked)</span>}
+            </span>
+            <span className="text-stone">
+              {isJustTracking
+                ? '💡 Tap any past or today date to check it off & lock it permanently'
+                : '💡 Tap dates to log completion'}
+            </span>
           </div>
         </div>
 

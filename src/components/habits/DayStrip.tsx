@@ -16,6 +16,8 @@ import {
   isSameMonth,
   addMonths,
   subMonths,
+  isAfter,
+  startOfDay,
 } from 'date-fns';
 import clsx from 'clsx';
 import { ChevronLeft, ChevronRight, Calendar, Eye, CheckCircle2, Sparkles } from 'lucide-react';
@@ -83,24 +85,34 @@ export const DayStrip: React.FC = () => {
   const calEnd = endOfWeek(mEnd, { weekStartsOn: 0 });
   const monthCalendarDays = eachDayOfInterval({ start: calStart, end: calEnd });
 
-  // Month Statistics for modal header/footer
+  // Month Statistics for modal header/footer (only count days up to today or with logs)
   const allDaysInMonth = eachDayOfInterval({ start: mStart, end: mEnd });
+  const todayStart = startOfDay(new Date());
   let monthPerfectDaysCount = 0;
   let monthTotalDueHabits = 0;
   let monthTotalCompletedHabits = 0;
 
   allDaysInMonth.forEach((d) => {
     const dKey = format(d, 'yyyy-MM-dd');
-    const due = activeHabits.filter((h) => isHabitDueOnDate(h, d, logs));
-    if (due.length > 0) {
-      monthTotalDueHabits += due.length;
-      const completed = due.filter((h) => {
-        const l = logs[`${h.id}_${dKey}`];
-        return l?.status === 'COMPLETED' || l?.status === 'EXCUSED';
-      }).length;
-      monthTotalCompletedHabits += completed;
-      if (completed === due.length) {
-        monthPerfectDaysCount += 1;
+    const isPastOrToday = !isAfter(startOfDay(d), todayStart);
+    if (isPastOrToday) {
+      const due = activeHabits.filter((h) => {
+        if (h.frequency?.type === 'JUST_TRACKING') {
+          const l = logs[`${h.id}_${dKey}`];
+          return l?.status === 'COMPLETED' || l?.status === 'EXCUSED';
+        }
+        return isHabitDueOnDate(h, d, logs);
+      });
+      if (due.length > 0) {
+        monthTotalDueHabits += due.length;
+        const completed = due.filter((h) => {
+          const l = logs[`${h.id}_${dKey}`];
+          return l?.status === 'COMPLETED' || l?.status === 'EXCUSED';
+        }).length;
+        monthTotalCompletedHabits += completed;
+        if (completed === due.length) {
+          monthPerfectDaysCount += 1;
+        }
       }
     }
   });
@@ -182,7 +194,13 @@ export const DayStrip: React.FC = () => {
           const isToday = key === todayKey;
 
           // Compute habits scheduled & completed on this date
-          const dueHabits = activeHabits.filter((h) => isHabitDueOnDate(h, day, logs));
+          const dueHabits = activeHabits.filter((h) => {
+            if (h.frequency?.type === 'JUST_TRACKING') {
+              const l = logs[`${h.id}_${key}`];
+              return l?.status === 'COMPLETED' || l?.status === 'EXCUSED';
+            }
+            return isHabitDueOnDate(h, day, logs);
+          });
           const completedHabits = dueHabits.filter((h) => {
             const l = logs[`${h.id}_${key}`];
             return l?.status === 'COMPLETED' || l?.status === 'EXCUSED';
@@ -299,22 +317,22 @@ export const DayStrip: React.FC = () => {
         <div className="space-y-4">
           {/* Month Navigation & Metrics Bar */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-surface-bone rounded-2xl border border-hairline">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between sm:justify-start gap-2">
               <button
                 type="button"
                 onClick={() => setModalMonth((prev) => subMonths(prev, 1))}
-                className="p-1.5 rounded-full hover:bg-white text-charcoal hover:text-ink transition-colors border border-hairline/60"
+                className="p-1.5 rounded-full hover:bg-white text-charcoal hover:text-ink transition-colors border border-hairline/60 cursor-pointer active:scale-90"
                 title="Previous Month"
               >
                 <ChevronLeft size={16} />
               </button>
-              <span className="font-display font-bold text-base sm:text-lg text-ink min-w-[140px] text-center">
+              <span className="font-display font-bold text-base sm:text-lg text-ink min-w-[130px] text-center">
                 {format(modalMonth, 'MMMM yyyy')}
               </span>
               <button
                 type="button"
                 onClick={() => setModalMonth((prev) => addMonths(prev, 1))}
-                className="p-1.5 rounded-full hover:bg-white text-charcoal hover:text-ink transition-colors border border-hairline/60"
+                className="p-1.5 rounded-full hover:bg-white text-charcoal hover:text-ink transition-colors border border-hairline/60 cursor-pointer active:scale-90"
                 title="Next Month"
               >
                 <ChevronRight size={16} />
@@ -323,17 +341,17 @@ export const DayStrip: React.FC = () => {
 
             {/* Quick KPI stats for this month */}
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
                 <CheckCircle2 size={12} /> {monthPerfectDaysCount} Perfect Days
               </span>
-              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20">
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 shadow-2xs">
                 <Sparkles size={12} /> {monthAvgRate}% Completion
               </span>
               {!isSameMonth(modalMonth, new Date()) && (
                 <button
                   type="button"
                   onClick={() => setModalMonth(new Date())}
-                  className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-white hover:bg-surface-bone text-charcoal hover:text-ink border border-hairline transition-colors"
+                  className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-white hover:bg-surface-bone text-charcoal hover:text-ink border border-hairline transition-colors cursor-pointer shadow-2xs"
                 >
                   This Month
                 </button>
@@ -346,7 +364,7 @@ export const DayStrip: React.FC = () => {
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
               <span
                 key={d}
-                className="text-[11px] uppercase font-bold tracking-wider text-charcoal/80 py-1"
+                className="text-[10px] sm:text-[11px] uppercase font-bold tracking-wider text-charcoal/70 py-1"
               >
                 {d}
               </span>
@@ -360,8 +378,15 @@ export const DayStrip: React.FC = () => {
               const inCurrentMonth = isSameMonth(day, modalMonth);
               const isSelected = dKey === selectedDate;
               const isToday = dKey === todayKey;
+              const isFuture = isAfter(startOfDay(day), todayStart);
 
-              const dueHabits = activeHabits.filter((h) => isHabitDueOnDate(h, day, logs));
+              const dueHabits = activeHabits.filter((h) => {
+                if (h.frequency?.type === 'JUST_TRACKING') {
+                  const l = logs[`${h.id}_${dKey}`];
+                  return l?.status === 'COMPLETED' || l?.status === 'EXCUSED';
+                }
+                return isHabitDueOnDate(h, day, logs);
+              });
               const completedHabits = dueHabits.filter((h) => {
                 const l = logs[`${h.id}_${dKey}`];
                 return l?.status === 'COMPLETED' || l?.status === 'EXCUSED';
@@ -370,6 +395,7 @@ export const DayStrip: React.FC = () => {
               const totalDue = dueHabits.length;
               const totalCompleted = completedHabits.length;
               const pct = totalDue > 0 ? Math.round((totalCompleted / totalDue) * 100) : 0;
+              const isPerfect = totalDue > 0 && totalCompleted === totalDue && !isFuture;
 
               return (
                 <button
@@ -381,19 +407,20 @@ export const DayStrip: React.FC = () => {
                     setIsMonthModalOpen(false);
                   }}
                   className={clsx(
-                    'flex flex-col items-center justify-between p-1.5 sm:p-2 rounded-2xl border transition-all text-left relative min-h-[58px] sm:min-h-[68px] group cursor-pointer',
-                    !inCurrentMonth && 'opacity-30 bg-surface-bone/50 border-hairline/40',
-                    inCurrentMonth && !isSelected && 'bg-canvas hover:bg-surface-bone border-hairline',
+                    'flex flex-col items-center justify-between p-1 sm:p-2 rounded-xl sm:rounded-2xl border transition-all text-left relative min-h-[52px] sm:min-h-[64px] group cursor-pointer',
+                    !inCurrentMonth && 'opacity-20 bg-surface-bone/30 border-transparent pointer-events-none',
+                    inCurrentMonth && !isSelected && isPerfect && 'bg-emerald-50/40 border-emerald-200/70 hover:bg-emerald-50/70',
+                    inCurrentMonth && !isSelected && !isPerfect && 'bg-surface-card hover:bg-surface-bone border-hairline/70',
                     isSelected && 'bg-ink text-white border-ink ring-2 ring-primary shadow-sm'
                   )}
                   title={`${format(day, 'EEEE, d MMMM yyyy')}: ${totalCompleted}/${totalDue} completed (${pct}%)`}
                 >
                   {/* Date number and Today indicator */}
-                  <div className="flex items-center justify-between w-full px-0.5">
+                  <div className="flex items-center justify-between w-full px-1">
                     <span
                       className={clsx(
                         'font-mono text-xs sm:text-sm font-bold',
-                        isSelected ? 'text-white' : inCurrentMonth ? 'text-ink' : 'text-stone'
+                        isSelected ? 'text-white' : inCurrentMonth ? 'text-ink' : 'text-stone/40'
                       )}
                     >
                       {format(day, 'd')}
@@ -406,37 +433,39 @@ export const DayStrip: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Completion status badge or progress indicator */}
-                  {totalDue > 0 ? (
-                    <div className="w-full mt-1">
-                      <div className="flex items-center justify-between text-[10px] font-mono font-bold leading-none mb-1">
+                  {/* Completion indicator: only for past or today with due habits */}
+                  {inCurrentMonth && !isFuture && totalDue > 0 ? (
+                    <div className="w-full px-0.5 mt-0.5">
+                      <div className="flex items-center justify-center sm:justify-between text-[9.5px] sm:text-[10px] font-mono font-bold leading-none mb-1">
                         <span
                           className={clsx(
-                            pct === 100
+                            isPerfect
                               ? isSelected
                                 ? 'text-emerald-300'
                                 : 'text-emerald-600'
                               : isSelected
                               ? 'text-white/80'
-                              : 'text-charcoal'
+                              : pct > 0
+                              ? 'text-amber-600'
+                              : 'text-stone/70'
                           )}
                         >
                           {pct}%
                         </span>
                         <span
                           className={clsx(
-                            'text-[9px] font-mono',
+                            'hidden sm:inline text-[9px] font-mono',
                             isSelected ? 'text-white/60' : 'text-stone/80'
                           )}
                         >
                           {totalCompleted}/{totalDue}
                         </span>
                       </div>
-                      <div className="w-full bg-stone/20 h-1 rounded-full overflow-hidden">
+                      <div className="w-full bg-stone/20 h-1 sm:h-1.5 rounded-full overflow-hidden">
                         <div
                           className={clsx(
                             'h-full rounded-full transition-all',
-                            pct === 100
+                            isPerfect
                               ? 'bg-emerald-500'
                               : pct >= 50
                               ? 'bg-amber-500'
@@ -446,16 +475,11 @@ export const DayStrip: React.FC = () => {
                         />
                       </div>
                     </div>
-                  ) : (
-                    <span
-                      className={clsx(
-                        'text-[10px] font-mono self-center mt-2',
-                        isSelected ? 'text-white/40' : 'text-stone/40'
-                      )}
-                    >
-                      -
+                  ) : inCurrentMonth && isFuture ? (
+                    <span className="text-[9px] text-stone/40 font-mono self-center mt-1 sm:mt-2">
+                      ·
                     </span>
-                  )}
+                  ) : null}
                 </button>
               );
             })}
@@ -475,7 +499,7 @@ export const DayStrip: React.FC = () => {
               </span>
             </div>
             <span className="text-[11px] text-stone">
-              Click any day to jump to its habit checklist
+              Click any date to view checklist
             </span>
           </div>
         </div>

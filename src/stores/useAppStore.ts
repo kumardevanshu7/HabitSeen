@@ -190,7 +190,7 @@ function checkPerfectDayTransition(
   try {
     const parsedDate = parseISO(dateKey);
     const dueHabits = habits.filter(
-      (h) => !h.isArchived && isHabitDueOnDate(h, parsedDate, updatedLogs)
+      (h) => !h.isArchived && isHabitDueOnDate(h, parsedDate, updatedLogs) && h.frequency?.type !== 'JUST_TRACKING'
     );
 
     if (dueHabits.length === 0) {
@@ -573,6 +573,15 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const logKey = `${habitId}_${dateKey}`;
     const existingLog = state.logs[logKey] || {};
 
+    // Safeguard: Once a "Just Tracking" habit is completed for this day, it is locked permanently
+    if (
+      existingLog.status === 'COMPLETED' &&
+      habit.frequency?.type === 'JUST_TRACKING' &&
+      (data.valueYesNo === false || (data.forceStatus && data.forceStatus !== 'COMPLETED'))
+    ) {
+      return;
+    }
+
     const mergedCandidate = {
       ...existingLog,
       ...data,
@@ -869,6 +878,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const state = get();
     const habit = state.habits.find((h) => h.id === habitId);
     if (!state.currentUser || !habit) return;
+    if (habit.frequency?.type === 'JUST_TRACKING') return; // Just Tracking habits are never missed or penalized
 
     const logKey = `${habitId}_${dateKey}`;
     const existingLog = state.logs[logKey];
