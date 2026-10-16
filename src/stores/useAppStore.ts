@@ -26,7 +26,15 @@ import {
   calculateXpForCompletion,
   getUsedExcusesInMonth,
 } from '../utils/streakEngine';
-import { WILL_HABIT_TIERS, MISS_PENALTIES, levelFromXp, calculateMaxHearts } from '../constants/gamification';
+import {
+  WILL_HABIT_TIERS,
+  MISS_PENALTIES,
+  levelFromXp,
+  calculateMaxHearts,
+  calculateHeartLossFromXpDrop,
+  MIDNIGHT_MISSED_HABIT_XP_PENALTY,
+  XP_LOSS_PER_HEART,
+} from '../constants/gamification';
 import { hashSecurityAnswer } from '../utils/cryptoUtils';
 import { doc, getDoc } from 'firebase/firestore';
 import {
@@ -151,8 +159,12 @@ interface AppState {
     forceComplete?: boolean
   ) => Promise<void>;
   updateChallenge: (updated: Challenge) => Promise<void>;
+  toggleArchiveChallenge: (id: string, forceArchived?: boolean) => Promise<void>;
   failChallengeDay: (challengeId: string, dateKey: string) => Promise<void>;
   deleteChallenge: (id: string) => Promise<void>;
+
+  // Midnight Rollover and XP/Heart Enforcement (-1 Heart per 350 XP lost)
+  checkAndEnforceMidnightRollover: () => Promise<void>;
 
   // Security Question & Fresh Account Reset
   setSecurityQuestion: (question: string, answer: string) => Promise<void>;
@@ -986,7 +998,13 @@ export const useAppStore = create<AppState>()((set, get) => ({
         });
       }
 
-      const newHearts = Math.max(0, currentHearts - heartLoss + bonusHeartHealed);
+      const netXpDrop = Math.max(0, -(xpDelta + extraBonusXp));
+      const { heartsToDeduct: xpHeartLoss, newLossAccumulator } = calculateHeartLossFromXpDrop(
+        netXpDrop,
+        state.user.gamification.xpLossTowardsHeart || 0
+      );
+      const totalHeartDeduction = heartLoss + xpHeartLoss;
+      const newHearts = Math.max(0, currentHearts - totalHeartDeduction + bonusHeartHealed);
       const newTotalXp = Math.max(0, state.user.gamification.totalXp + xpDelta + extraBonusXp);
 
       const lvlInfo = levelFromXp(newTotalXp);
@@ -1004,6 +1022,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
           totalXp: newTotalXp,
           level: newLevel,
           levelTitle: newLevelTitle,
+          xpLossTowardsHeart: newLossAccumulator,
           perfectDaysCompleted: updatedPerfectDays,
         },
       };
@@ -1246,7 +1265,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const updatedChallenge: Challenge = {
       ...challenge,
       dayLogs: nextDayLogs,
-      status: isChallengeNowConquered || challenge.status === 'COMPLETED' ? 'COMPLETED' : 'ACTIVE',
+      status: isChallengeNowConquered || challenge.status === 'COMPLETED' || completedDaysCount >= challenge.targetDays ? 'COMPLETED' : 'ACTIVE',
       completedAt: isChallengeNowConquered
         ? new Date().toISOString()
         : challenge.completedAt,
@@ -1374,6 +1393,163 @@ export const useAppStore = create<AppState>()((set, get) => ({
     set((s) => ({
       challenges: s.challenges.filter((c) => c.id !== id),
     }));
+  },
+
+  toggleArchiveChallenge: async (id, forceArchived) => {
+    const { currentUser, challenges } = get();
+    const target = challenges.find((c) => c.id === id);
+    if (!target || !currentUser) return;
+
+    const nextArchived = typeof forceArchived === 'boolean' ? forceArchived : !target.isArchived;
+    const updated: Challenge = {
+      ...target,
+      isArchived: nextArchived,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await updateChallengeInDb(currentUser.uid, updated);
+    set((s) => ({
+      challenges: s.challenges.map((c) => (c.id === id ? updated : c)),
+    }));
+  },
+
+  checkAndEnforceMidnightRollover: async () => {
+    const state = get();
+    const { currentUser, user, habits, logs } = state;
+    if (!currentUser || !user || habits.length === 0) return;
+
+    const today = getTodayKey();
+    const todayDate = parseISO(today);
+
+    // Also scan challenges: any challenge that finished all target days or past its endDate is completed
+    let challengesUpdated = false;
+    const updatedChallenges = state.challenges.map((c) => {
+      if (c.status !== 'COMPLETED' && !c.isArchived) {
+        const completedCount = Object.values(c.dayLogs || {}).filter((l) => l.status === 'COMPLETED').length;
+        const target = Math.max(1, c.targetDays || 7);
+        const hasPassedEnd = c.endDate ? today > c.endDate : false;
+        if (completedCount >= target || hasPassedEnd) {
+          challengesUpdated = true;
+          const finishedC: Challenge = {
+            ...c,
+            status: 'COMPLETED',
+            completedAt: c.completedAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          updateChallengeInDb(currentUser.uid, finishedC);
+          return finishedC;
+        }
+      }
+      return c;
+    });
+
+    if (challengesUpdated) {
+      set({ challenges: updatedChallenges });
+    }
+
+    // Scan up to the last 7 past days for missed uncompleted scheduled habits
+    const newlyMissedLogs: Record<string, HabitLog> = {};
+    const affectedHabitIds = new Set<string>();
+    let totalXpLost = 0;
+
+    for (let i = 1; i <= 7; i++) {
+      const pastD = addDays(todayDate, -i);
+      const pastKey = format(pastD, 'yyyy-MM-dd');
+
+      for (const h of habits) {
+        // Skip archived and "Just Tracking" habits (they never miss or penalize)
+        if (h.isArchived || h.frequency?.type === 'JUST_TRACKING') continue;
+        if (h.schedule.startDate && pastKey < h.schedule.startDate) continue;
+        if (h.schedule.endDate && pastKey > h.schedule.endDate) continue;
+
+        const isDue = isHabitDueOnDate(h, pastD, logs);
+        if (!isDue) continue;
+
+        const logKey = `${h.id}_${pastKey}`;
+        const existingLog = logs[logKey] || newlyMissedLogs[logKey];
+
+        // If no log exists or it was left incomplete (PARTIAL) when the day ended at midnight:
+        if (!existingLog || existingLog.status === 'PARTIAL') {
+          const missedLog: HabitLog = {
+            date: pastKey,
+            habitId: h.id,
+            status: 'MISSED',
+            missedReasonType: 'FORGOT_ACCIDENTAL',
+            missedReasonText: 'Day ended at midnight without completion',
+            notes: 'Auto-enforced at midnight',
+            xpEarned: -MIDNIGHT_MISSED_HABIT_XP_PENALTY,
+            loggedAt: new Date().toISOString(),
+          };
+
+          newlyMissedLogs[logKey] = missedLog;
+          affectedHabitIds.add(h.id);
+          totalXpLost += MIDNIGHT_MISSED_HABIT_XP_PENALTY;
+        }
+      }
+    }
+
+    if (Object.keys(newlyMissedLogs).length === 0) {
+      return;
+    }
+
+    // Persist new missed logs to Firestore
+    for (const [logKey, mLog] of Object.entries(newlyMissedLogs)) {
+      await saveLogToDb(currentUser.uid, logKey, mLog);
+    }
+
+    const mergedLogs = { ...logs, ...newlyMissedLogs };
+
+    // Update affected habits' streaks and stats
+    const updatedHabits = habits.map((h) => {
+      if (!affectedHabitIds.has(h.id)) return h;
+      const { currentStreak, bestStreak, unlockedChallenges } = computeHabitStreaks(h, mergedLogs);
+      const updatedH: Habit = {
+        ...h,
+        stats: {
+          ...h.stats,
+          currentStreak,
+          bestStreak,
+          unlockedChallenges,
+          totalTrackedDays: Object.values(mergedLogs).filter((l) => l.habitId === h.id).length,
+        },
+        updatedAt: new Date().toISOString(),
+      };
+      updateHabitInDb(currentUser.uid, updatedH);
+      return updatedH;
+    });
+
+    // Enforce XP drop and -1 Heart per 350 XP lost
+    const { heartsToDeduct, newLossAccumulator } = calculateHeartLossFromXpDrop(
+      totalXpLost,
+      user.gamification.xpLossTowardsHeart || 0
+    );
+
+    const currentHearts = user.gamification.hearts ?? 5;
+    const newHearts = Math.max(0, currentHearts - heartsToDeduct);
+    const newTotalXp = Math.max(0, (user.gamification.totalXp || 0) - totalXpLost);
+    const lvlInfo = levelFromXp(newTotalXp);
+    const newMaxHearts = calculateMaxHearts(newTotalXp);
+
+    const updatedUser: UserProfile = {
+      ...user,
+      gamification: {
+        ...user.gamification,
+        totalXp: newTotalXp,
+        level: lvlInfo.level,
+        levelTitle: lvlInfo.title,
+        hearts: Math.min(newMaxHearts, newHearts),
+        maxHearts: newMaxHearts,
+        xpLossTowardsHeart: newLossAccumulator,
+      },
+    };
+
+    await saveUserProfileToDb(currentUser.uid, updatedUser);
+
+    set({
+      logs: mergedLogs,
+      habits: updatedHabits,
+      user: updatedUser,
+    });
   },
 
   setSecurityQuestion: async (question, answer) => {

@@ -22,6 +22,8 @@ import {
   CheckCircle2,
   XCircle,
   Pencil,
+  Archive,
+  ArchiveRestore,
 } from 'lucide-react';
 import { addDays, format, parseISO } from 'date-fns';
 import clsx from 'clsx';
@@ -31,10 +33,13 @@ export const ChallengesView: React.FC = () => {
     challenges,
     logChallengeDay,
     failChallengeDay,
+    updateChallenge,
     deleteChallenge,
+    toggleArchiveChallenge,
     user,
   } = useAppStore();
 
+  const [challengesTab, setChallengesTab] = useState<'active' | 'archived'>('active');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingChallenge, setEditingChallenge] = useState<Challenge | null>(null);
   const [inspectedChallenge, setInspectedChallenge] = useState<Challenge | null>(null);
@@ -44,11 +49,42 @@ export const ChallengesView: React.FC = () => {
 
   const activeDateKey = getTodayKey();
 
+  // Helper: Evaluates whether a challenge is finished/conquered
+  const isChallengeFinished = (c: Challenge) => {
+    if (c.status === 'COMPLETED' || c.isArchived) return true;
+    const targetDays = Math.max(1, c.targetDays || 7);
+    const dayLogs = c.dayLogs || {};
+    const completedDays = Object.values(dayLogs).filter(
+      (l) => l.status === 'COMPLETED'
+    ).length;
+    if (completedDays >= targetDays) return true;
+
+    // Window has elapsed past endDate
+    const today = getTodayKey();
+    if (c.endDate && today > c.endDate) return true;
+
+    return false;
+  };
+
+  // Auto-sync any challenge that has completed all days or passed endDate to 'COMPLETED' status
+  useEffect(() => {
+    for (const c of challenges) {
+      if (c.status !== 'COMPLETED' && !c.isArchived && isChallengeFinished(c)) {
+        updateChallenge({
+          ...c,
+          status: 'COMPLETED',
+          completedAt: c.completedAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    }
+  }, [challenges, updateChallenge]);
+
   // Auto-enforce Rule 2 (-90% Health Deduction) on any past day (startDate <= d < today) left incomplete/PARTIAL
   useEffect(() => {
     const today = getTodayKey();
     for (const c of challenges) {
-      if (c.status === 'COMPLETED') continue;
+      if (c.status === 'COMPLETED' || isChallengeFinished(c)) continue;
       const targetDays = Math.max(1, c.targetDays || 7);
       for (let idx = 0; idx < targetDays; idx++) {
         const dKey = format(addDays(parseISO(c.startDate), idx), 'yyyy-MM-dd');
@@ -70,8 +106,9 @@ export const ChallengesView: React.FC = () => {
     }
   }, [challenges, failChallengeDay]);
 
-  const activeChallenges = challenges.filter((c) => c.status !== 'COMPLETED');
-  const completedChallenges = challenges.filter((c) => c.status === 'COMPLETED');
+  const activeChallenges = challenges.filter((c) => !isChallengeFinished(c));
+  const archivedChallenges = challenges.filter((c) => isChallengeFinished(c));
+  const completedChallenges = archivedChallenges;
 
   // Aggregate Challenge Analytics
   const totalChallengeDaysCompleted = challenges.reduce((sum, c) => {
@@ -212,36 +249,140 @@ export const ChallengesView: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. CHALLENGES LIST */}
-      {challenges.length === 0 ? (
-        <div className="text-center py-14 px-4 bg-surface-card border border-hairline rounded-3xl">
-          <div className="w-16 h-16 rounded-full bg-red-50 text-primary flex items-center justify-center mx-auto mb-3">
-            <Flame size={32} />
-          </div>
-          <h3 className="font-display font-bold text-xl text-ink">
-            No Active Challenges Yet
-          </h3>
-          <p className="text-charcoal text-xs sm:text-sm mt-1 max-w-md mx-auto">
-            Test your iron willpower. Start a 7, 9, 11, or Custom Day Challenge where missing a task costs 90% of your health and completing it rewards massive EXP &amp; Hearts!
-          </p>
-          <Button
-            onClick={() => setIsCreateOpen(true)}
-            variant="primary"
-            size="md"
-            className="mt-5 gap-1.5"
+      {/* 2.5 TAB SWITCHER: ACTIVE CHALLENGES vs ARCHIVED CHALLENGES */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-hairline pb-3">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setChallengesTab('active')}
+            className={clsx(
+              'px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer',
+              challengesTab === 'active'
+                ? 'bg-rose-600 text-white shadow-xs'
+                : 'bg-surface-card hover:bg-surface-bone text-charcoal border border-hairline'
+            )}
           >
-            <Plus size={16} /> Add First Challenge
-          </Button>
+            <Flame size={15} className={challengesTab === 'active' ? 'fill-white' : 'text-rose-500'} />
+            <span>Active Challenges</span>
+            <span
+              className={clsx(
+                'px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold',
+                challengesTab === 'active' ? 'bg-white/20 text-white' : 'bg-surface-bone text-charcoal'
+              )}
+            >
+              {activeChallenges.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setChallengesTab('archived')}
+            className={clsx(
+              'px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer',
+              challengesTab === 'archived'
+                ? 'bg-amber-500 text-white shadow-xs'
+                : 'bg-surface-card hover:bg-surface-bone text-charcoal border border-hairline'
+            )}
+          >
+            <Trophy size={15} className={challengesTab === 'archived' ? 'fill-white' : 'text-amber-500'} />
+            <span>Archived Challenges</span>
+            <span
+              className={clsx(
+                'px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold',
+                challengesTab === 'archived' ? 'bg-white/20 text-white' : 'bg-surface-bone text-charcoal'
+              )}
+            >
+              {archivedChallenges.length}
+            </span>
+          </button>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {challenges.map((c) => {
+
+        <Button
+          onClick={() => setIsCreateOpen(true)}
+          variant="primary"
+          size="sm"
+          className="gap-1.5 text-xs shadow-xs self-start sm:self-auto"
+        >
+          <Plus size={14} /> <span>New Challenge</span>
+        </Button>
+      </div>
+
+      {/* 3. CHALLENGES LIST */}
+      {(() => {
+        const displayedList = challengesTab === 'active' ? activeChallenges : archivedChallenges;
+
+        if (displayedList.length === 0) {
+          if (challengesTab === 'active') {
+            return (
+              <div className="text-center py-14 px-4 bg-surface-card border border-hairline rounded-3xl">
+                <div className="w-16 h-16 rounded-full bg-red-50 text-primary flex items-center justify-center mx-auto mb-3">
+                  <Flame size={32} />
+                </div>
+                <h3 className="font-display font-bold text-xl text-ink">
+                  No Active Challenges Yet
+                </h3>
+                <p className="text-charcoal text-xs sm:text-sm mt-1 max-w-md mx-auto">
+                  Test your iron willpower. Start a 7, 9, 11, or Custom Day Challenge where missing a task costs 90% of your health and completing it rewards massive EXP &amp; Hearts!
+                </p>
+                <div className="mt-5 flex items-center justify-center gap-3">
+                  <Button
+                    onClick={() => setIsCreateOpen(true)}
+                    variant="primary"
+                    size="md"
+                    className="gap-1.5"
+                  >
+                    <Plus size={16} /> Add First Challenge
+                  </Button>
+                  {archivedChallenges.length > 0 && (
+                    <Button
+                      onClick={() => setChallengesTab('archived')}
+                      variant="outline"
+                      size="md"
+                      className="gap-1.5"
+                    >
+                      <Trophy size={15} /> View Archived ({archivedChallenges.length})
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          } else {
+            return (
+              <div className="text-center py-14 px-4 bg-surface-card border border-hairline rounded-3xl">
+                <div className="w-16 h-16 rounded-full bg-amber-50 text-amber-500 flex items-center justify-center mx-auto mb-3">
+                  <Trophy size={32} />
+                </div>
+                <h3 className="font-display font-bold text-xl text-ink">
+                  No Archived Challenges Yet
+                </h3>
+                <p className="text-charcoal text-xs sm:text-sm mt-1 max-w-md mx-auto">
+                  Conquer a 7, 9, 11, or Custom Day Challenge to enshrine your victory in the Archive!
+                </p>
+                <div className="mt-5 flex items-center justify-center gap-3">
+                  <Button
+                    onClick={() => setChallengesTab('active')}
+                    variant="outline"
+                    size="md"
+                    className="gap-1.5"
+                  >
+                    <Flame size={15} /> Go to Active Challenges
+                  </Button>
+                </div>
+              </div>
+            );
+          }
+        }
+
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {displayedList.map((c) => {
             const IconComp =
               CATEGORY_ICONS.find((i) => i.id === c.icon)?.icon ||
               CATEGORY_ICONS[0].icon;
             const vibrantColor = boostVibrancy(c.color);
             const iconColor = getContrastIconColor(vibrantColor);
 
+            const isFinished = isChallengeFinished(c);
             const dayLogs = c.dayLogs || {};
             const completedDays = Object.values(dayLogs).filter(
               (l) => l.status === 'COMPLETED'
@@ -268,7 +409,7 @@ export const ChallengesView: React.FC = () => {
                 key={c.id}
                 className={clsx(
                   'bg-surface-card border-2 rounded-3xl p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between',
-                  c.status === 'COMPLETED' && 'ring-2 ring-badge-success/40'
+                  (c.status === 'COMPLETED' || isFinished) && 'ring-2 ring-badge-success/40'
                 )}
                 style={{
                   borderColor: `${vibrantColor}45`,
@@ -297,7 +438,7 @@ export const ChallengesView: React.FC = () => {
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200 whitespace-nowrap">
                             ⚠️ -90% Stake
                           </span>
-                          {c.status === 'COMPLETED' && (
+                          {(c.status === 'COMPLETED' || isFinished) && (
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 whitespace-nowrap">
                               🏆 Completed
                             </span>
@@ -310,6 +451,18 @@ export const ChallengesView: React.FC = () => {
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => toggleArchiveChallenge(c.id)}
+                        className="p-1.5 text-charcoal hover:text-amber-500 hover:bg-surface-bone rounded-full transition-colors cursor-pointer"
+                        title={c.isArchived || isFinished ? 'Unarchive Challenge' : 'Move to Archive'}
+                      >
+                        {c.isArchived || isFinished ? (
+                          <ArchiveRestore size={16} />
+                        ) : (
+                          <Archive size={16} />
+                        )}
+                      </button>
                       <button
                         type="button"
                         onClick={() => setEditingChallenge(c)}
@@ -456,7 +609,30 @@ export const ChallengesView: React.FC = () => {
 
                 {/* BOTTOM ACTION AREA */}
                 <div className="pt-3.5 mt-4 border-t border-hairline flex items-center justify-between gap-2">
-                  {isTodayCompleted ? (
+                  {challengesTab === 'archived' || isFinished ? (
+                    <div className="flex items-center justify-between w-full">
+                      <span className="text-xs font-bold text-amber-600 flex items-center gap-1.5">
+                        <Trophy size={16} /> Conquered • Total +{c.totalXpEarned || (targetDays * 50)} XP
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setInspectedChallenge(c)}
+                          className="text-xs font-bold text-charcoal hover:underline"
+                        >
+                          Analytics
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => toggleArchiveChallenge(c.id, false)}
+                          className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
+                          title="Resume / Move back to Active Challenges"
+                        >
+                          <ArchiveRestore size={13} /> Unarchive
+                        </button>
+                      </div>
+                    </div>
+                  ) : isTodayCompleted ? (
                     <div className="flex items-center justify-between w-full">
                       <span className="text-xs font-bold text-badge-success flex items-center gap-1.5">
                         <CheckCircle2 size={16} /> Completed (+50 XP &amp; +1 ❤️)
@@ -519,7 +695,8 @@ export const ChallengesView: React.FC = () => {
             );
           })}
         </div>
-      )}
+      );
+    })()}
 
       {/* CREATE & EDIT CHALLENGE MODAL */}
       <CreateChallengeModal

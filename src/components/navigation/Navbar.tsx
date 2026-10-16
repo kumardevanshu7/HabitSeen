@@ -1,13 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
 import { Button } from '../ui/Button';
 import { logOut } from '../../services/firebase';
-import { Plus, Award, LogOut, Heart, Zap, Flame, CheckSquare, Clock, BarChart2 } from 'lucide-react';
+import { Plus, Award, LogOut, Heart, Zap, Flame, CheckSquare, Clock, BarChart2, Info, Sparkles } from 'lucide-react';
 import clsx from 'clsx';
+import { PointsSystemModal } from './PointsSystemModal';
 
 interface NavbarProps {
-  activeTab: 'habits' | 'challenges' | 'breaks' | 'analytics';
-  onSelectTab: (tab: 'habits' | 'challenges' | 'breaks' | 'analytics') => void;
+  activeTab: 'habits' | 'challenges' | 'tracking' | 'breaks' | 'analytics';
+  onSelectTab: (tab: 'habits' | 'challenges' | 'tracking' | 'breaks' | 'analytics') => void;
   onOpenCreateHabit: () => void;
   onOpenProfile?: () => void;
 }
@@ -19,6 +20,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenProfile,
 }) => {
   const { user, currentUser, challenges } = useAppStore();
+  const [isPointsInfoOpen, setIsPointsInfoOpen] = useState(false);
 
   const handleLogout = async () => {
     if (window.confirm('Are you sure you want to sign out?')) {
@@ -33,7 +35,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   const activeChallengesCount = challenges.filter((c) => c.status === 'ACTIVE').length;
 
   return (
-    <header className="sticky top-0 z-40 bg-canvas/90 backdrop-blur-md border-b border-hairline">
+    <>
+      <header className="sticky top-0 z-40 bg-canvas/90 backdrop-blur-md border-b border-hairline">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
         {/* LOGO & BRAND */}
         <div className="flex items-center gap-2.5 shrink-0">
@@ -93,6 +96,20 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
           <button
             type="button"
+            aria-current={activeTab === 'tracking' ? 'page' : undefined}
+            onClick={() => onSelectTab('tracking')}
+            className={clsx(
+              'px-3.5 lg:px-4 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-1.5',
+              activeTab === 'tracking'
+                ? 'bg-amber-500 text-white shadow-xs'
+                : 'text-charcoal hover:text-ink hover:bg-surface-bone'
+            )}
+          >
+            <Sparkles size={13} className={activeTab === 'tracking' ? 'text-white' : 'text-amber-500'} />
+            <span>Just Tracking</span>
+          </button>
+          <button
+            type="button"
             aria-current={activeTab === 'breaks' ? 'page' : undefined}
             onClick={() => onSelectTab('breaks')}
             className={clsx(
@@ -121,7 +138,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </nav>
 
-        {/* RIGHT AREA: HEARTS VITALITY + WILLPOWER XP + ADD HABIT CTA + LOGOUT */}
+        {/* RIGHT AREA: HEARTS VITALITY + WILLPOWER XP + INFO GUIDE + ADD HABIT CTA + LOGOUT */}
         <div className="flex items-center gap-2 shrink-0">
           {/* 1. Vitality Hearts Badge */}
           {user && (
@@ -151,6 +168,17 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           )}
 
+          {/* 3. Points System & Rules Info Icon Button */}
+          <button
+            type="button"
+            onClick={() => setIsPointsInfoOpen(true)}
+            aria-label="Points and Hearts System Guide"
+            className="flex items-center justify-center w-8 h-8 rounded-full bg-surface-card hover:bg-surface-bone text-charcoal hover:text-primary border border-hairline shadow-2xs transition-all active:scale-95 shrink-0"
+            title="Points, Hearts & Midnight Rules Guide"
+          >
+            <Info size={15} />
+          </button>
+
           <Button
             onClick={onOpenCreateHabit}
             variant="primary"
@@ -173,5 +201,12 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </div>
     </header>
+
+    {/* Points & Rules Info Modal */}
+    <PointsSystemModal
+      isOpen={isPointsInfoOpen}
+      onClose={() => setIsPointsInfoOpen(false)}
+    />
+  </>
   );
 };

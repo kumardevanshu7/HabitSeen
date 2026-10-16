@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { CheckSquare, ShieldAlert, BarChart2, Plus, User, Flame } from 'lucide-react';
+import { CheckSquare, ShieldAlert, BarChart2, Plus, User, Flame, Sparkles } from 'lucide-react';
 import clsx from 'clsx';
 import { ProfileModal } from '../profile/ProfileModal';
 
 interface BottomNavProps {
-  activeTab: 'habits' | 'challenges' | 'breaks' | 'analytics';
-  onSelectTab: (tab: 'habits' | 'challenges' | 'breaks' | 'analytics') => void;
+  activeTab: 'habits' | 'challenges' | 'tracking' | 'breaks' | 'analytics';
+  onSelectTab: (tab: 'habits' | 'challenges' | 'tracking' | 'breaks' | 'analytics') => void;
   onOpenCreateHabit: () => void;
   onOpenProfile?: () => void;
 }
@@ -30,7 +30,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
     <>
       <nav
         aria-label="Mobile Navigation"
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-canvas/95 backdrop-blur-lg border-t border-hairline px-1.5 py-1 grid grid-cols-6 items-center shadow-lg safe-bottom"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-canvas/95 backdrop-blur-lg border-t border-hairline px-1 py-1 grid grid-cols-7 items-center shadow-lg safe-bottom"
       >
         {/* 1. Habits */}
         <button
@@ -43,8 +43,8 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             activeTab === 'habits' ? 'text-primary font-bold' : 'text-stone hover:text-ink font-medium'
           )}
         >
-          <CheckSquare size={19} />
-          <span className="text-[9.5px]">Habits</span>
+          <CheckSquare size={18} />
+          <span className="text-[9px]">Habits</span>
         </button>
 
         {/* 2. Challenges */}
@@ -58,25 +58,40 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             activeTab === 'challenges' ? 'text-rose-600 font-bold' : 'text-stone hover:text-ink font-medium'
           )}
         >
-          <Flame size={19} className={activeTab === 'challenges' ? 'fill-rose-600/20' : ''} />
-          <span className="text-[9.5px]">Challenges</span>
+          <Flame size={18} className={activeTab === 'challenges' ? 'fill-rose-600/20' : ''} />
+          <span className="text-[9px]">Challenges</span>
         </button>
 
-        {/* 3. CENTER RAISED ACTION BUTTON */}
+        {/* 3. Just Tracking (Directly after Challenges) */}
+        <button
+          type="button"
+          aria-label="Just Tracking View"
+          aria-current={activeTab === 'tracking' ? 'page' : undefined}
+          onClick={() => onSelectTab('tracking')}
+          className={clsx(
+            'flex flex-col items-center justify-center min-h-[44px] gap-0.5 py-1 rounded-xl transition-colors',
+            activeTab === 'tracking' ? 'text-amber-500 font-bold' : 'text-stone hover:text-ink font-medium'
+          )}
+        >
+          <Sparkles size={18} className={activeTab === 'tracking' ? 'fill-amber-500/20' : ''} />
+          <span className="text-[9px]">Tracking</span>
+        </button>
+
+        {/* 4. CENTER RAISED ACTION BUTTON */}
         <div className="flex flex-col items-center justify-center min-h-[44px]">
           <button
             type="button"
             aria-label="Add Habit"
             onClick={onOpenCreateHabit}
-            className="w-11 h-11 -mt-4 rounded-full bg-primary text-white flex items-center justify-center shadow-xl ring-4 ring-canvas active:scale-90 transition-transform hover:bg-primary-deep"
+            className="w-10 h-10 -mt-3.5 rounded-full bg-primary text-white flex items-center justify-center shadow-xl ring-4 ring-canvas active:scale-90 transition-transform hover:bg-primary-deep"
             title="Add Habit"
           >
-            <Plus size={22} strokeWidth={2.5} />
+            <Plus size={20} strokeWidth={2.5} />
           </button>
-          <span className="text-[9.5px] font-bold text-primary mt-0.5">Add</span>
+          <span className="text-[9px] font-bold text-primary mt-0.5">Add</span>
         </div>
 
-        {/* 4. Quit Break */}
+        {/* 5. Quit Break */}
         <button
           type="button"
           aria-label="Timer Habit Break Hub"
@@ -87,11 +102,11 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             activeTab === 'breaks' ? 'text-primary font-bold' : 'text-stone hover:text-ink font-medium'
           )}
         >
-          <ShieldAlert size={19} />
-          <span className="text-[9.5px]">Quit Break</span>
+          <ShieldAlert size={18} />
+          <span className="text-[9px]">Quit Break</span>
         </button>
 
-        {/* 5. Analytics */}
+        {/* 6. Analytics */}
         <button
           type="button"
           aria-label="Analytics View"
@@ -102,19 +117,19 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             activeTab === 'analytics' ? 'text-primary font-bold' : 'text-stone hover:text-ink font-medium'
           )}
         >
-          <BarChart2 size={19} />
-          <span className="text-[9.5px]">Analytics</span>
+          <BarChart2 size={18} />
+          <span className="text-[9px]">Analytics</span>
         </button>
 
-        {/* 6. Profile & Willpower */}
+        {/* 7. Profile & Willpower */}
         <button
           type="button"
           aria-label="User Profile"
           onClick={handleOpenProfile}
           className="flex flex-col items-center justify-center min-h-[44px] gap-0.5 py-1 rounded-xl transition-colors text-stone hover:text-ink font-medium"
         >
-          <User size={19} />
-          <span className="text-[9.5px]">Profile</span>
+          <User size={18} />
+          <span className="text-[9px]">Profile</span>
         </button>
       </nav>
 

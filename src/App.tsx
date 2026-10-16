@@ -32,7 +32,7 @@ import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { Button } from './components/ui/Button';
 import { AlertCircle, RefreshCw, WifiOff } from 'lucide-react';
 
-type AppTab = 'habits' | 'challenges' | 'breaks' | 'analytics';
+type AppTab = 'habits' | 'challenges' | 'tracking' | 'breaks' | 'analytics';
 
 export const App: React.FC = () => {
   const {
@@ -52,6 +52,8 @@ export const App: React.FC = () => {
     setHabitBreaks,
     setChallenges,
     resetStore,
+    checkAndEnforceMidnightRollover,
+    selectedDate,
   } = useAppStore();
 
   const [activeTab, setActiveTab] = useState<AppTab>('habits');
@@ -81,10 +83,13 @@ export const App: React.FC = () => {
     if (current.tab === nextTab && (nextTab !== 'habits' || current.category === 'all')) {
       return;
     }
-    const nextCategory = nextTab === 'habits' ? 'all' : current.category;
+    const nextCategory =
+      nextTab === 'habits' ? 'all' : nextTab === 'tracking' ? 'cat-just-tracking' : current.category;
     setActiveTab(nextTab);
     if (nextTab === 'habits') {
       setSelectedCategory('all');
+    } else if (nextTab === 'tracking') {
+      setSelectedCategory('cat-just-tracking');
     }
     if (typeof window !== 'undefined') {
       window.history.pushState(
@@ -309,6 +314,46 @@ export const App: React.FC = () => {
     setProfileStatus,
   ]);
 
+  // Midnight rollover enforcement effect: checks past unlogged days and enforces -1 Heart per 350 XP lost
+  useEffect(() => {
+    if (!currentUser) return;
+
+    // Run check on load / authentication
+    checkAndEnforceMidnightRollover();
+
+    // Schedule check at 12:00:02 AM every midnight
+    let timerId: NodeJS.Timeout;
+    const scheduleMidnightRollover = () => {
+      const now = new Date();
+      const tomorrowMidnight = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() + 1,
+        0,
+        0,
+        2
+      );
+      const msUntilMidnight = Math.max(1000, tomorrowMidnight.getTime() - now.getTime());
+      timerId = setTimeout(() => {
+        checkAndEnforceMidnightRollover();
+        scheduleMidnightRollover();
+      }, msUntilMidnight);
+    };
+    scheduleMidnightRollover();
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        checkAndEnforceMidnightRollover();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearTimeout(timerId);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [currentUser, checkAndEnforceMidnightRollover]);
+
   // Loading Splash Screen with 8s Timeout & Offline Fallback
   if (authLoading || (currentUser && profileLoading)) {
     return (
@@ -319,7 +364,7 @@ export const App: React.FC = () => {
           className="w-16 h-16 rounded-2xl object-contain shadow-lg animate-pulse mb-3"
         />
         <p className="font-display font-bold text-xl text-ink">HabitsSeen</p>
-        <span className="text-xs text-charcoal mt-1">Connecting to Cloud Firestore...</span>
+        <span className="text-xs text-charcoal mt-1">Connecting...</span>
 
         {(splashTimedOut || syncError) && (
           <div className="mt-6 max-w-sm w-full bg-surface-card border border-amber-200/80 p-4 rounded-2xl shadow-sm text-left animate-in fade-in duration-300">
@@ -408,14 +453,19 @@ export const App: React.FC = () => {
         )}
 
         <ErrorBoundary fallbackTitle="An error occurred rendering this section">
-          {activeTab === 'habits' && (
+          {(activeTab === 'habits' || activeTab === 'tracking') && (
             <HabitsView
-              selectedCategory={selectedCategory}
-              onSelectCategory={handleSelectCategory}
+              selectedCategory={activeTab === 'tracking' ? 'cat-just-tracking' : selectedCategory}
+              onSelectCategory={(cat) => {
+                if (activeTab === 'tracking') {
+                  setActiveTab('habits');
+                }
+                handleSelectCategory(cat);
+              }}
               onOpenChallengesTab={() => handleSelectTab('challenges')}
               onOpenCreateHabit={() => {
                 setEditingHabit(null);
-                setCreateHabitInitialFrequency(undefined);
+                setCreateHabitInitialFrequency(activeTab === 'tracking' ? 'JUST_TRACKING' : undefined);
                 setIsCreateHabitOpen(true);
               }}
               onOpenCreateHabitWithFrequency={(freq) => {
@@ -488,6 +538,7 @@ export const App: React.FC = () => {
         isOpen={isCreateHabitOpen}
         habitToEdit={editingHabit}
         initialFrequencyType={createHabitInitialFrequency}
+        initialDate={selectedDate}
         onClose={() => {
           setIsCreateHabitOpen(false);
           setEditingHabit(null);

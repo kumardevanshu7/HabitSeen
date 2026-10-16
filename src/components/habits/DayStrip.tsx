@@ -138,12 +138,12 @@ export const DayStrip: React.FC = () => {
           <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
             <Calendar size={17} className="shrink-0" />
           </div>
-          <div className="flex items-center gap-2">
-            <h2 className="font-display font-bold text-lg sm:text-xl text-ink tracking-tight group-hover:text-primary transition-colors">
+          <div className="flex items-center gap-1.5">
+            <h2 className="font-display font-bold text-sm sm:text-lg text-ink tracking-tight group-hover:text-primary transition-colors">
               {monthYearLabel}
             </h2>
-            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-primary bg-primary/10 hover:bg-primary/20 px-2.5 py-0.5 rounded-full border border-primary/20 transition-colors">
-              <Eye size={12} /> View Month
+            <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold text-primary bg-primary/10 hover:bg-primary/20 px-2 py-0.5 rounded-full border border-primary/20 transition-colors">
+              <Eye size={11} /> Month
             </span>
           </div>
         </button>

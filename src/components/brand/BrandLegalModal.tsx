@@ -307,10 +307,17 @@ export const BrandLegalModal: React.FC<BrandLegalModalProps> = ({
               <div>
                 <h4 className="font-bold text-ink text-sm mb-1">9. Contact</h4>
                 <p>
-                  Direct privacy inquiries to Kumar Devanshu at{' '}
-                  <span className="font-mono text-primary font-bold">
-                    {founderEmail}
-                  </span>
+                  Direct privacy inquiries to Kumar Devanshu
+                  {founderEmail ? (
+                    <>
+                      {' '}at{' '}
+                      <span className="font-mono text-primary font-bold">
+                        {founderEmail}
+                      </span>
+                    </>
+                  ) : (
+                    ' through official Arigato Labs channels'
+                  )}
                   .
                 </p>
               </div>
@@ -404,10 +411,17 @@ export const BrandLegalModal: React.FC<BrandLegalModalProps> = ({
               <div>
                 <h4 className="font-bold text-ink text-sm mb-1">10. Contact</h4>
                 <p>
-                  For legal notices or questions, contact{' '}
-                  <span className="font-mono text-primary font-bold">
-                    {founderEmail}
-                  </span>
+                  For legal notices or questions, contact
+                  {founderEmail ? (
+                    <>
+                      {' '}
+                      <span className="font-mono text-primary font-bold">
+                        {founderEmail}
+                      </span>
+                    </>
+                  ) : (
+                    ' through official Arigato Labs channels'
+                  )}
                   .
                 </p>
               </div>

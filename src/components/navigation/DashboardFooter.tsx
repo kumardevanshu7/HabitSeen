@@ -138,14 +138,9 @@ export const DashboardFooter: React.FC<DashboardFooterProps> = ({
             <button
               type="button"
               onClick={() => onOpenBrandLegal('explore')}
-              className="flex items-center gap-1.5 hover:text-primary transition-colors"
+              className="hover:text-primary transition-colors"
             >
-              <img
-                src="/arigato-single-logo.png"
-                alt="Arigato Labs"
-                className="w-3.5 h-3.5 object-contain"
-              />
-              <span>Explore Arigato Labs</span>
+              Overview
             </button>
             <button
               type="button"
@@ -185,13 +180,18 @@ export const DashboardFooter: React.FC<DashboardFooterProps> = ({
             developed by <strong>{APP_CONFIG.founderName}</strong> in {APP_CONFIG.copyrightYear}.
           </p>
           <p className="text-[11px]">
-            Copyright © {APP_CONFIG.copyrightYear} {APP_CONFIG.companyName}. All Rights Reserved. Contact:{' '}
-            <a
-              href={`mailto:${APP_CONFIG.supportEmail}`}
-              className="font-mono text-charcoal hover:text-primary transition-colors"
-            >
-              {APP_CONFIG.supportEmail}
-            </a>
+            Copyright © {APP_CONFIG.copyrightYear} {APP_CONFIG.companyName}. All Rights Reserved.
+            {APP_CONFIG.supportEmail && (
+              <>
+                {' '}Contact:{' '}
+                <a
+                  href={`mailto:${APP_CONFIG.supportEmail}`}
+                  className="font-mono text-charcoal hover:text-primary transition-colors"
+                >
+                  {APP_CONFIG.supportEmail}
+                </a>
+              </>
+            )}
           </p>
         </div>
       </div>

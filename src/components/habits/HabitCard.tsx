@@ -8,6 +8,7 @@ import {
   parseHMSToSeconds,
   isDateInThisWeek,
   isDateInThisMonth,
+  getTodayKey,
 } from '../../utils/dateMath';
 import {
   Check,
@@ -86,6 +87,22 @@ export const HabitCard: React.FC<HabitCardProps> = ({
   const isExcused = dayLog?.status === 'EXCUSED';
   const isMissed = dayLog?.status === 'MISSED' || dayLog?.status === 'FAILED';
 
+  const todayKey = getTodayKey();
+  const isPastDate = dateKey < todayKey;
+  const isFutureDate = dateKey > todayKey;
+  const isDateLocked = isPastDate || isFutureDate;
+
+  const [lockedNotice, setLockedNotice] = useState<string | null>(null);
+
+  const showLockedNotice = () => {
+    setLockedNotice(
+      isPastDate
+        ? `🔒 Past date (${dateKey}) is locked. Only today's tasks can be logged!`
+        : `🔒 Future date (${dateKey}) cannot be marked in advance.`
+    );
+    setTimeout(() => setLockedNotice(null), 3500);
+  };
+
   const streakInfo = computeHabitStreaks(habit, logs);
   const currentStreak = streakInfo.currentStreak;
   const flameTier = getFlameTier(currentStreak);
@@ -144,6 +161,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
 
   // YES / NO TOGGLE
   const handleToggleYesNo = () => {
+    if (isDateLocked) {
+      showLockedNotice();
+      return;
+    }
     if (isCompleted) {
       if (isJustTracking) {
         // Locked permanently once completed for this day! Cannot uncheck.
@@ -158,6 +179,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
 
   // NUMERIC HANDLERS: User can adjust counts freely with stepper buttons, then tap checkmark to lock!
   const adjustNumeric = (delta: number) => {
+    if (isDateLocked) {
+      showLockedNotice();
+      return;
+    }
     const nextVal = Math.max(0, currentNum + delta);
     setCurrentNum(nextVal);
     const goal = habit.config.numeric?.goal || 1;
@@ -170,6 +195,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
 
   // NUMERIC TOGGLE / LOCK HANDLER (tap checkmark to lock with entered value or goal)
   const handleToggleNumericComplete = () => {
+    if (isDateLocked) {
+      showLockedNotice();
+      return;
+    }
     if (isCompleted) {
       if (isJustTracking) return; // Just Tracking habits lock permanently once marked done
       handleUnlock();
@@ -187,6 +216,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
 
   // MANUAL TIMER LOGGING (User writes their time, no auto-start stopwatch)
   const handleSaveTimer = (overrideSeconds?: number, markComplete: boolean = true) => {
+    if (isDateLocked) {
+      showLockedNotice();
+      return;
+    }
     let totalSecs =
       overrideSeconds !== undefined
         ? overrideSeconds
@@ -215,6 +248,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
   };
 
   const handleMatchTargetTimer = () => {
+    if (isDateLocked) {
+      showLockedNotice();
+      return;
+    }
     const hms = formatSecondsToHMS(targetSeconds);
     setInputHours(String(hms.hours).padStart(2, '0'));
     setInputMinutes(String(hms.minutes).padStart(2, '0'));
@@ -223,6 +260,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
 
   // CHECKLIST HANDLERS
   const toggleChecklistItem = (itemId: string) => {
+    if (isDateLocked) {
+      showLockedNotice();
+      return;
+    }
     const exists = completedItems.includes(itemId);
     const updated = exists
       ? completedItems.filter((id) => id !== itemId)
@@ -233,6 +274,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
   };
 
   const handleToggleChecklistComplete = () => {
+    if (isDateLocked) {
+      showLockedNotice();
+      return;
+    }
     if (isCompleted) {
       logHabit(habit.id, dateKey, {
         valueChecklistCompletedItemIds: completedItems,
@@ -249,6 +294,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
 
   // UNLOCK ACTION
   const handleUnlock = () => {
+    if (isDateLocked) {
+      showLockedNotice();
+      return;
+    }
     if (isExcused || isMissed) {
       logHabit(habit.id, dateKey, { valueYesNo: false, valueNumeric: 0, valueTimerSeconds: 0 });
       return;
@@ -420,6 +469,11 @@ export const HabitCard: React.FC<HabitCardProps> = ({
       }}
     >
       <div className="p-3 sm:p-3.5 flex items-center justify-between gap-2 sm:gap-3.5">
+        {lockedNotice && (
+          <div className="absolute top-1 left-1/2 -translate-x-1/2 z-30 bg-ink/95 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-lg border border-white/20 whitespace-nowrap animate-in fade-in duration-200 pointer-events-none">
+            {lockedNotice}
+          </div>
+        )}
         {/* LEFT: Category Icon + Habit Title & Meta */}
         <div
           onClick={(e) => {
@@ -442,7 +496,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
             <h4
               className={clsx(
                 'font-display font-bold text-sm sm:text-base text-ink tracking-tight truncate hover:text-primary transition-colors',
-                isCompleted && habit.type === 'YES_NO' && 'line-through text-charcoal'
+                isCompleted && 'line-through text-charcoal opacity-75'
               )}
             >
               {habit.name}
@@ -534,84 +588,87 @@ export const HabitCard: React.FC<HabitCardProps> = ({
 
           {/* NUMERIC */}
           {habit.type === 'NUMERIC' && (
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <div className="font-mono text-xs font-bold text-ink whitespace-nowrap">
-                <span
-                  className={clsx(
-                    'text-sm font-black',
-                    isCompleted ? 'text-badge-success' : 'text-primary'
-                  )}
-                >
-                  {currentNum}
-                </span>
-                <span className="text-charcoal font-medium">/{habit.config.numeric?.goal}</span>
-              </div>
-              {!isExcused && !isMissed && (
-                <div className="flex items-center gap-1">
-                  {!isCompleted && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          adjustNumeric(-1);
-                        }}
-                        className="w-7 h-7 rounded-full bg-surface-bone hover:bg-stone/20 flex items-center justify-center text-ink border border-hairline transition-all active:scale-90 cursor-pointer"
-                        title="Decrease count"
-                      >
-                        <Minus size={12} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          adjustNumeric(1);
-                        }}
-                        className="w-7 h-7 rounded-full bg-surface-bone hover:bg-stone/20 flex items-center justify-center text-ink border border-hairline transition-all active:scale-90 cursor-pointer"
-                        title="Increase count"
-                      >
-                        <Plus size={12} />
-                      </button>
-                    </>
-                  )}
-                  {/* RED CIRCLE -> GREEN TICK TOGGLE */}
+            <div className="flex items-center gap-1.5">
+              {!isExcused && !isMissed && !isCompleted ? (
+                /* Compact integrated stepper pill for mobile & desktop */
+                <div className="inline-flex items-center bg-surface-bone rounded-full border border-hairline p-0.5 shadow-2xs shrink-0">
                   <button
                     type="button"
-                    disabled={isJustTracking && isCompleted}
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleToggleNumericComplete();
+                      adjustNumeric(-1);
                     }}
-                    className={clsx(
-                      'w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0',
-                      isCompleted
-                        ? clsx(
-                            'bg-badge-success border-2 border-badge-success text-white',
-                            isJustTracking
-                              ? 'cursor-default ring-2 ring-badge-success/30'
-                              : 'active:scale-90 cursor-pointer'
-                          )
-                        : 'border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500 active:scale-90 cursor-pointer'
-                    )}
-                    title={
-                      isCompleted
-                        ? isJustTracking
-                          ? 'Completed & Locked'
-                          : 'Completed! Click to unlock'
-                        : 'Tap to mark complete & lock'
-                    }
+                    className="w-6 h-6 rounded-full hover:bg-stone/20 flex items-center justify-center text-charcoal hover:text-ink transition-all active:scale-90 cursor-pointer"
+                    title="Decrease count"
                   >
-                    <Check
-                      size={16}
-                      className={clsx(isCompleted ? 'stroke-[3]' : 'stroke-[2.5]')}
-                    />
+                    <Minus size={11} />
                   </button>
-                  {isJustTracking && isCompleted && (
-                    <span className="hidden xs:inline-flex items-center gap-0.5 text-[10px] font-bold text-badge-success bg-badge-success/10 px-1.5 py-0.5 rounded-full border border-badge-success/20">
-                      <Lock size={9} /> Locked
-                    </span>
-                  )}
+                  <div className="font-mono text-xs font-bold text-ink px-1.5 whitespace-nowrap min-w-[34px] text-center">
+                    <span className="text-primary font-black">{currentNum}</span>
+                    <span className="text-charcoal font-medium text-[10px]">/{habit.config.numeric?.goal}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      adjustNumeric(1);
+                    }}
+                    className="w-6 h-6 rounded-full hover:bg-stone/20 flex items-center justify-center text-charcoal hover:text-ink transition-all active:scale-90 cursor-pointer"
+                    title="Increase count"
+                  >
+                    <Plus size={11} />
+                  </button>
                 </div>
+              ) : (
+                <div className="font-mono text-xs font-bold text-ink whitespace-nowrap px-1">
+                  <span
+                    className={clsx(
+                      'text-xs sm:text-sm font-black',
+                      isCompleted ? 'text-badge-success' : 'text-primary'
+                    )}
+                  >
+                    {currentNum}
+                  </span>
+                  <span className="text-charcoal font-medium text-[10px]">/{habit.config.numeric?.goal}</span>
+                </div>
+              )}
+
+              {/* RED CIRCLE -> GREEN TICK TOGGLE */}
+              <button
+                type="button"
+                disabled={isJustTracking && isCompleted}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleToggleNumericComplete();
+                }}
+                className={clsx(
+                  'w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0',
+                  isCompleted
+                    ? clsx(
+                        'bg-badge-success border-2 border-badge-success text-white',
+                        isJustTracking
+                          ? 'cursor-default ring-2 ring-badge-success/30'
+                          : 'active:scale-90 cursor-pointer'
+                      )
+                    : 'border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500 active:scale-90 cursor-pointer'
+                )}
+                title={
+                  isCompleted
+                    ? isJustTracking
+                      ? 'Completed & Locked'
+                      : 'Completed! Click to unlock'
+                    : 'Tap to mark complete & lock'
+                }
+              >
+                <Check
+                  size={16}
+                  className={clsx(isCompleted ? 'stroke-[3]' : 'stroke-[2.5]')}
+                />
+              </button>
+              {isJustTracking && isCompleted && (
+                <span className="hidden xs:inline-flex items-center gap-0.5 text-[10px] font-bold text-badge-success bg-badge-success/10 px-1.5 py-0.5 rounded-full border border-badge-success/20">
+                  <Lock size={9} /> Locked
+                </span>
               )}
             </div>
           )}
@@ -702,7 +759,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                 e.stopPropagation();
                 setIsMissedModalOpen(true);
               }}
-              className="p-1.5 text-charcoal hover:text-red-600 bg-surface-bone hover:bg-red-50 border border-hairline rounded-full flex items-center justify-center transition-colors shrink-0 cursor-pointer"
+              className="hidden sm:inline-flex p-1.5 text-charcoal hover:text-red-600 bg-surface-bone hover:bg-red-50 border border-hairline rounded-full items-center justify-center transition-colors shrink-0 cursor-pointer"
               title="Log missed habit with reason"
             >
               <ShieldAlert size={13} />
@@ -813,6 +870,11 @@ export const HabitCard: React.FC<HabitCardProps> = ({
       }}
     >
       <div className="p-3.5 sm:p-4">
+        {lockedNotice && (
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 bg-ink/95 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-lg border border-white/20 whitespace-nowrap animate-in fade-in duration-200 pointer-events-none">
+            {lockedNotice}
+          </div>
+        )}
         {/* TOP ROW: CATEGORY + PRIORITY + STATUS BADGE + DETAILS BUTTON (OPTIMIZED NO-WRAP) */}
         <div className="flex items-center justify-between gap-1.5 mb-2.5">
           <div
@@ -845,6 +907,15 @@ export const HabitCard: React.FC<HabitCardProps> = ({
           </div>
 
           <div className="flex items-center gap-1 shrink-0 ml-auto">
+            {isPastDate && (
+              <span
+                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-surface-bone text-stone text-[9px] font-bold border border-hairline whitespace-nowrap shrink-0"
+                title="Past dates are locked and cannot be edited"
+              >
+                <Lock size={9} />
+                <span>Locked</span>
+              </span>
+            )}
             {isCompleted && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200 whitespace-nowrap shrink-0 shadow-2xs">
                 <Check size={11} className="stroke-[3]" />
@@ -930,7 +1001,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
           <h3
             className={clsx(
               'font-display font-bold text-lg sm:text-xl text-ink tracking-tight group-hover/title:text-primary transition-colors',
-              isCompleted && habit.type === 'YES_NO' && 'line-through text-charcoal'
+              isCompleted && 'line-through text-charcoal opacity-75'
             )}
           >
             {habit.name}
@@ -1487,6 +1558,29 @@ export const HabitCard: React.FC<HabitCardProps> = ({
           <p className="text-xs text-charcoal">
             Choose an action for this habit:
           </p>
+
+          {!isCompleted && !isJustTracking && (
+            <button
+              type="button"
+              onClick={() => {
+                setIsOptionsMenuOpen(false);
+                setIsMissedModalOpen(true);
+              }}
+              className="w-full flex items-center gap-3 p-3 rounded-2xl bg-surface-bone hover:bg-red-50 text-ink text-left transition-colors font-medium border border-hairline group cursor-pointer"
+            >
+              <div className="w-9 h-9 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                <ShieldAlert size={18} />
+              </div>
+              <div>
+                <span className="font-bold text-sm block text-red-700 group-hover:text-red-800 transition-colors">
+                  Log Missed Day / Excuse
+                </span>
+                <span className="text-xs text-charcoal">
+                  Mark this habit as missed with reason or apply freeze
+                </span>
+              </div>
+            </button>
+          )}
 
           <button
             type="button"

@@ -165,6 +165,7 @@ export interface Challenge {
   totalHeartsLost: number;
   totalHeartsGained: number;
   completedAt?: string;
+  isArchived?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -190,6 +191,7 @@ export interface UserProfile {
     consistencyScore: number; // 0 - 100%
     hearts: number;           // Default 5 ❤️
     maxHearts: number;        // Default 5
+    xpLossTowardsHeart?: number; // Accumulated XP penalty towards next heart deduction (0 - 349)
     perfectDaysCompleted?: string[]; // Dates (YYYY-MM-DD) where 100% perfect day bonus was awarded
     lastDeathAt?: string;     // ISO timestamp of last zero-vitality death / soft reset
   };

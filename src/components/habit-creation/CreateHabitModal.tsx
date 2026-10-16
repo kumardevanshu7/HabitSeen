@@ -38,6 +38,7 @@ import {
   ArrowRight,
   ArrowLeft,
   Sparkles,
+  Info,
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -46,6 +47,7 @@ interface CreateHabitModalProps {
   onClose: () => void;
   habitToEdit?: Habit | null;
   initialFrequencyType?: FrequencyType;
+  initialDate?: string;
 }
 
 export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
@@ -53,8 +55,17 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
   onClose,
   habitToEdit,
   initialFrequencyType,
+  initialDate,
 }) => {
-  const { categories, addHabit, updateHabit, habits, challenges } = useAppStore();
+  const {
+    categories,
+    addHabit,
+    updateHabit,
+    logHabit,
+    habits,
+    challenges,
+    selectedDate,
+  } = useAppStore();
 
   // Wizard Step: 1 = Category, 2 = Habit & Target, 3 = Schedule & Priority
   const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1);
@@ -104,8 +115,9 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
   const [intervalDays, setIntervalDays] = useState<number>(2);
 
   // Schedule & Continuous Priority Number (0 to 100)
-  const [startDate, setStartDate] = useState<string>(getTodayKey());
+  const [startDate, setStartDate] = useState<string>(initialDate || selectedDate || getTodayKey());
   const [endDate, setEndDate] = useState<string>('');
+  const [markInitialDateCompleted, setMarkInitialDateCompleted] = useState<boolean>(false);
   const [priority, setPriority] = useState<number>(50); // Default 50 out of 100
 
   // Error validation & loading
@@ -204,14 +216,16 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
       setPeriodCount(3);
       setPeriodType('WEEK');
       setIntervalDays(2);
-      setStartDate(getTodayKey());
+      const initialStartDate = initialDate || selectedDate || getTodayKey();
+      setStartDate(initialStartDate);
       setEndDate('');
+      setMarkInitialDateCompleted(false);
       setNewItemText('');
       setPriority(50);
       setNameError('');
       setWizardStep(1); // Start at category when creating new habit
     }
-  }, [habitToEdit, isOpen, categories, initialFrequencyType]);
+  }, [habitToEdit, isOpen, categories, initialFrequencyType, initialDate, selectedDate]);
 
   // Checklist Helpers
   const addChecklistItem = () => {
@@ -393,7 +407,7 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
           schedule,
         });
       } else {
-        await addHabit({
+        const createdHabit = await addHabit({
           name: name.trim(),
           description: description.trim(),
           categoryId: selectedCategoryId,
@@ -402,6 +416,23 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
           frequency,
           schedule,
         });
+
+        if (markInitialDateCompleted && createdHabit?.id) {
+          const targetDateKey = startDate || selectedDate || getTodayKey();
+          await logHabit(createdHabit.id, targetDateKey, {
+            valueYesNo: true,
+            valueNumeric: type === 'NUMERIC' ? (Number(numericGoal) || 1) : undefined,
+            valueTimerSeconds:
+              type === 'TIMER'
+                ? parseHMSToSeconds(
+                    Number(timerHours) || 0,
+                    Number(timerMinutes) || 0,
+                    Number(timerSecs) || 0
+                  ) || 60
+                : undefined,
+            forceStatus: 'COMPLETED',
+          });
+        }
       }
 
       onClose();
@@ -1218,20 +1249,43 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <Input
-                      label={frequencyType === 'JUST_TRACKING' ? 'Start Date (Optional)' : 'Start Date'}
+                      label={frequencyType === 'JUST_TRACKING' ? 'Start Date (Optional / Past Date Allowed)' : 'Start Date'}
                       type="date"
                       value={startDate}
                       onChange={(e) => setStartDate(e.target.value)}
                       required={frequencyType !== 'JUST_TRACKING'}
                     />
-                    {frequencyType === 'JUST_TRACKING' && startDate && (
-                      <button
-                        type="button"
-                        onClick={() => setStartDate('')}
-                        className="text-[11px] text-primary hover:underline mt-1 block"
-                      >
-                        Clear start date (track anytime without start date)
-                      </button>
+                    {startDate && startDate < getTodayKey() && (
+                      <div className="mt-1.5 p-2 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-800 flex items-start gap-1.5">
+                        <Info size={13} className="shrink-0 mt-0.5 text-amber-600" />
+                        <span>
+                          <strong>Initial Past Date Allowed:</strong> You can set an earlier date when first creating this task. Once created, previous dates are locked from retroactive modification.
+                        </span>
+                      </div>
+                    )}
+                    {frequencyType === 'JUST_TRACKING' && (
+                      <div className="mt-2 space-y-1">
+                        <label className="flex items-center gap-2 text-xs text-ink cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={markInitialDateCompleted}
+                            onChange={(e) => setMarkInitialDateCompleted(e.target.checked)}
+                            className="rounded border-hairline text-primary focus:ring-primary w-4 h-4 cursor-pointer"
+                          />
+                          <span className="font-medium">
+                            Mark as done on initial date ({startDate || 'today'})
+                          </span>
+                        </label>
+                        {startDate && (
+                          <button
+                            type="button"
+                            onClick={() => setStartDate('')}
+                            className="text-[11px] text-primary hover:underline block pt-0.5"
+                          >
+                            Clear start date (track anytime without start date)
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
 

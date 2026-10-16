@@ -45,6 +45,27 @@ export const MISS_PENALTIES = {
   },
 } as const;
 
+export const XP_LOSS_PER_HEART = 350;
+export const MIDNIGHT_MISSED_HABIT_XP_PENALTY = 50;
+
+/**
+ * Calculates heart deductions based on accumulated XP losses:
+ * Every 350 XP lost deducts exactly 1 heart (-1 Heart per 350 XP down).
+ * Any remainder (0 - 349) is carried forward.
+ */
+export function calculateHeartLossFromXpDrop(
+  xpDropAmount: number,
+  existingLossAccumulator: number = 0
+): { heartsToDeduct: number; newLossAccumulator: number } {
+  if (xpDropAmount <= 0) {
+    return { heartsToDeduct: 0, newLossAccumulator: existingLossAccumulator };
+  }
+  const totalLoss = existingLossAccumulator + xpDropAmount;
+  const heartsToDeduct = Math.floor(totalLoss / XP_LOSS_PER_HEART);
+  const newLossAccumulator = totalLoss % XP_LOSS_PER_HEART;
+  return { heartsToDeduct, newLossAccumulator };
+}
+
 export const FLAME_TIERS = [
   { minStreak: 365, title: 'Legendary Flame', color: '#ea2804', text: 'text-red-500', glow: 'shadow-red-500/50' },
   { minStreak: 100, title: 'Golden Flame', color: '#eab308', text: 'text-amber-500', glow: 'shadow-amber-500/50' },

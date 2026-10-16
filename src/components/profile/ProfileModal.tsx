@@ -259,19 +259,33 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 />
               </div>
 
-              {/* Heart Icons (Supports up to 50 lives cleanly) */}
-              <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto no-scrollbar py-0.5">
-                {Array.from({ length: maxHearts }).map((_, i) => (
-                  <Heart
-                    key={i}
-                    size={13}
-                    className={
-                      i < hearts
-                        ? 'text-red-500 fill-red-500'
-                        : 'text-stone/30 fill-stone/10'
-                    }
-                  />
-                ))}
+              {/* Scaled Vitality Hearts (5-heart clean meter, never congested) */}
+              <div className="flex items-center justify-between px-2.5 py-1.5 bg-red-50/70 rounded-xl border border-red-100">
+                <div className="flex items-center gap-1.5">
+                  {[0, 1, 2, 3, 4].map((step) => {
+                    const threshold = (step + 1) / 5;
+                    const prevThreshold = step / 5;
+                    const ratio = hearts / Math.max(1, maxHearts);
+                    const isFull = ratio >= threshold;
+                    const isPartial = ratio > prevThreshold && ratio < threshold;
+                    return (
+                      <Heart
+                        key={step}
+                        size={17}
+                        className={`transition-all duration-300 ${
+                          isFull
+                            ? 'text-red-500 fill-red-500 drop-shadow-xs'
+                            : isPartial
+                            ? 'text-red-400 fill-red-200'
+                            : 'text-stone/30 fill-stone/10'
+                        }`}
+                      />
+                    );
+                  })}
+                </div>
+                <span className="text-[11px] font-bold text-red-700 font-mono tracking-tight">
+                  {hearts} / {maxHearts} Lives
+                </span>
               </div>
 
               {/* Next Milestone info */}
