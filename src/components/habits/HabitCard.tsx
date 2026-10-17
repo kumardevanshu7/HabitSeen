@@ -575,235 +575,278 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                   </>
                 )
               )}
+              {/* MOBILE ONLY: Timer progress badge so it doesn't crowd the right action cluster on phones */}
+              {habit.type === 'TIMER' && !isMissed && !isExcused && (
+                <>
+                  <span className="sm:hidden">•</span>
+                  <span
+                    className={clsx(
+                      'sm:hidden inline-flex items-center gap-1 font-mono font-bold text-[10px] px-1.5 py-0.5 rounded-full border shrink-0',
+                      isCompleted
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-surface-bone text-charcoal border-hairline'
+                    )}
+                    title={`${formattedLoggedHMS} / ${formattedTargetHMS}`}
+                  >
+                    <Clock size={9} />
+                    {compactLoggedTime}/{compactTargetTime}
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </div>
 
         {/* RIGHT: Actions + Controls */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {/* YES_NO */}
-          {habit.type === 'YES_NO' && (
+          {isExcused ? (
+            /* EXCUSED STATUS BADGE ONLY (No check button) */
             <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                type="button"
-                disabled={isCompleted}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleToggleYesNo();
-                }}
-                className={clsx(
-                  'w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0',
-                  isCompleted
-                    ? 'bg-badge-success border-2 border-badge-success text-white cursor-default ring-2 ring-badge-success/30'
-                    : 'border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500 active:scale-90 cursor-pointer'
-                )}
-                title={
-                  isCompleted
-                    ? 'Completed & Locked: Tasks cannot be unchecked once marked done'
-                    : 'Tap to mark done'
-                }
-              >
-                <Check size={18} className="stroke-[3]" />
-              </button>
-              {isCompleted && (
-                <span className="hidden xs:inline-flex items-center gap-0.5 text-[10px] font-bold text-badge-success bg-badge-success/10 px-1.5 py-0.5 rounded-full border border-badge-success/20">
-                  <Lock size={9} /> Locked
+              {habit.type === 'NUMERIC' && (
+                <span className="font-mono text-xs font-bold text-charcoal px-1">
+                  {currentNum}/{habit.config.numeric?.goal}
                 </span>
               )}
+              {habit.type === 'TIMER' && (
+                <span className="font-mono text-[10px] sm:text-xs font-bold text-charcoal px-1">
+                  {compactLoggedTime} / {compactTargetTime}
+                </span>
+              )}
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-100 text-blue-800 text-[10px] sm:text-xs font-bold whitespace-nowrap shrink-0 shadow-2xs">
+                <ShieldCheck size={12} className="text-blue-600 shrink-0" /> Excused
+              </span>
             </div>
-          )}
-
-          {/* NUMERIC */}
-          {habit.type === 'NUMERIC' && (
-            <div className="flex items-center gap-1.5">
-              {!isExcused && !isMissed && !isCompleted ? (
-                /* Compact integrated stepper pill for mobile & desktop */
-                <div className="inline-flex items-center bg-surface-bone rounded-full border border-hairline p-0.5 shadow-2xs shrink-0">
+          ) : isMissed ? (
+            /* MISSED STATUS BADGE ONLY (No check button) */
+            <div className="flex items-center gap-1.5 shrink-0">
+              {habit.type === 'NUMERIC' && (
+                <span className="font-mono text-xs font-bold text-charcoal px-1">
+                  {currentNum}/{habit.config.numeric?.goal}
+                </span>
+              )}
+              {habit.type === 'TIMER' && (
+                <span className="font-mono text-[10px] sm:text-xs font-bold text-charcoal px-1">
+                  {compactLoggedTime} / {compactTargetTime}
+                </span>
+              )}
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-100 text-red-800 text-[10px] sm:text-xs font-bold whitespace-nowrap shrink-0 shadow-2xs">
+                <AlertTriangle size={12} className="text-red-600 shrink-0" /> Missed
+              </span>
+            </div>
+          ) : (
+            /* ACTIVE / COMPLETED CONTROLS */
+            <>
+              {/* YES_NO */}
+              {habit.type === 'YES_NO' && (
+                <div className="flex items-center gap-1.5 shrink-0">
                   <button
                     type="button"
+                    disabled={isCompleted}
                     onClick={(e) => {
                       e.stopPropagation();
-                      adjustNumeric(-1);
+                      handleToggleYesNo();
                     }}
-                    className="w-6 h-6 rounded-full hover:bg-stone/20 flex items-center justify-center text-charcoal hover:text-ink transition-all active:scale-90 cursor-pointer"
-                    title="Decrease count"
+                    className={clsx(
+                      'w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0',
+                      isCompleted
+                        ? 'bg-badge-success border-2 border-badge-success text-white cursor-default ring-2 ring-badge-success/30'
+                        : 'border-2 border-stone-300 dark:border-stone-600 bg-surface-card hover:border-badge-success hover:bg-badge-success/10 text-transparent hover:text-badge-success active:scale-90 cursor-pointer'
+                    )}
+                    title={
+                      isCompleted
+                        ? 'Completed & Locked: Tasks cannot be unchecked once marked done'
+                        : 'Tap to mark done'
+                    }
                   >
-                    <Minus size={11} />
+                    <Check size={18} className={clsx(isCompleted ? 'stroke-[3]' : 'stroke-[2.5]')} />
                   </button>
-                  <div className="font-mono text-xs font-bold text-ink px-1.5 whitespace-nowrap min-w-[34px] text-center">
-                    <span className="text-primary font-black">{currentNum}</span>
-                    <span className="text-charcoal font-medium text-[10px]">/{habit.config.numeric?.goal}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      adjustNumeric(1);
-                    }}
-                    className="w-6 h-6 rounded-full hover:bg-stone/20 flex items-center justify-center text-charcoal hover:text-ink transition-all active:scale-90 cursor-pointer"
-                    title="Increase count"
-                  >
-                    <Plus size={11} />
-                  </button>
+                  {isCompleted && (
+                    <span className="hidden xs:inline-flex items-center gap-0.5 text-[10px] font-bold text-badge-success bg-badge-success/10 px-1.5 py-0.5 rounded-full border border-badge-success/20">
+                      <Lock size={9} /> Locked
+                    </span>
+                  )}
                 </div>
-              ) : (
-                <div className="font-mono text-xs font-bold text-ink whitespace-nowrap px-1">
+              )}
+
+              {/* NUMERIC */}
+              {habit.type === 'NUMERIC' && (
+                <div className="flex items-center gap-1.5">
+                  {!isCompleted ? (
+                    /* Compact integrated stepper pill */
+                    <div className="inline-flex items-center bg-surface-bone rounded-full border border-hairline p-0.5 shadow-2xs shrink-0">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          adjustNumeric(-1);
+                        }}
+                        className="w-6 h-6 rounded-full hover:bg-stone/20 flex items-center justify-center text-charcoal hover:text-ink transition-all active:scale-90 cursor-pointer"
+                        title="Decrease count"
+                      >
+                        <Minus size={11} />
+                      </button>
+                      <div className="font-mono text-xs font-bold text-ink px-1.5 whitespace-nowrap min-w-[34px] text-center">
+                        <span className="text-primary font-black">{currentNum}</span>
+                        <span className="text-charcoal font-medium text-[10px]">/{habit.config.numeric?.goal}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          adjustNumeric(1);
+                        }}
+                        className="w-6 h-6 rounded-full hover:bg-stone/20 flex items-center justify-center text-charcoal hover:text-ink transition-all active:scale-90 cursor-pointer"
+                        title="Increase count"
+                      >
+                        <Plus size={11} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="font-mono text-xs font-bold text-ink whitespace-nowrap px-1">
+                      <span className="text-xs sm:text-sm font-black text-badge-success">
+                        {currentNum}
+                      </span>
+                      <span className="text-charcoal font-medium text-[10px]">/{habit.config.numeric?.goal}</span>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    disabled={isCompleted}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleNumericComplete();
+                    }}
+                    className={clsx(
+                      'w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0',
+                      isCompleted
+                        ? 'bg-badge-success border-2 border-badge-success text-white cursor-default ring-2 ring-badge-success/30'
+                        : 'border-2 border-stone-300 dark:border-stone-600 bg-surface-card hover:border-badge-success hover:bg-badge-success/10 text-transparent hover:text-badge-success active:scale-90 cursor-pointer'
+                    )}
+                    title={
+                      isCompleted
+                        ? 'Completed & Locked: Tasks cannot be unchecked once marked done'
+                        : 'Tap to mark complete & lock'
+                    }
+                  >
+                    <Check
+                      size={16}
+                      className={clsx(isCompleted ? 'stroke-[3]' : 'stroke-[2.5]')}
+                    />
+                  </button>
+                  {isCompleted && (
+                    <span className="hidden xs:inline-flex items-center gap-0.5 text-[10px] font-bold text-badge-success bg-badge-success/10 px-1.5 py-0.5 rounded-full border border-badge-success/20">
+                      <Lock size={9} /> Locked
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* TIMER */}
+              {habit.type === 'TIMER' && (
+                <div className="flex items-center gap-1.5 sm:gap-2">
                   <span
                     className={clsx(
-                      'text-xs sm:text-sm font-black',
-                      isCompleted ? 'text-badge-success' : 'text-primary'
+                      'hidden sm:inline-flex font-mono text-[10px] sm:text-[11px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full border whitespace-nowrap shrink-0',
+                      isCompleted
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-surface-bone text-charcoal border-hairline'
                     )}
+                    title={`${formattedLoggedHMS} / ${formattedTargetHMS}`}
                   >
-                    {currentNum}
+                    {compactLoggedTime} / {compactTargetTime}
                   </span>
-                  <span className="text-charcoal font-medium text-[10px]">/{habit.config.numeric?.goal}</span>
+                  <button
+                    type="button"
+                    disabled={isCompleted}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!isCompleted) {
+                        handleSaveTimer(undefined, true);
+                      } else {
+                        showCompletedLockedNotice();
+                      }
+                    }}
+                    className={clsx(
+                      'w-8 h-8 rounded-full flex items-center justify-center transition-all shrink-0',
+                      isCompleted
+                        ? 'bg-badge-success border-2 border-badge-success text-white cursor-default ring-2 ring-badge-success/30'
+                        : 'border-2 border-stone-300 dark:border-stone-600 bg-surface-card hover:border-badge-success hover:bg-badge-success/10 text-transparent hover:text-badge-success active:scale-90 cursor-pointer'
+                    )}
+                    title={
+                      isCompleted
+                        ? 'Completed & Locked: Tasks cannot be unchecked once marked done'
+                        : 'Tap to mark complete'
+                    }
+                  >
+                    <Check size={16} className={clsx(isCompleted ? 'stroke-[3]' : 'stroke-[2.5]')} />
+                  </button>
+                  {isCompleted && (
+                    <span className="hidden xs:inline-flex items-center gap-0.5 text-[10px] font-bold text-badge-success bg-badge-success/10 px-1.5 py-0.5 rounded-full border border-badge-success/20">
+                      <Lock size={9} /> Locked
+                    </span>
+                  )}
                 </div>
               )}
 
-              {/* RED CIRCLE -> GREEN TICK TOGGLE */}
-              <button
-                type="button"
-                disabled={isCompleted}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleToggleNumericComplete();
-                }}
-                className={clsx(
-                  'w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0',
-                  isCompleted
-                    ? 'bg-badge-success border-2 border-badge-success text-white cursor-default ring-2 ring-badge-success/30'
-                    : 'border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500 active:scale-90 cursor-pointer'
-                )}
-                title={
-                  isCompleted
-                    ? 'Completed & Locked: Tasks cannot be unchecked once marked done'
-                    : 'Tap to mark complete & lock'
-                }
-              >
-                <Check
-                  size={16}
-                  className="stroke-[3]"
-                />
-              </button>
-              {isCompleted && (
-                <span className="hidden xs:inline-flex items-center gap-0.5 text-[10px] font-bold text-badge-success bg-badge-success/10 px-1.5 py-0.5 rounded-full border border-badge-success/20">
-                  <Lock size={9} /> Locked
-                </span>
+              {/* CHECKLIST */}
+              {habit.type === 'CHECKLIST' && (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsChecklistExpanded(!isChecklistExpanded);
+                    }}
+                    className="text-xs font-mono font-bold text-charcoal hover:text-ink bg-surface-bone px-2 py-1 rounded-full border border-hairline flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>{completedItems.length}/{habit.config.checklist?.items.length || 0}</span>
+                    {isChecklistExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isCompleted}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleChecklistComplete();
+                    }}
+                    className={clsx(
+                      'w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0',
+                      isCompleted
+                        ? 'bg-badge-success border-2 border-badge-success text-white cursor-default ring-2 ring-badge-success/30'
+                        : 'border-2 border-stone-300 dark:border-stone-600 bg-surface-card hover:border-badge-success hover:bg-badge-success/10 text-transparent hover:text-badge-success active:scale-90 cursor-pointer'
+                    )}
+                    title={
+                      isCompleted
+                        ? 'Completed & Locked: Tasks cannot be unchecked once marked done'
+                        : 'Tap to mark done'
+                    }
+                  >
+                    <Check size={16} className={clsx(isCompleted ? 'stroke-[3]' : 'stroke-[2.5]')} />
+                  </button>
+                  {isCompleted && (
+                    <span className="hidden xs:inline-flex items-center gap-0.5 text-[10px] font-bold text-badge-success bg-badge-success/10 px-1.5 py-0.5 rounded-full border border-badge-success/20">
+                      <Lock size={9} /> Locked
+                    </span>
+                  )}
+                </div>
               )}
-            </div>
-          )}
 
-          {/* TIMER */}
-          {habit.type === 'TIMER' && (
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <span
-                className={clsx(
-                  'font-mono text-[10px] sm:text-[11px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full border whitespace-nowrap shrink-0',
-                  isCompleted
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    : 'bg-surface-bone text-charcoal border-hairline'
-                )}
-                title={`${formattedLoggedHMS} / ${formattedTargetHMS}`}
-              >
-                {compactLoggedTime} / {compactTargetTime}
-              </span>
-              <button
-                type="button"
-                disabled={isCompleted}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (!isCompleted) {
-                    handleSaveTimer(undefined, true);
-                  } else {
-                    showCompletedLockedNotice();
-                  }
-                }}
-                className={clsx(
-                  'w-8 h-8 rounded-full flex items-center justify-center transition-all shrink-0',
-                  isCompleted
-                    ? 'bg-badge-success border-2 border-badge-success text-white cursor-default ring-2 ring-badge-success/30'
-                    : 'border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500 active:scale-90 cursor-pointer'
-                )}
-                title={
-                  isCompleted
-                    ? 'Completed & Locked: Tasks cannot be unchecked once marked done'
-                    : 'Tap to mark complete'
-                }
-              >
-                <Check size={16} className="stroke-[3]" />
-              </button>
-              {isCompleted && (
-                <span className="hidden xs:inline-flex items-center gap-0.5 text-[10px] font-bold text-badge-success bg-badge-success/10 px-1.5 py-0.5 rounded-full border border-badge-success/20">
-                  <Lock size={9} /> Locked
-                </span>
+              {/* MISSED SHORTCUT (DESKTOP) */}
+              {!isCompleted && !isJustTracking && !isDateLocked && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsMissedModalOpen(true);
+                  }}
+                  className="hidden sm:inline-flex p-1.5 text-charcoal hover:text-red-600 bg-surface-bone hover:bg-red-50 border border-hairline rounded-full items-center justify-center transition-colors shrink-0 cursor-pointer"
+                  title="Log missed habit with reason"
+                >
+                  <ShieldAlert size={13} />
+                </button>
               )}
-            </div>
-          )}
-
-          {/* CHECKLIST */}
-          {habit.type === 'CHECKLIST' && (
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsChecklistExpanded(!isChecklistExpanded);
-                }}
-                className="text-xs font-mono font-bold text-charcoal hover:text-ink bg-surface-bone px-2 py-1 rounded-full border border-hairline flex items-center gap-1 cursor-pointer"
-              >
-                <span>{completedItems.length}/{habit.config.checklist?.items.length || 0}</span>
-                {isChecklistExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-              </button>
-              <button
-                type="button"
-                disabled={isCompleted}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleToggleChecklistComplete();
-                }}
-                className={clsx(
-                  'w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0',
-                  isCompleted
-                    ? 'bg-badge-success border-2 border-badge-success text-white cursor-default ring-2 ring-badge-success/30'
-                    : 'border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500 active:scale-90 cursor-pointer'
-                )}
-                title={
-                  isCompleted
-                    ? 'Completed & Locked: Tasks cannot be unchecked once marked done'
-                    : 'Tap to mark done'
-                }
-              >
-                <Check size={16} className="stroke-[3]" />
-              </button>
-              {isCompleted && (
-                <span className="hidden xs:inline-flex items-center gap-0.5 text-[10px] font-bold text-badge-success bg-badge-success/10 px-1.5 py-0.5 rounded-full border border-badge-success/20">
-                  <Lock size={9} /> Locked
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* STATUS / MISSED BUTTON */}
-          {isExcused ? (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold whitespace-nowrap shrink-0">
-              <ShieldCheck size={11} className="text-blue-600 shrink-0" /> Excused
-            </span>
-          ) : isMissed ? (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-800 text-[10px] font-bold whitespace-nowrap shrink-0">
-              <AlertTriangle size={11} className="text-red-600 shrink-0" /> Missed
-            </span>
-          ) : !isCompleted && !isJustTracking && !isDateLocked && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsMissedModalOpen(true);
-              }}
-              className="hidden sm:inline-flex p-1.5 text-charcoal hover:text-red-600 bg-surface-bone hover:bg-red-50 border border-hairline rounded-full items-center justify-center transition-colors shrink-0 cursor-pointer"
-              title="Log missed habit with reason"
-            >
-              <ShieldAlert size={13} />
-            </button>
+            </>
           )}
 
           {/* ANALYTICS BUTTON (DESKTOP/TABLET) */}
@@ -1155,7 +1198,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                           'w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0',
                           isCompleted
                             ? 'bg-badge-success border-2 border-badge-success text-white shadow-md cursor-default ring-2 ring-badge-success/30'
-                            : 'border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500 active:scale-90 cursor-pointer'
+                            : 'border-2 border-stone-300 dark:border-stone-600 bg-surface-card hover:border-badge-success hover:bg-badge-success/10 text-transparent hover:text-badge-success active:scale-90 cursor-pointer'
                         )}
                         title={
                           isCompleted
@@ -1247,7 +1290,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                             'w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0',
                             isCompleted
                               ? 'bg-badge-success border-2 border-badge-success text-white shadow-md cursor-default ring-2 ring-badge-success/30'
-                              : 'border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500 active:scale-90 cursor-pointer'
+                              : 'border-2 border-stone-300 dark:border-stone-600 bg-surface-card hover:border-badge-success hover:bg-badge-success/10 text-transparent hover:text-badge-success active:scale-90 cursor-pointer'
                           )}
                           title={
                             isCompleted
@@ -1406,11 +1449,11 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                           </button>
                         )}
 
-                        {/* RED CIRCLE COMPLETE BUTTON */}
+                        {/* COMPLETE BUTTON: neutral circle toggle, green on complete */}
                         <button
                           type="button"
                           onClick={() => handleSaveTimer(undefined, true)}
-                          className="w-10 h-10 rounded-full border-2 border-red-500 bg-red-50 hover:bg-red-100 flex items-center justify-center text-red-500 shadow-xs hover:shadow-sm transition-all duration-200 active:scale-90 cursor-pointer shrink-0"
+                          className="w-10 h-10 rounded-full border-2 border-stone-300 dark:border-stone-600 bg-surface-card hover:border-badge-success hover:bg-badge-success/10 flex items-center justify-center text-transparent hover:text-badge-success shadow-xs hover:shadow-sm transition-all duration-200 active:scale-90 cursor-pointer shrink-0"
                           title="Tap to mark complete"
                         >
                           <Check size={20} className="stroke-[2.5]" />
@@ -1496,7 +1539,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                           'w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0',
                           isCompleted
                             ? 'bg-badge-success border-2 border-badge-success text-white shadow-md cursor-default ring-2 ring-badge-success/30'
-                            : 'border-2 border-red-500 bg-red-50 hover:bg-red-100 text-red-500 active:scale-90 cursor-pointer'
+                            : 'border-2 border-stone-300 dark:border-stone-600 bg-surface-card hover:border-badge-success hover:bg-badge-success/10 text-transparent hover:text-badge-success active:scale-90 cursor-pointer'
                         )}
                         title={
                           isCompleted

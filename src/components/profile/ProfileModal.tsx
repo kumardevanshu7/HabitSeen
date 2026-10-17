@@ -234,11 +234,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           </div>
 
           {/* VITALITY & WILLPOWER STATS */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             {/* Hearts / Health */}
-            <div className="p-3.5 bg-surface-card rounded-2xl border border-red-200/80 shadow-2xs space-y-2">
+            <div className="p-4 bg-surface-card rounded-2xl border border-red-200/80 shadow-2xs space-y-2.5">
               <div className="flex items-center justify-between text-xs font-semibold text-charcoal">
-                <span>Vitality (Hearts)</span>
+                <span className="font-bold">Vitality (Hearts)</span>
                 <Heart size={16} className="text-red-500 fill-red-500" />
               </div>
               <div className="flex items-baseline justify-between gap-1">
@@ -260,8 +260,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               </div>
 
               {/* Scaled Vitality Hearts (5-heart clean meter, never congested) */}
-              <div className="flex items-center justify-between px-2.5 py-1.5 bg-red-50/70 rounded-xl border border-red-100">
-                <div className="flex items-center gap-1.5">
+              <div className="flex items-center justify-between gap-2 px-3 py-2 bg-red-50/80 rounded-xl border border-red-100">
+                <div className="flex items-center gap-1.5 shrink-0">
                   {[0, 1, 2, 3, 4].map((step) => {
                     const threshold = (step + 1) / 5;
                     const prevThreshold = step / 5;
@@ -283,43 +283,48 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                     );
                   })}
                 </div>
-                <span className="text-[11px] font-bold text-red-700 font-mono tracking-tight">
+                <span className="text-xs font-bold text-red-700 font-mono tracking-tight shrink-0 whitespace-nowrap">
                   {hearts} / {maxHearts} Lives
                 </span>
               </div>
 
               {/* Next Milestone info */}
-              <div className="pt-1 border-t border-hairline/60 text-[10px] space-y-1">
+              <div className="pt-2 border-t border-hairline/60 text-[11px] space-y-1.5">
                 {heartsUpgrade.nextThreshold ? (
-                  <p className="text-red-700 font-semibold flex items-center justify-between">
+                  <div className="text-red-700 font-semibold flex items-center justify-between gap-2 flex-wrap">
                     <span>Next: +5 Lives</span>
                     <span className="font-mono font-bold">{heartsUpgrade.xpNeeded} XP to {heartsUpgrade.nextThreshold} XP</span>
-                  </p>
+                  </div>
                 ) : (
                   <p className="text-emerald-700 font-bold">Max 50 Lives Unlocked! 🛡️</p>
                 )}
-                <p className="text-charcoal leading-tight">
+                <p className="text-charcoal leading-snug">
                   <span className="text-red-600 font-bold">⚠️ Sudden Death:</span> 0 lives triggers a 10s countdown to full fresh start wipe.
                 </p>
               </div>
             </div>
 
             {/* Willpower XP */}
-            <div className="p-3.5 bg-surface-card rounded-2xl border border-amber-200/80 shadow-2xs space-y-1.5">
-              <div className="flex items-center justify-between text-xs font-semibold text-charcoal">
-                <span>Willpower XP</span>
-                <Zap size={16} className="text-amber-500 fill-amber-500" />
+            <div className="p-4 bg-surface-card rounded-2xl border border-amber-200/80 shadow-2xs space-y-2.5 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between text-xs font-semibold text-charcoal mb-1">
+                  <span className="font-bold">Willpower XP</span>
+                  <Zap size={16} className="text-amber-500 fill-amber-500" />
+                </div>
+                <div className="flex items-baseline gap-1">
+                  <span className="font-mono text-2xl font-black text-amber-600">{totalXp}</span>
+                  <span className="text-xs font-medium text-charcoal">XP</span>
+                </div>
+                <div className="inline-flex items-center gap-1 bg-amber-500/10 text-amber-700 text-[11px] font-bold px-2.5 py-1 rounded-full mt-2">
+                  <Award size={13} /> {levelTitle}
+                </div>
               </div>
-              <div className="flex items-baseline gap-1">
-                <span className="font-mono text-2xl font-black text-amber-600">{totalXp}</span>
-                <span className="text-xs font-medium text-charcoal">XP</span>
+
+              <div className="pt-2 border-t border-hairline/60 text-[11px] text-charcoal">
+                <p className="leading-snug">
+                  <strong>100% Perfect Days</strong> award <span className="font-mono font-bold text-amber-600">+100</span> bonus Willpower XP.
+                </p>
               </div>
-              <div className="inline-flex items-center gap-1 bg-amber-500/10 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-full mt-1 truncate">
-                <Award size={11} /> {levelTitle}
-              </div>
-              <p className="text-[10px] text-charcoal pt-1">
-                100% Perfect Days award +100 bonus Willpower XP.
-              </p>
             </div>
           </div>
 

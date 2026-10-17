@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
-import { Habit } from '../../types/habit';
+import { Habit, HabitLog } from '../../types/habit';
 import { useAppStore } from '../../stores/useAppStore';
 import { STREAK_CHALLENGES, CATEGORY_ICONS } from '../../constants/iconsAndColors';
 import { boostVibrancy, getContrastIconColor } from '../../utils/colorUtils';
@@ -15,6 +15,12 @@ import {
   Sparkles,
   Lock,
   CheckCircle2,
+  History,
+  Clock,
+  ShieldCheck,
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import {
   format,
@@ -27,6 +33,7 @@ import {
   addMonths,
   isAfter,
   startOfDay,
+  parseISO,
 } from 'date-fns';
 import clsx from 'clsx';
 
@@ -49,6 +56,7 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
 }) => {
   const { categories, logs, deleteHabit } = useAppStore();
   const [currentCalendarMonth, setCurrentCalendarMonth] = useState(new Date());
+  const [showAllLogs, setShowAllLogs] = useState(false);
   const [pendingSecurityAction, setPendingSecurityAction] = useState<{
     type: 'edit' | 'delete';
     title: string;
@@ -73,6 +81,68 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
   const missedLogs = habitLogs.filter((l) => l.status === 'MISSED' || l.status === 'FAILED');
   const skippedLogs = habitLogs.filter((l) => l.status === 'SKIPPED');
   const totalTracked = habitLogs.length;
+
+  const sortedHabitLogs = [...habitLogs].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const displayedLogs = showAllLogs ? sortedHabitLogs : sortedHabitLogs.slice(0, 7);
+
+  const formatSecondsReadable = (totalSecs: number) => {
+    const h = Math.floor(totalSecs / 3600);
+    const m = Math.floor((totalSecs % 3600) / 60);
+    if (h > 0) return `${h}h ${m}m`;
+    if (m > 0) return `${m}m`;
+    return `${totalSecs}s`;
+  };
+
+  const renderLogWorkValue = (log: HabitLog) => {
+    switch (habit.type) {
+      case 'TIMER': {
+        const secs = log.valueTimerSeconds ?? 0;
+        const targetSecs = habit.config.timer?.targetSeconds ?? 0;
+        return (
+          <span className="font-mono text-xs font-bold text-ink">
+            {formatSecondsReadable(secs)} <span className="text-stone text-[10px] font-normal">/ {formatSecondsReadable(targetSecs)}</span>
+          </span>
+        );
+      }
+      case 'NUMERIC': {
+        const num = log.valueNumeric ?? 0;
+        const goal = habit.config.numeric?.goal ?? 1;
+        const unit = habit.config.numeric?.unit ? ` ${habit.config.numeric.unit}` : '';
+        return (
+          <span className="font-mono text-xs font-bold text-ink">
+            {num} <span className="text-stone text-[10px] font-normal">/ {goal}{unit}</span>
+          </span>
+        );
+      }
+      case 'CHECKLIST': {
+        const done = log.valueChecklistCompletedItemIds?.length ?? 0;
+        const total = habit.config.checklist?.items?.length ?? 0;
+        return (
+          <span className="font-mono text-xs font-bold text-ink">
+            {done} <span className="text-stone text-[10px] font-normal">/ {total} items done</span>
+          </span>
+        );
+      }
+      case 'YES_NO':
+      default: {
+        return (
+          <span className="text-xs font-medium text-ink">
+            {log.status === 'COMPLETED' ? 'Marked Complete' : 'Incomplete'}
+          </span>
+        );
+      }
+    }
+  };
+
+  const formatLogDateLabel = (dateStr: string) => {
+    try {
+      const parsed = parseISO(dateStr);
+      if (isSameDay(parsed, new Date())) return 'Today';
+      return format(parsed, 'EEE, dd MMM yyyy');
+    } catch {
+      return dateStr;
+    }
+  };
 
   let streakInfo = { currentStreak: 0, bestStreak: 0, unlockedChallenges: [] as number[] };
   try {
@@ -496,6 +566,140 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
               💡 Activity history is read-only. Log check-ins and excuses from the daily dashboard.
             </span>
           </div>
+        </div>
+
+        {/* 5. DETAILED DAILY ACTIVITY LOGS & WORK RECORDED */}
+        <div className="p-4 bg-surface-card border border-hairline rounded-2xl space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <History size={16} className="text-primary" />
+              <h4 className="text-xs font-bold uppercase tracking-wider text-ink">
+                Daily Work &amp; Performance History
+              </h4>
+            </div>
+            <span className="text-[11px] font-mono font-bold text-charcoal bg-surface-bone px-2 py-0.5 rounded-full border border-hairline">
+              {sortedHabitLogs.length} Records
+            </span>
+          </div>
+
+          {sortedHabitLogs.length === 0 ? (
+            <div className="p-6 bg-surface-bone/50 border border-dashed border-hairline rounded-xl text-center text-xs text-charcoal">
+              No activity logs recorded yet. Check off this habit on the dashboard to build your log history!
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {/* MOBILE CARD VIEW (< sm) */}
+              <div className="space-y-2 sm:hidden">
+                {displayedLogs.map((log) => {
+                  const isDone = log.status === 'COMPLETED';
+                  const isExc = log.status === 'EXCUSED';
+                  const isMis = log.status === 'MISSED' || log.status === 'FAILED';
+                  return (
+                    <div
+                      key={log.date}
+                      className="p-3 bg-canvas rounded-xl border border-hairline/80 flex flex-col gap-1.5 shadow-2xs"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-xs font-bold text-ink">
+                          {formatLogDateLabel(log.date)}
+                        </span>
+                        {isDone && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            ✓ Done
+                          </span>
+                        )}
+                        {isExc && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                            🛡️ Excused
+                          </span>
+                        )}
+                        {isMis && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                            ⚠️ Missed
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between text-xs pt-1 border-t border-hairline/60">
+                        <span className="text-charcoal font-medium">Recorded Work:</span>
+                        {renderLogWorkValue(log)}
+                      </div>
+
+                      {log.missedReasonText && (
+                        <div className="text-[11px] text-charcoal bg-surface-bone px-2.5 py-1 rounded-lg border border-hairline/60 italic">
+                          "{log.missedReasonText}"
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* DESKTOP / TABLET TABLE VIEW (>= sm) */}
+              <div className="hidden sm:block overflow-hidden rounded-xl border border-hairline bg-canvas">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-surface-bone/80 border-b border-hairline text-charcoal font-semibold uppercase text-[10px] tracking-wider">
+                    <tr>
+                      <th className="py-2.5 px-3.5">Date</th>
+                      <th className="py-2.5 px-3">Status</th>
+                      <th className="py-2.5 px-3">Work / Value Recorded</th>
+                      <th className="py-2.5 px-3.5 text-right">Notes / Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-hairline/60">
+                    {displayedLogs.map((log) => {
+                      const isDone = log.status === 'COMPLETED';
+                      const isExc = log.status === 'EXCUSED';
+                      const isMis = log.status === 'MISSED' || log.status === 'FAILED';
+                      return (
+                        <tr key={log.date} className="hover:bg-surface-bone/40 transition-colors">
+                          <td className="py-2.5 px-3.5 font-mono font-bold text-ink whitespace-nowrap">
+                            {formatLogDateLabel(log.date)}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            {isDone && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 whitespace-nowrap">
+                                ✓ Done
+                              </span>
+                            )}
+                            {isExc && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200 whitespace-nowrap">
+                                🛡️ Excused
+                              </span>
+                            )}
+                            {isMis && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 whitespace-nowrap">
+                                ⚠️ Missed
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            {renderLogWorkValue(log)}
+                          </td>
+                          <td className="py-2.5 px-3.5 text-right text-charcoal text-[11px] truncate max-w-[200px]">
+                            {log.missedReasonText ? `"${log.missedReasonText}"` : '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {sortedHabitLogs.length > 7 && (
+                <div className="text-center pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowAllLogs(!showAllLogs)}
+                    className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:text-primary-deep px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors cursor-pointer"
+                  >
+                    <span>{showAllLogs ? 'Show Recent 7 Days' : `View All ${sortedHabitLogs.length} Days`}</span>
+                    {showAllLogs ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* FOOTER CLOSE */}
