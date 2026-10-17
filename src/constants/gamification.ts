@@ -48,6 +48,23 @@ export const MISS_PENALTIES = {
 export const XP_LOSS_PER_HEART = 350;
 export const MIDNIGHT_MISSED_HABIT_XP_PENALTY = 50;
 
+export const GAME_RULES = {
+  PERFECT_DAY_XP_BONUS: 100, // +100 bonus Willpower XP for 100% completion of due habits
+  PERFECT_DAY_HEART_HEAL: 1, // Restores +1 heart if below max
+  CHALLENGE_DAILY_XP: 50,
+  CHALLENGE_DAILY_HEART_HEAL: 1,
+  CHALLENGE_VICTORY_BONUS_MULTIPLIER: 30, // targetDays * 30 XP
+  CHALLENGE_VICTORY_HEART_HEAL: 2,
+  CHALLENGE_FAIL_HEALTH_DEDUCTION_PCT: 90, // -90% current health
+  CHALLENGE_FAIL_XP_PENALTY: 50,
+  XP_LOSS_PER_HEART: 350, // -350 XP loss = -1 Heart
+  MIDNIGHT_MISSED_HABIT_XP_PENALTY: 50,
+  SOFT_RESET_XP_PENALTY: 100,
+  STARTING_HEARTS: 5,
+  MAX_GENUINE_EXCUSES_PER_MONTH: 3,
+  DEFAULT_LEVEL_TITLE: 'Will Habit Initiate',
+} as const;
+
 /**
  * Calculates heart deductions based on accumulated XP losses:
  * Every 350 XP lost deducts exactly 1 heart (-1 Heart per 350 XP down).

@@ -64,6 +64,7 @@ export function CustomSelect<T extends string | number>({
 
     if (e.key === 'Escape') {
       e.preventDefault();
+      e.stopPropagation();
       setIsOpen(false);
       triggerRef.current?.focus();
     } else if (e.key === 'ArrowDown') {

@@ -10,6 +10,7 @@ interface ModalProps {
   subtitle?: string;
   children: React.ReactNode;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '4xl';
+  zIndex?: string;
 }
 
 // Global modal counter to prevent multiple modals from clobbering body overflow
@@ -73,6 +74,7 @@ export const Modal: React.FC<ModalProps> = ({
   subtitle,
   children,
   maxWidth = 'md',
+  zIndex = 'z-50',
 }) => {
   const titleId = useId();
   const onCloseRef = useRef(onClose);
@@ -148,7 +150,10 @@ export const Modal: React.FC<ModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby={title ? titleId : undefined}
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200"
+      className={clsx(
+        'fixed inset-0 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200',
+        zIndex
+      )}
     >
       {/* Backdrop */}
       <div

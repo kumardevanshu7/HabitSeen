@@ -31,6 +31,8 @@ export const CreateCategoryModal: React.FC<CreateCategoryModalProps> = ({
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const submittingRef = React.useRef(false);
+
   useEffect(() => {
     if (categoryToEdit && isOpen) {
       setName(categoryToEdit.name);
@@ -49,6 +51,8 @@ export const CreateCategoryModal: React.FC<CreateCategoryModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingRef.current || isSubmitting) return;
+
     const trimmed = name.trim();
     if (!trimmed) {
       setError('Please provide a category name');
@@ -66,6 +70,7 @@ export const CreateCategoryModal: React.FC<CreateCategoryModalProps> = ({
     }
 
     setError('');
+    submittingRef.current = true;
     setIsSubmitting(true);
 
     try {
@@ -74,7 +79,7 @@ export const CreateCategoryModal: React.FC<CreateCategoryModalProps> = ({
           ...categoryToEdit,
           name: trimmed,
           icon: selectedIcon,
-          color: vibrantColor,
+          color: selectedColor,
         };
         await updateCategory(updatedCat);
         onClose();
@@ -82,7 +87,7 @@ export const CreateCategoryModal: React.FC<CreateCategoryModalProps> = ({
         const newCat = await addCategory({
           name: trimmed,
           icon: selectedIcon,
-          color: vibrantColor,
+          color: selectedColor,
           isDefault: false,
         });
 
@@ -96,6 +101,7 @@ export const CreateCategoryModal: React.FC<CreateCategoryModalProps> = ({
       console.error('Failed to save category:', err);
       setError(err.message || 'Failed to save category');
     } finally {
+      submittingRef.current = false;
       setIsSubmitting(false);
     }
   };
@@ -121,6 +127,7 @@ export const CreateCategoryModal: React.FC<CreateCategoryModalProps> = ({
           label="Category Name"
           placeholder="e.g. Fitness & Power, Mindful Coding"
           value={name}
+          maxLength={40}
           onChange={(e) => {
             setName(e.target.value);
             if (error) setError('');

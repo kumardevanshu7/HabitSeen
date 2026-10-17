@@ -271,11 +271,12 @@ export const BrandLegalModal: React.FC<BrandLegalModalProps> = ({
               </div>
 
               <div>
-                <h4 className="font-bold text-ink text-sm mb-1">5. Storage & retention</h4>
+                <h4 className="font-bold text-ink text-sm mb-1">5. Storage, Retention & Data Portability</h4>
                 <p>
-                  Data is stored in Google Cloud Firestore and cached locally in your browser for
-                  offline capability. You have full sovereignty over your data and can request
-                  complete deletion or purge at any time.
+                  Data is stored securely in Google Cloud Firestore and cached locally in your browser for
+                  offline capability. Your habit records and profile information are retained for as long as
+                  your account remains active. You maintain full sovereignty over your data and can request
+                  complete deletion, account reset, or a full wipe at any time through the in-app security settings.
                 </p>
               </div>
 
@@ -289,10 +290,11 @@ export const BrandLegalModal: React.FC<BrandLegalModalProps> = ({
               </div>
 
               <div>
-                <h4 className="font-bold text-ink text-sm mb-1">7. Children</h4>
+                <h4 className="font-bold text-ink text-sm mb-1">7. Children's Privacy (COPPA & DPDP)</h4>
                 <p>
-                  HabitsSeen is not directed toward children under 13. We do not knowingly collect
-                  personal information from children under 13.
+                  HabitsSeen is not directed toward children under 13. In compliance with COPPA and the
+                  Digital Personal Data Protection Act, we do not knowingly collect personal information
+                  from individuals under 13 years of age.
                 </p>
               </div>
 
@@ -305,21 +307,20 @@ export const BrandLegalModal: React.FC<BrandLegalModalProps> = ({
               </div>
 
               <div>
-                <h4 className="font-bold text-ink text-sm mb-1">9. Contact</h4>
+                <h4 className="font-bold text-ink text-sm mb-1">9. Grievance Officer & Contact</h4>
                 <p>
-                  Direct privacy inquiries to Kumar Devanshu
-                  {founderEmail ? (
-                    <>
-                      {' '}at{' '}
-                      <span className="font-mono text-primary font-bold">
-                        {founderEmail}
-                      </span>
-                    </>
-                  ) : (
-                    ' through official Arigato Labs channels'
-                  )}
-                  .
+                  Pursuant to the Information Technology Act and DPDP rules, any privacy inquiries or grievances
+                  may be addressed directly to our Grievance Officer:
                 </p>
+                <div className="mt-1.5 p-2.5 bg-surface-bone rounded-xl border border-hairline font-mono text-[11px] space-y-0.5">
+                  <p><strong>Grievance Officer:</strong> Kumar Devanshu</p>
+                  <p><strong>Organization:</strong> Arigato Labs</p>
+                  <p><strong>Jurisdiction:</strong> New Delhi, India</p>
+                  <p>
+                    <strong>Email:</strong>{' '}
+                    <span className="text-primary font-bold">{founderEmail}</span>
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -369,9 +370,9 @@ export const BrandLegalModal: React.FC<BrandLegalModalProps> = ({
               <div>
                 <h4 className="font-bold text-ink text-sm mb-1">5. Intellectual Property</h4>
                 <p>
-                  The Arigato Labs name, brand logos (including `arigato-labs-logo.png` and
-                  `arigato-single-logo.png`), UI assets, and designs are exclusive property of
-                  Arigato Labs and Kumar Devanshu.
+                  The Arigato Labs name, wordmarks, trademarks, official logos, UI assets, and bespoke designs
+                  are exclusive property of Arigato Labs and founder Kumar Devanshu. Unauthorized reproduction,
+                  scraping, or reuse without prior written permission is prohibited.
                 </p>
               </div>
 
@@ -401,28 +402,20 @@ export const BrandLegalModal: React.FC<BrandLegalModalProps> = ({
               </div>
 
               <div>
-                <h4 className="font-bold text-ink text-sm mb-1">9. Governing Law</h4>
+                <h4 className="font-bold text-ink text-sm mb-1">9. Governing Law & Jurisdiction</h4>
                 <p>
-                  These terms are governed by the laws of India, within the jurisdiction of the
-                  founder Kumar Devanshu.
+                  These terms shall be governed by and construed in accordance with the laws of India.
+                  Any disputes arising out of or related to these terms shall be subject to the exclusive
+                  jurisdiction of the courts of New Delhi, India.
                 </p>
               </div>
 
               <div>
-                <h4 className="font-bold text-ink text-sm mb-1">10. Contact</h4>
+                <h4 className="font-bold text-ink text-sm mb-1">10. Grievance Redressal & Legal Notices</h4>
                 <p>
-                  For legal notices or questions, contact
-                  {founderEmail ? (
-                    <>
-                      {' '}
-                      <span className="font-mono text-primary font-bold">
-                        {founderEmail}
-                      </span>
-                    </>
-                  ) : (
-                    ' through official Arigato Labs channels'
-                  )}
-                  .
+                  For legal notices or grievances, contact our Grievance Officer: Kumar Devanshu (Arigato Labs)
+                  at <span className="font-mono text-primary font-bold">{founderEmail}</span> or via official
+                  Arigato Labs channels in New Delhi, India.
                 </p>
               </div>
             </div>

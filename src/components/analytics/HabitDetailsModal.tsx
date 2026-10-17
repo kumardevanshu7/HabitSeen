@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Habit } from '../../types/habit';
@@ -29,7 +29,6 @@ import {
   startOfDay,
 } from 'date-fns';
 import clsx from 'clsx';
-import confetti from 'canvas-confetti';
 
 import { computeHabitStreaks } from '../../utils/streakEngine';
 import { isDateInThisWeek, isDateInThisMonth } from '../../utils/dateMath';
@@ -48,12 +47,16 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
   onClose,
   onEdit,
 }) => {
-  const { categories, logs, deleteHabit, logHabit } = useAppStore();
+  const { categories, logs, deleteHabit } = useAppStore();
   const [currentCalendarMonth, setCurrentCalendarMonth] = useState(new Date());
   const [pendingSecurityAction, setPendingSecurityAction] = useState<{
     type: 'edit' | 'delete';
     title: string;
   } | null>(null);
+
+  useEffect(() => {
+    setCurrentCalendarMonth(new Date());
+  }, [habit?.id]);
 
   if (!habit) return null;
 
@@ -90,25 +93,6 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
 
   const successRate =
     totalTracked > 0 ? Math.round((completedLogs.length / totalTracked) * 100) : 0;
-
-  const handleToggleCalendarDay = (dateKey: string, isFutureDate: boolean) => {
-    if (!habit || isFutureDate) return;
-    const logKey = `${habit.id}_${dateKey}`;
-    const dayLog = logs?.[logKey];
-    const isCompleted = dayLog?.status === 'COMPLETED';
-
-    if (isCompleted) {
-      if (isJustTracking) {
-        // Locked permanently!
-        return;
-      }
-      logHabit(habit.id, dateKey, { valueYesNo: false });
-      return;
-    }
-
-    confetti({ particleCount: 35, spread: 50, origin: { y: 0.6 } });
-    logHabit(habit.id, dateKey, { valueYesNo: true });
-  };
 
   // Calendar days
   const monthStart = startOfMonth(currentCalendarMonth);
@@ -411,8 +395,9 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
             <div className="flex items-center gap-2">
               <button
                 type="button"
+                aria-label="Previous Month"
                 onClick={() => setCurrentCalendarMonth(subMonths(currentCalendarMonth, 1))}
-                className="px-2 py-1 text-xs bg-surface-bone hover:bg-stone/20 rounded-full border border-hairline font-semibold"
+                className="px-2.5 py-1 text-xs bg-surface-bone hover:bg-stone/20 rounded-full border border-hairline font-semibold transition-colors cursor-pointer"
               >
                 Prev
               </button>
@@ -421,23 +406,24 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
               </span>
               <button
                 type="button"
+                aria-label="Next Month"
                 onClick={() => setCurrentCalendarMonth(addMonths(currentCalendarMonth, 1))}
-                className="px-2 py-1 text-xs bg-surface-bone hover:bg-stone/20 rounded-full border border-hairline font-semibold"
+                className="px-2.5 py-1 text-xs bg-surface-bone hover:bg-stone/20 rounded-full border border-hairline font-semibold transition-colors cursor-pointer"
               >
                 Next
               </button>
             </div>
           </div>
 
-          {/* Calendar Day Grid */}
+          {/* Calendar Day Grid (Monday First, Read-Only) */}
           <div className="grid grid-cols-7 gap-1 text-center">
-            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, idx) => (
+            {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, idx) => (
               <span key={idx} className="text-[10px] font-bold text-charcoal py-1">
                 {day}
               </span>
             ))}
-            {/* Day of week offset padding */}
-            {Array.from({ length: daysInMonth[0] ? getDay(daysInMonth[0]) : 0 }).map((_, idx) => (
+            {/* Monday-start offset padding */}
+            {Array.from({ length: daysInMonth[0] ? (getDay(daysInMonth[0]) + 6) % 7 : 0 }).map((_, idx) => (
               <div key={`offset-${idx}`} className="h-9" />
             ))}
             {daysInMonth.map((day) => {
@@ -452,38 +438,31 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
               const isFuture = isAfter(startOfDay(day), startOfDay(new Date()));
 
               return (
-                <button
+                <div
                   key={dateKey}
-                  type="button"
-                  disabled={isFuture || (isCompleted && isJustTracking)}
-                  onClick={() => handleToggleCalendarDay(dateKey, isFuture)}
+                  aria-label={`${dateKey} activity`}
                   className={clsx(
                     'h-9 rounded-xl flex flex-col items-center justify-center text-xs font-mono transition-all border select-none',
                     isCompleted && 'bg-badge-success text-white border-badge-success font-bold shadow-2xs',
                     isExcused && 'bg-blue-100 text-blue-700 border-blue-300 font-bold',
                     isMissed && 'bg-amber-100 text-amber-800 border-amber-300 font-semibold',
                     isSkipped && 'bg-red-100 text-red-600 border-red-200',
-                    !dayLog && !isFuture && 'bg-surface-bone text-charcoal border-hairline/60 hover:bg-stone/20 hover:border-primary/50 cursor-pointer active:scale-95',
-                    isFuture && 'opacity-35 bg-surface-bone/50 text-charcoal/50 border-hairline/30 cursor-not-allowed',
-                    isToday && 'ring-2 ring-primary ring-offset-1 font-bold',
-                    isCompleted && isJustTracking && 'cursor-default ring-1 ring-badge-success/40'
+                    !dayLog && !isFuture && 'bg-surface-bone text-charcoal border-hairline/60',
+                    isFuture && 'opacity-35 bg-surface-bone/50 text-charcoal/50 border-hairline/30',
+                    isToday && 'ring-2 ring-primary ring-offset-1 font-bold'
                   )}
                   title={`${dateKey}: ${
                     isCompleted
-                      ? isJustTracking
-                        ? 'Completed & Locked'
-                        : 'Completed (Click to unmark)'
+                      ? 'Completed'
                       : isFuture
-                      ? 'Future date'
+                      ? 'Upcoming'
                       : isExcused
                       ? `Excused: ${dayLog?.missedReasonText || 'Protected'}`
                       : isMissed
-                      ? `Missed: ${dayLog?.missedReasonText || 'Uncompleted'}`
+                      ? `Missed: ${dayLog?.missedReasonText || 'Incomplete'}`
                       : isSkipped
                       ? 'Skipped'
-                      : isJustTracking
-                      ? 'Click to complete & lock for this day'
-                      : 'Click to mark complete'
+                      : 'Not Tracked'
                   }`}
                 >
                   <span>{format(day, 'd')}</span>
@@ -495,21 +474,26 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
                   )}
                   {isExcused && <span className="text-[8px] leading-none">🛡️</span>}
                   {isMissed && <span className="text-[8px] leading-none">!</span>}
-                </button>
+                </div>
               );
             })}
           </div>
 
           {/* Calendar Helper Info */}
           <div className="mt-3 pt-2.5 border-t border-hairline/70 flex items-center justify-between text-[11px] text-charcoal flex-wrap gap-2">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-badge-success shrink-0" /> Completed
-              {isJustTracking && <span className="inline-flex items-center gap-0.5 text-[10px] text-primary font-bold">(Locked)</span>}
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-badge-success shrink-0" /> Completed
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" /> Excused
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" /> Missed
+              </span>
+            </div>
             <span className="text-stone">
-              {isJustTracking
-                ? '💡 Tap any past or today date to check it off & lock it permanently'
-                : '💡 Tap dates to log completion'}
+              💡 Activity history is read-only. Log check-ins and excuses from the daily dashboard.
             </span>
           </div>
         </div>

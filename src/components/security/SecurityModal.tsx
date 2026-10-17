@@ -5,7 +5,7 @@ import { Input } from '../ui/Input';
 import { useAppStore } from '../../stores/useAppStore';
 import { ShieldCheck, ShieldAlert, Lock, AlertTriangle, KeyRound, Info } from 'lucide-react';
 import clsx from 'clsx';
-import { verifySecurityAnswer, hashSecurityAnswer } from '../../utils/cryptoUtils';
+import { verifySecurityAnswer, hashSecurityAnswer, hasSecurityGuard } from '../../utils/cryptoUtils';
 import { saveUserProfileToDb } from '../../services/firestoreService';
 
 interface SecurityModalProps {
@@ -16,6 +16,7 @@ interface SecurityModalProps {
   isDanger?: boolean;
   onSuccess: () => void | Promise<void>;
   onOpenProfileSetup?: () => void;
+  zIndex?: string;
 }
 
 export const SecurityModal: React.FC<SecurityModalProps> = ({
@@ -26,6 +27,7 @@ export const SecurityModal: React.FC<SecurityModalProps> = ({
   isDanger = false,
   onSuccess,
   onOpenProfileSetup,
+  zIndex,
 }) => {
   const { user, currentUser } = useAppStore();
   const [answer, setAnswer] = useState('');
@@ -43,7 +45,7 @@ export const SecurityModal: React.FC<SecurityModalProps> = ({
   if (!isOpen) return null;
 
   const security = user?.security;
-  const hasSecurityQuestion = Boolean(security?.question && (security?.answerHash || security?.answer));
+  const hasSecurityQuestion = hasSecurityGuard(user);
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,6 +134,7 @@ export const SecurityModal: React.FC<SecurityModalProps> = ({
       title={title}
       subtitle="Accidental-Action Guard: Protects your account against unintended actions"
       maxWidth="md"
+      zIndex={zIndex}
     >
       <form onSubmit={handleVerify} className="space-y-4 pt-1">
         {/* ACTION SUMMARY BADGE */}

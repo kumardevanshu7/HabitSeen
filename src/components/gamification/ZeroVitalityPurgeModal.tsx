@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppStore } from '../../stores/useAppStore';
-import { Skull, AlertTriangle, ShieldAlert, RefreshCw, HeartPulse, Trash2 } from 'lucide-react';
-import confetti from 'canvas-confetti';
+import { HeartPulse, AlertTriangle, ShieldAlert, RefreshCw, Trash2, Sparkles } from 'lucide-react';
 import { SecurityModal } from '../security/SecurityModal';
 
 export const ZeroVitalityPurgeModal: React.FC = () => {
@@ -30,16 +29,9 @@ export const ZeroVitalityPurgeModal: React.FC = () => {
       return;
     }
 
-    // Trigger red hazard confetti burst when entering zero vitality
-    try {
-      confetti({
-        particleCount: 50,
-        spread: 80,
-        origin: { y: 0.5 },
-        colors: ['#ea2804', '#7f1d1d', '#000000', '#f59e0b'],
-      });
-    } catch (e) {
-      // Ignore confetti if not loaded
+    // Pause countdown if user is inside the security wipe prompt
+    if (isFullWipeSecurityOpen) {
+      return;
     }
 
     const interval = setInterval(() => {
@@ -53,14 +45,14 @@ export const ZeroVitalityPurgeModal: React.FC = () => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isZeroLives]);
+  }, [isZeroLives, isFullWipeSecurityOpen]);
 
   // Separate effect for triggering when countdown hits 0 (avoids stale closures and updater side effects)
   useEffect(() => {
-    if (isZeroLives && secondsLeft === 0 && !hasTriggeredRef.current && !error) {
+    if (isZeroLives && secondsLeft === 0 && !hasTriggeredRef.current && !error && !isFullWipeSecurityOpen) {
       handleSoftReset();
     }
-  }, [secondsLeft, isZeroLives, error]);
+  }, [secondsLeft, isZeroLives, error, isFullWipeSecurityOpen]);
 
   const handleSoftReset = async () => {
     if (hasTriggeredRef.current) return;
@@ -72,8 +64,9 @@ export const ZeroVitalityPurgeModal: React.FC = () => {
       await softResetAccount();
     } catch (err: any) {
       console.error('Failed to revive account vitality:', err);
-      setIsProcessing(false);
       setError(err?.message || 'Failed to revive vitality. Please check your connection and retry.');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -90,36 +83,36 @@ export const ZeroVitalityPurgeModal: React.FC = () => {
       aria-modal="true"
       className="fixed inset-0 z-[9999] bg-[#0c0505] text-white flex flex-col items-center justify-center p-4 sm:p-6 overflow-hidden select-none animate-in fade-in duration-300"
     >
-      {/* Background Red Warning Ambient Glow */}
+      {/* Background Warning Ambient Glow */}
       <div className="absolute inset-0 bg-radial from-red-600/20 via-transparent to-black pointer-events-none" />
       <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-600 via-amber-500 to-red-600 animate-pulse" />
 
       {/* Main Revival Container */}
-      <div className="relative z-10 w-full max-w-lg bg-[#180a0a] border-2 border-red-600/60 rounded-3xl p-6 sm:p-8 shadow-[0_0_60px_rgba(234,40,4,0.35)] text-center space-y-6">
-        {/* Pulsing Skull Icon */}
+      <div className="relative z-10 w-full max-w-lg bg-[#180a0a] border-2 border-red-500/50 rounded-3xl p-6 sm:p-8 shadow-[0_0_60px_rgba(234,40,4,0.35)] text-center space-y-6">
+        {/* Supportive Vitality Pulse Icon */}
         <div className="flex justify-center">
           <div className="relative">
-            <div className="w-24 h-24 rounded-full bg-red-950/80 border-2 border-red-500 flex items-center justify-center text-red-500 shadow-[0_0_30px_rgba(234,40,4,0.6)] animate-pulse">
-              <Skull size={48} className="stroke-[2.2]" />
+            <div className="w-22 h-22 rounded-full bg-red-950/80 border-2 border-red-500 flex items-center justify-center text-red-400 shadow-[0_0_30px_rgba(234,40,4,0.5)]">
+              <HeartPulse size={44} className="stroke-[2.2] animate-pulse" />
             </div>
-            <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-red-600 text-white flex items-center justify-center text-xs font-black shadow-md border-2 border-[#180a0a]">
+            <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-red-600 text-white flex items-center justify-center text-xs font-black shadow-md border-2 border-[#180a0a]">
               0
             </div>
           </div>
         </div>
 
-        {/* Header Titles */}
+        {/* Header Titles - Supportive, Non-Punitive Framing */}
         <div className="space-y-2">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-mono font-bold uppercase tracking-wider">
             <AlertTriangle size={13} className="text-red-500 shrink-0" />
-            <span>0 Vitality &bull; Disciplinary Revival</span>
+            <span>Vitality Depleted &bull; Recovery Protocol</span>
           </div>
 
           <h2 className="font-display font-extrabold text-2xl sm:text-3xl text-white tracking-tight uppercase">
-            Discipline Broken
+            Reset &amp; Recover
           </h2>
           <p className="text-stone text-xs sm:text-sm max-w-sm mx-auto leading-relaxed">
-            All your hearts have reached <strong className="text-red-400">0</strong>. A disciplinary Soft Reset will revive your vitality so you can get back on track.
+            Your hearts have reached <strong className="text-red-400">0</strong>. Everyone stumbles—what matters is restarting. A Soft Reset will restore your vitality so you can continue building momentum.
           </p>
         </div>
 
@@ -208,16 +201,24 @@ export const ZeroVitalityPurgeModal: React.FC = () => {
         </div>
       </div>
 
-      {/* Security Modal Guard for Full Account Wipe */}
+      {/* Security Modal Guard for Full Account Wipe (rendered on top of z-[9999]) */}
       <SecurityModal
         isOpen={isFullWipeSecurityOpen}
         onClose={() => setIsFullWipeSecurityOpen(false)}
         title="Authorize Full Account Wipe"
         actionTitle="Permanently Delete All Habits, History, and Reset to Onboarding"
         isDanger
+        zIndex="z-[10001]"
         onSuccess={async () => {
           setIsProcessing(true);
-          await resetEntireAccount();
+          try {
+            await resetEntireAccount();
+          } catch (err: any) {
+            console.error('Failed to wipe account:', err);
+            setError(err?.message || 'Failed to execute account wipe.');
+          } finally {
+            setIsProcessing(false);
+          }
         }}
       />
     </div>

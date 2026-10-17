@@ -5,6 +5,7 @@ import { logOut } from '../../services/firebase';
 import { Plus, Award, LogOut, Heart, Zap, Flame, CheckSquare, Clock, BarChart2, Info, Sparkles } from 'lucide-react';
 import clsx from 'clsx';
 import { PointsSystemModal } from './PointsSystemModal';
+import { ProfileModal } from '../profile/ProfileModal';
 
 interface NavbarProps {
   activeTab: 'habits' | 'challenges' | 'tracking' | 'breaks' | 'analytics';
@@ -21,6 +22,15 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const { user, currentUser, challenges } = useAppStore();
   const [isPointsInfoOpen, setIsPointsInfoOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+
+  const handleOpenProfile = () => {
+    if (onOpenProfile) {
+      onOpenProfile();
+    } else {
+      setIsProfileModalOpen(true);
+    }
+  };
 
   const handleLogout = async () => {
     if (window.confirm('Are you sure you want to sign out?')) {
@@ -144,7 +154,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {user && (
             <button
               type="button"
-              onClick={onOpenProfile}
+              onClick={handleOpenProfile}
               className="flex items-center gap-1 px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-full border border-red-200 text-xs font-bold shadow-2xs transition-all active:scale-95 shrink-0"
               title={`${hearts}/${maxHearts} Hearts (Click to open profile)`}
             >
@@ -158,7 +168,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {user && (
             <button
               type="button"
-              onClick={onOpenProfile}
+              onClick={handleOpenProfile}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-card hover:bg-surface-bone rounded-full border border-hairline text-xs font-medium text-ink shadow-2xs transition-all active:scale-95 shrink-0"
               title={`${levelTitle} — ${totalXp} Total XP (Click to open profile)`}
             >
@@ -207,6 +217,14 @@ export const Navbar: React.FC<NavbarProps> = ({
       isOpen={isPointsInfoOpen}
       onClose={() => setIsPointsInfoOpen(false)}
     />
+
+    {/* Fallback Profile Modal if not managed by parent */}
+    {!onOpenProfile && (
+      <ProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+      />
+    )}
   </>
   );
 };

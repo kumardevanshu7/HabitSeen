@@ -22,28 +22,49 @@ export const InstallPromptBanner: React.FC = () => {
       return;
     }
 
-    const dismissedAt = localStorage.getItem('habitsseen_install_prompt_dismissed');
-    if (dismissedAt) {
-      const diffDays = (Date.now() - Number(dismissedAt)) / (1000 * 60 * 60 * 24);
-      if (diffDays < 7) {
-        return;
+    try {
+      const dismissedAt = localStorage.getItem('habitsseen_install_prompt_dismissed');
+      if (dismissedAt) {
+        const diffDays = (Date.now() - Number(dismissedAt)) / (1000 * 60 * 60 * 24);
+        if (diffDays < 7) {
+          return;
+        }
       }
+    } catch {
+      // Ignore storage errors in restricted/private browsing modes
     }
 
-    // 2. Check for iOS device
+    // 2. Check for iOS device (including iPadOS 13+ desktop userAgent)
     const userAgent = window.navigator.userAgent.toLowerCase();
-    const isIosDevice = /iphone|ipad|ipod/.test(userAgent);
+    const isIosDevice =
+      /iphone|ipad|ipod/.test(userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     setIsIOS(isIosDevice);
 
-    // 3. Listen for Chrome/Edge/Android beforeinstallprompt
-    const handleBeforeInstallPrompt = (e: Event) => {
+    // 3. Check for pre-captured global prompt from main.tsx
+    const globalPrompt = (window as any).__pwaInstallPrompt;
+    if (globalPrompt) {
+      setDeferredPrompt(globalPrompt);
+      setTimeout(() => setShowBanner(true), 2000);
+    }
+
+    // 4. Listen for Chrome/Edge/Android beforeinstallprompt & custom prompt event
+    const handlePromptEvent = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
-      // Show install prompt banner after a short delay
+      const promptEvent = (e as CustomEvent).detail || e;
+      setDeferredPrompt(promptEvent as BeforeInstallPromptEvent);
       setTimeout(() => setShowBanner(true), 2000);
     };
 
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('beforeinstallprompt', handlePromptEvent);
+    window.addEventListener('pwa-prompt-available', handlePromptEvent);
+
+    // 5. Dismiss banner on appinstalled event
+    const handleAppInstalled = () => {
+      setShowBanner(false);
+      setDeferredPrompt(null);
+    };
+    window.addEventListener('appinstalled', handleAppInstalled);
 
     // If on iOS and not standalone, show banner after delay
     if (isIosDevice && !isStandalone) {
@@ -51,7 +72,9 @@ export const InstallPromptBanner: React.FC = () => {
     }
 
     return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('beforeinstallprompt', handlePromptEvent);
+      window.removeEventListener('pwa-prompt-available', handlePromptEvent);
+      window.removeEventListener('appinstalled', handleAppInstalled);
     };
   }, []);
 
@@ -94,7 +117,7 @@ export const InstallPromptBanner: React.FC = () => {
                 Install HabitsSeen
               </p>
               <p className="text-[11px] text-stone font-medium">
-                Fast 1-tap homescreen access & offline tracking
+                Fast 1-tap homescreen access &amp; habit tracking
               </p>
             </div>
           </div>

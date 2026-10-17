@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '../ui/Button';
 import { AuthModal } from './AuthModal';
 import { InstallPromptBanner } from '../pwa/InstallPromptBanner';
+import { BrandLegalModal, BrandLegalTab } from '../brand/BrandLegalModal';
 import {
   ShieldAlert,
   Award,
@@ -13,11 +14,14 @@ import {
   Target,
   BarChart3,
   Calendar,
+  Flame,
 } from 'lucide-react';
 
 export const LandingPage: React.FC = () => {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('signup');
+  const [legalModalOpen, setLegalModalOpen] = useState(false);
+  const [legalTab, setLegalTab] = useState<BrandLegalTab>('privacy');
 
   const handleOpenAuth = (mode: 'login' | 'signup') => {
     setAuthMode(mode);
@@ -25,7 +29,7 @@ export const LandingPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-canvas text-ink flex flex-col selection:bg-primary selection:text-white">
+    <div className="min-h-screen min-h-dvh bg-canvas text-ink flex flex-col selection:bg-primary selection:text-white">
       {/* PWA 1-TAP INSTALLATION PROMPT */}
       <InstallPromptBanner />
 
@@ -114,43 +118,56 @@ export const LandingPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Card 1: 4 Habit Types */}
-          <div className="bg-surface-card border border-hairline rounded-3xl p-6 sm:p-7 shadow-xs hover:shadow-md transition-all">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          {/* Card 1: 4 Habit Types + Just Tracking */}
+          <div className="bg-surface-card border border-hairline rounded-3xl p-6 shadow-xs hover:shadow-md transition-all">
             <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center mb-5">
               <Target size={26} />
             </div>
-            <h3 className="font-display font-bold text-xl text-ink">
-              4 Adaptive Habit Types
+            <h3 className="font-display font-bold text-lg text-ink">
+              4 Behavioral Models
             </h3>
             <p className="text-charcoal text-xs sm:text-sm mt-2 leading-relaxed">
-              Track simple <strong>Yes/No</strong> habits, <strong>Numeric targets</strong> with customizable operators (at least, less than, exactly), <strong>Interactive Timers</strong>, and dynamic <strong>Checklists</strong> with starred critical tasks.
+              Track simple <strong>Yes/No</strong> habits, <strong>Numeric targets</strong> with custom operators, <strong>Interactive Timers</strong>, and <strong>Checklists</strong>. Need flexibility? Enable <strong>Just Tracking</strong> to log past days freely with zero health penalties.
             </p>
           </div>
 
-          {/* Card 2: Will Habit Gamification */}
-          <div className="bg-surface-card border border-hairline rounded-3xl p-6 sm:p-7 shadow-xs hover:shadow-md transition-all">
+          {/* Card 2: Hardcore Challenges */}
+          <div className="bg-surface-card border border-hairline rounded-3xl p-6 shadow-xs hover:shadow-md transition-all">
+            <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-600 flex items-center justify-center mb-5">
+              <Flame size={26} />
+            </div>
+            <h3 className="font-display font-bold text-lg text-ink">
+              Hardcore Challenges
+            </h3>
+            <p className="text-charcoal text-xs sm:text-sm mt-2 leading-relaxed">
+              Lock in high-stakes 7, 9, 11, or 21-day sprints. Miss a day, and face the strict <strong>-90% health penalty</strong>. Survive all required completions to earn permanent trophies and massive XP bonuses.
+            </p>
+          </div>
+
+          {/* Card 3: Will Habit Gamification */}
+          <div className="bg-surface-card border border-hairline rounded-3xl p-6 shadow-xs hover:shadow-md transition-all">
             <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-5">
               <Award size={26} />
             </div>
-            <h3 className="font-display font-bold text-xl text-ink">
-              "Will Habit" Level Badges
+            <h3 className="font-display font-bold text-lg text-ink">
+              "Will Habit" Gamification
             </h3>
             <p className="text-charcoal text-xs sm:text-sm mt-2 leading-relaxed">
-              Unlock Tier 1 upon onboarding and earn dynamic XP points based on difficulty, priority, and streak multipliers. Level up from <em>Will Initiate</em> to <em>Legendary Monk</em>.
+              Earn XP points based on difficulty, priority, and streak multipliers. Level up from <em>Will Habit Initiate</em> to <em>Legendary Monk</em> with Duolingo-style hearts vitality protection.
             </p>
           </div>
 
-          {/* Card 3: Timer Habit Break */}
-          <div className="bg-surface-card border border-hairline rounded-3xl p-6 sm:p-7 shadow-xs hover:shadow-md transition-all">
+          {/* Card 4: Timer Habit Break */}
+          <div className="bg-surface-card border border-hairline rounded-3xl p-6 shadow-xs hover:shadow-md transition-all">
             <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-600 flex items-center justify-center mb-5">
               <ShieldAlert size={26} />
             </div>
-            <h3 className="font-display font-bold text-xl text-ink">
-              Timer Habit Break (Sobriety)
+            <h3 className="font-display font-bold text-lg text-ink">
+              Sobriety Break Timers
             </h3>
             <p className="text-charcoal text-xs sm:text-sm mt-2 leading-relaxed">
-              Quitting smoking, doomscrolling, or sugar? A continuous timestamp stopwatch calculates exact elapsed abstinence 24/7—even when the app or your device is turned off.
+              Quitting smoking, doomscrolling, alcohol, or junk food? Real-time timestamp chronometers calculate continuous clean time 24/7—even when the app or phone is powered off.
             </p>
           </div>
         </div>
@@ -211,6 +228,42 @@ export const LandingPage: React.FC = () => {
             />
             <span className="font-display font-bold text-lg">HabitsSeen</span>
           </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-white/70">
+            <button
+              type="button"
+              onClick={() => {
+                setLegalTab('privacy');
+                setLegalModalOpen(true);
+              }}
+              className="hover:text-white transition-colors underline cursor-pointer"
+            >
+              Privacy Policy
+            </button>
+            <span>&bull;</span>
+            <button
+              type="button"
+              onClick={() => {
+                setLegalTab('terms');
+                setLegalModalOpen(true);
+              }}
+              className="hover:text-white transition-colors underline cursor-pointer"
+            >
+              Terms of Service
+            </button>
+            <span>&bull;</span>
+            <button
+              type="button"
+              onClick={() => {
+                setLegalTab('explore');
+                setLegalModalOpen(true);
+              }}
+              className="hover:text-white transition-colors underline cursor-pointer"
+            >
+              Arigato Labs
+            </button>
+          </div>
+
           <p className="text-xs text-white/60">
             &copy; 2026 HabitsSeen by Arigato Labs. Designed with precision & purpose.
           </p>
@@ -222,6 +275,13 @@ export const LandingPage: React.FC = () => {
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
         defaultMode={authMode}
+      />
+
+      {/* BRAND & LEGAL MODAL */}
+      <BrandLegalModal
+        isOpen={legalModalOpen}
+        onClose={() => setLegalModalOpen(false)}
+        initialTab={legalTab}
       />
     </div>
   );

@@ -66,3 +66,8 @@ export async function verifySecurityAnswer(
     return false;
   }
 }
+
+export function hasSecurityGuard(user?: { security?: { question?: string; answer?: string; answerHash?: string } } | null): boolean {
+  if (!user?.security?.question) return false;
+  return Boolean(user.security.answerHash || user.security.answer);
+}

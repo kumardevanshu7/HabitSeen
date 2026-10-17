@@ -49,31 +49,43 @@ export const ChallengesView: React.FC = () => {
 
   const activeDateKey = getTodayKey();
 
-  // Helper: Evaluates whether a challenge is finished/conquered
-  const isChallengeFinished = (c: Challenge) => {
-    if (c.status === 'COMPLETED' || c.isArchived) return true;
+  // Helper: Evaluates whether a challenge is conquered (completedDays >= targetDays)
+  const isChallengeConquered = (c: Challenge) => {
+    if (c.status === 'COMPLETED') return true;
     const targetDays = Math.max(1, c.targetDays || 7);
     const dayLogs = c.dayLogs || {};
     const completedDays = Object.values(dayLogs).filter(
       (l) => l.status === 'COMPLETED'
     ).length;
-    if (completedDays >= targetDays) return true;
-
-    // Window has elapsed past endDate
-    const today = getTodayKey();
-    if (c.endDate && today > c.endDate) return true;
-
-    return false;
+    return completedDays >= targetDays;
   };
 
-  // Auto-sync any challenge that has completed all days or passed endDate to 'COMPLETED' status
+  // Helper: Evaluates whether a challenge has passed its end date without conquering
+  const isChallengeExpired = (c: Challenge) => {
+    if (isChallengeConquered(c)) return false;
+    const today = getTodayKey();
+    return Boolean(c.endDate && today > c.endDate);
+  };
+
+  const isChallengeFinished = (c: Challenge) => {
+    return c.isArchived || isChallengeConquered(c) || isChallengeExpired(c);
+  };
+
+  // Auto-sync: Conquer if target days achieved, Fail if endDate elapsed without target days
   useEffect(() => {
     for (const c of challenges) {
-      if (c.status !== 'COMPLETED' && !c.isArchived && isChallengeFinished(c)) {
+      if (c.isArchived) continue;
+      if (c.status !== 'COMPLETED' && isChallengeConquered(c)) {
         updateChallenge({
           ...c,
           status: 'COMPLETED',
           completedAt: c.completedAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      } else if (c.status !== 'FAILED' && c.status !== 'COMPLETED' && isChallengeExpired(c)) {
+        updateChallenge({
+          ...c,
+          status: 'FAILED',
           updatedAt: new Date().toISOString(),
         });
       }
@@ -83,8 +95,10 @@ export const ChallengesView: React.FC = () => {
   // Auto-enforce Rule 2 (-90% Health Deduction) on any past day (startDate <= d < today) left incomplete/PARTIAL
   useEffect(() => {
     const today = getTodayKey();
+    let penaltyEnforcedThisCycle = false;
+
     for (const c of challenges) {
-      if (c.status === 'COMPLETED' || isChallengeFinished(c)) continue;
+      if (c.status === 'COMPLETED' || c.status === 'FAILED' || isChallengeFinished(c)) continue;
       const targetDays = Math.max(1, c.targetDays || 7);
       for (let idx = 0; idx < targetDays; idx++) {
         const dKey = format(addDays(parseISO(c.startDate), idx), 'yyyy-MM-dd');
@@ -93,22 +107,31 @@ export const ChallengesView: React.FC = () => {
         const enforceKey = `${c.id}_${dKey}`;
         if (
           (!log || log.status === 'PARTIAL') &&
-          !autoEnforcedRef.current.has(enforceKey)
+          !autoEnforcedRef.current.has(enforceKey) &&
+          !penaltyEnforcedThisCycle
         ) {
           autoEnforcedRef.current.add(enforceKey);
-          failChallengeDay(c.id, dKey).then(() => {
-            setPenaltyToast(
-              `⚠️ Rule 2 Auto-Enforced on "${c.name}" (${dKey}): Missed day detected — 90% Health & 50 XP deducted!`
-            );
-          });
+          penaltyEnforcedThisCycle = true;
+          failChallengeDay(c.id, dKey)
+            .then(() => {
+              setPenaltyToast(
+                `⚠️ Rule 2 Auto-Enforced on "${c.name}" (${dKey}): Missed day detected — 90% Health & 50 XP deducted!`
+              );
+            })
+            .catch((err) => {
+              console.error('Failed to auto-enforce penalty:', err);
+              autoEnforcedRef.current.delete(enforceKey);
+            });
+          break;
         }
       }
+      if (penaltyEnforcedThisCycle) break;
     }
   }, [challenges, failChallengeDay]);
 
   const activeChallenges = challenges.filter((c) => !isChallengeFinished(c));
   const archivedChallenges = challenges.filter((c) => isChallengeFinished(c));
-  const completedChallenges = archivedChallenges;
+  const completedChallenges = challenges.filter((c) => isChallengeConquered(c));
 
   // Aggregate Challenge Analytics
   const totalChallengeDaysCompleted = challenges.reduce((sum, c) => {
@@ -140,6 +163,8 @@ export const ChallengesView: React.FC = () => {
     dateKey: string,
     taskId: string
   ) => {
+    if (isChallengeFinished(challenge) || challenge.status === 'COMPLETED' || challenge.isArchived) return;
+
     const dayLog = challenge.dayLogs?.[dateKey];
     if (dayLog?.status === 'FAILED' || dayLog?.status === 'COMPLETED') return;
 
@@ -157,6 +182,11 @@ export const ChallengesView: React.FC = () => {
   const handleTriggerFailPenalty = async (challenge: Challenge, dateKey: string) => {
     const currentHearts = user?.gamification?.hearts ?? 5;
     const lost = Number((currentHearts * 0.9).toFixed(2));
+    const confirmed = window.confirm(
+      `⚠️ Hardcore Penalty Warning:\n\nAre you sure you want to mark Missed for "${challenge.name}" on ${dateKey}?\n\nThis will immediately deduct 90% of your current Health (-${lost} ❤️) and deduct 50 XP.\n\nThis action cannot be undone.`
+    );
+    if (!confirmed) return;
+
     await failChallengeDay(challenge.id, dateKey);
     setPenaltyToast(
       `⚠️ Rule 2 Enforced on "${challenge.name}": -90% Health (-${lost} ❤️) & -50 XP deducted! Zero excuses.`
@@ -463,14 +493,16 @@ export const ChallengesView: React.FC = () => {
                           <Archive size={16} />
                         )}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditingChallenge(c)}
-                        className="p-1.5 text-charcoal hover:text-primary hover:bg-surface-bone rounded-full transition-colors cursor-pointer"
-                        title="Edit Challenge & Rename Tasks"
-                      >
-                        <Pencil size={16} />
-                      </button>
+                      {!isFinished && (
+                        <button
+                          type="button"
+                          onClick={() => setEditingChallenge(c)}
+                          className="p-1.5 text-charcoal hover:text-primary hover:bg-surface-bone rounded-full transition-colors cursor-pointer"
+                          title="Edit Challenge & Rename Tasks"
+                        >
+                          <Pencil size={16} />
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => setInspectedChallenge(c)}
@@ -542,35 +574,45 @@ export const ChallengesView: React.FC = () => {
                     <div className="space-y-1.5 pt-1">
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] font-bold uppercase tracking-wider text-charcoal block">
-                          Mandatory Daily Tasks ({todayCompletedTaskIds.length}/{c.tasks.length}):
+                          {isFinished
+                            ? `Mandatory Tasks (All Conquered • ${c.tasks.length}/${c.tasks.length}):`
+                            : `Mandatory Daily Tasks (${todayCompletedTaskIds.length}/${c.tasks.length}):`}
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => setEditingChallenge(c)}
-                          className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
-                          title="Rename or edit tasks"
-                        >
-                          <Pencil size={10} /> Rename / Edit Tasks
-                        </button>
+                        {!isFinished && (
+                          <button
+                            type="button"
+                            onClick={() => setEditingChallenge(c)}
+                            className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                            title="Rename or edit tasks"
+                          >
+                            <Pencil size={10} /> Rename / Edit Tasks
+                          </button>
+                        )}
                       </div>
                       {c.tasks.map((task) => {
                         const isChecked =
-                          isTodayCompleted || todayCompletedTaskIds.includes(task.id);
+                          isFinished || isTodayCompleted || todayCompletedTaskIds.includes(task.id);
                         return (
                           <div
                             key={task.id}
                             onClick={() => {
-                              if (!isChecked) {
+                              if (!isChecked && !isFinished) {
                                 handleToggleSubTask(c, activeDateKey, task.id);
                               }
                             }}
                             className={clsx(
                               'flex items-center justify-between p-2.5 rounded-xl border text-xs transition-all select-none',
-                              isChecked
+                              isChecked || isFinished
                                 ? 'bg-emerald-50/70 border-emerald-300 text-charcoal cursor-default'
                                 : 'bg-surface-bone/70 border-hairline text-ink hover:bg-stone/20 cursor-pointer'
                             )}
-                            title={isChecked ? 'Task completed' : 'Click to complete task'}
+                            title={
+                              isFinished
+                                ? 'Challenge Completed & Archived (Read Only)'
+                                : isChecked
+                                ? 'Task completed'
+                                : 'Click to complete task'
+                            }
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
                               <div
@@ -611,9 +653,15 @@ export const ChallengesView: React.FC = () => {
                 <div className="pt-3.5 mt-4 border-t border-hairline flex items-center justify-between gap-2">
                   {challengesTab === 'archived' || isFinished ? (
                     <div className="flex items-center justify-between w-full">
-                      <span className="text-xs font-bold text-amber-600 flex items-center gap-1.5">
-                        <Trophy size={16} /> Conquered • Total +{c.totalXpEarned || (targetDays * 50)} XP
-                      </span>
+                      {isChallengeConquered(c) ? (
+                        <span className="text-xs font-bold text-amber-600 flex items-center gap-1.5">
+                          <Trophy size={16} /> Conquered • Total +{c.totalXpEarned || (targetDays * 50)} XP
+                        </span>
+                      ) : (
+                        <span className="text-xs font-bold text-red-600 flex items-center gap-1.5">
+                          <XCircle size={16} /> Challenge Expired / Failed
+                        </span>
+                      )}
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
@@ -622,14 +670,16 @@ export const ChallengesView: React.FC = () => {
                         >
                           Analytics
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => toggleArchiveChallenge(c.id, false)}
-                          className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
-                          title="Resume / Move back to Active Challenges"
-                        >
-                          <ArchiveRestore size={13} /> Unarchive
-                        </button>
+                        {c.isArchived && (
+                          <button
+                            type="button"
+                            onClick={() => toggleArchiveChallenge(c.id, false)}
+                            className="text-xs font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                            title="Resume / Move back to Active Challenges"
+                          >
+                            <ArchiveRestore size={13} /> Unarchive
+                          </button>
+                        )}
                       </div>
                     </div>
                   ) : isTodayCompleted ? (
@@ -684,7 +734,7 @@ export const ChallengesView: React.FC = () => {
                       >
                         <Check size={15} className="stroke-[3] shrink-0" />
                         <span className="truncate">Complete Day</span>
-                        <span className="hidden xs:inline-flex items-center text-[10px] font-mono font-black px-1.5 py-0.5 rounded-full bg-white/20 text-white shrink-0">
+                        <span className="hidden sm:inline-flex items-center text-[10px] font-mono font-black px-1.5 py-0.5 rounded-full bg-white/20 text-white shrink-0">
                           +50 XP
                         </span>
                       </button>

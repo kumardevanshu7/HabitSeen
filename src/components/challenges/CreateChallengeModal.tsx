@@ -24,6 +24,7 @@ import {
   Edit2,
 } from 'lucide-react';
 import clsx from 'clsx';
+import { getTodayKey } from '../../utils/dateMath';
 
 interface CreateChallengeModalProps {
   isOpen: boolean;
@@ -147,8 +148,16 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
     }
   }, [isOpen, challengeToEdit]);
 
+  const isStarted = Boolean(
+    challengeToEdit &&
+    (Object.keys(challengeToEdit.dayLogs || {}).length > 0 ||
+      (challengeToEdit.startDate && getTodayKey() >= challengeToEdit.startDate))
+  );
+
   const effectiveDays =
-    durationPreset === 'custom' ? Math.max(1, Number(customDays) || 7) : durationPreset;
+    durationPreset === 'custom'
+      ? Math.min(365, Math.max(1, Number(customDays) || 7))
+      : durationPreset;
 
   const vibrantColor = boostVibrancy(selectedColor);
   const SelectedIconComp =
@@ -173,6 +182,7 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
   };
 
   const handleRemoveTask = (id: string) => {
+    if (isStarted) return;
     setTasks(tasks.filter((t) => t.id !== id));
   };
 
@@ -182,8 +192,8 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
       setError('Please enter a challenge name');
       return;
     }
-    if (durationPreset === 'custom' && (!customDays || customDays < 1)) {
-      setError('Please enter a valid number of days (at least 1)');
+    if (durationPreset === 'custom' && (!customDays || customDays < 1 || customDays > 365)) {
+      setError('Please enter a valid duration between 1 and 365 days');
       return;
     }
     setError('');
@@ -331,13 +341,20 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
               </span>
             </div>
 
-            <div className="grid grid-cols-4 gap-2.5">
+            {isStarted && (
+              <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 p-2.5 rounded-xl font-medium">
+                🔒 This challenge has already started. Duration and mandatory tasks are locked to preserve disciplinary commitment.
+              </p>
+            )}
+
+            <div className={clsx("grid grid-cols-4 gap-2.5", isStarted && "opacity-50 pointer-events-none")}>
               {([7, 9, 11, 'custom'] as const).map((preset) => {
                 const isSelected = durationPreset === preset;
                 return (
                   <button
                     type="button"
                     key={String(preset)}
+                    disabled={isStarted}
                     onClick={() => setDurationPreset(preset)}
                     className={clsx(
                       'py-3 px-2 rounded-2xl border-2 font-display font-bold text-xs sm:text-sm transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer',
@@ -365,14 +382,15 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
             {durationPreset === 'custom' && (
               <div className="pt-2 animate-in fade-in duration-150">
                 <Input
-                  label="Enter Custom Number of Days"
+                  label="Enter Custom Number of Days (Max 365)"
                   type="number"
                   min={1}
-                  max={1000}
+                  max={365}
                   value={customDays}
-                  onChange={(e) => setCustomDays(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                  onChange={(e) => setCustomDays(Math.min(365, Math.max(1, parseInt(e.target.value, 10) || 1)))}
                   placeholder="e.g. 21, 30, 45, 75"
                   required
+                  disabled={isStarted}
                 />
               </div>
             )}

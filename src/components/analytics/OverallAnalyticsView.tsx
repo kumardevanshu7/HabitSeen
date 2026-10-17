@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAppStore } from '../../stores/useAppStore';
 import { WILL_HABIT_TIERS, CATEGORY_ICONS } from '../../constants/iconsAndColors';
-import { levelFromXp } from '../../constants/gamification';
+import { levelFromXp, GAME_RULES } from '../../constants/gamification';
 import { boostVibrancy, getContrastIconColor } from '../../utils/colorUtils';
 import {
   Award,
@@ -58,7 +58,7 @@ export const OverallAnalyticsView: React.FC<OverallAnalyticsViewProps> = ({
   const { user, habits, logs, habitBreaks, categories, challenges } = useAppStore();
 
   const userLevel = user?.gamification?.level ?? 1;
-  const userXp = user?.gamification?.totalXp ?? 100;
+  const userXp = user?.gamification?.totalXp ?? 0;
   const userTitle = user?.gamification?.levelTitle ?? 'Will Habit Initiate';
   const userConsistency = user?.gamification?.consistencyScore ?? 100;
 
@@ -92,7 +92,7 @@ export const OverallAnalyticsView: React.FC<OverallAnalyticsViewProps> = ({
     }
   });
   const weeklyCompleted = weeklyLogs.filter((l) => l.status === 'COMPLETED').length;
-  const weeklyRate = weeklyLogs.length > 0 ? Math.round((weeklyCompleted / weeklyLogs.length) * 100) : 100;
+  const weeklyRate = weeklyLogs.length > 0 ? Math.round((weeklyCompleted / weeklyLogs.length) * 100) : 0;
 
   const monthlyLogs = allLogsArray.filter((l) => {
     try {
@@ -103,7 +103,7 @@ export const OverallAnalyticsView: React.FC<OverallAnalyticsViewProps> = ({
     }
   });
   const monthlyCompleted = monthlyLogs.filter((l) => l.status === 'COMPLETED').length;
-  const monthlyRate = monthlyLogs.length > 0 ? Math.round((monthlyCompleted / monthlyLogs.length) * 100) : 100;
+  const monthlyRate = monthlyLogs.length > 0 ? Math.round((monthlyCompleted / monthlyLogs.length) * 100) : 0;
 
   // Habit Type Breakdown
   const yesNoCount = habits.filter((h) => h.type === 'YES_NO').length;
@@ -111,26 +111,38 @@ export const OverallAnalyticsView: React.FC<OverallAnalyticsViewProps> = ({
   const timerCount = habits.filter((h) => h.type === 'TIMER').length;
   const checklistCount = habits.filter((h) => h.type === 'CHECKLIST').length;
 
-  // Day of the Week Consistency (Mon..Sun)
-  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const dayStats = dayNames.map((name, dayIndex) => {
+  // Day of the Week Consistency (Monday-first: Mon..Sun)
+  const dayOrder = [1, 2, 3, 4, 5, 6, 0];
+  const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const dayStats = dayNames.map((name, idx) => {
+    const dayOfWeek = dayOrder[idx];
     const dayLogs = allLogsArray.filter((l) => {
       try {
-        return parseISO(l.date).getDay() === dayIndex;
+        return parseISO(l.date).getDay() === dayOfWeek;
       } catch {
         return false;
       }
     });
     const completed = dayLogs.filter((l) => l.status === 'COMPLETED').length;
     const rate = dayLogs.length > 0 ? Math.round((completed / dayLogs.length) * 100) : 0;
-    return { name, dayIndex, total: dayLogs.length, completed, rate };
+    return { name, dayIndex: dayOfWeek, total: dayLogs.length, completed, rate };
   });
 
-  // 120-Day Activity Heatmap Matrix
+  // 120-Day Activity Heatmap Matrix & Pre-aggregated Completions Lookup
   const pastYearDays = eachDayOfInterval({
     start: subDays(now, 119),
     end: now,
   });
+
+  const completionsByDate = React.useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const l of allLogsArray) {
+      if (l.status === 'COMPLETED' && l.date) {
+        map[l.date] = (map[l.date] || 0) + 1;
+      }
+    }
+    return map;
+  }, [logs]);
 
   // --- DEEP ANALYTICS METRICS ---
   // 1. Circadian / Peak Discipline Execution Window
@@ -176,7 +188,7 @@ export const OverallAnalyticsView: React.FC<OverallAnalyticsViewProps> = ({
   const totalPerfectDays = perfectDaysList.length;
   const thirtyDaysAgoKey = format(subDays(now, 30), 'yyyy-MM-dd');
   const past30dPerfectDays = perfectDaysList.filter((k) => k >= thirtyDaysAgoKey).length;
-  const perfectDaysXpGenerated = totalPerfectDays * 25;
+  const perfectDaysXpGenerated = totalPerfectDays * GAME_RULES.PERFECT_DAY_XP_BONUS;
 
   // 3. Habit Streak Health Quadrants
   const activeHabitsList = habits.filter((h) => !h.isArchived);
@@ -196,17 +208,20 @@ export const OverallAnalyticsView: React.FC<OverallAnalyticsViewProps> = ({
   const focusMins = Math.floor((totalTimerSeconds % 3600) / 60);
 
   const activeHabitBreaks = habitBreaks.filter((b) => !b.isArchived);
-  let totalSobrietyHours = 0;
+  let longestSobrietyHours = 0;
   activeHabitBreaks.forEach((hb) => {
     try {
       const s = parseISO(hb.startedAt);
       const diffMs = now.getTime() - s.getTime();
-      if (diffMs > 0) totalSobrietyHours += Math.floor(diffMs / (1000 * 60 * 60));
+      if (diffMs > 0) {
+        const hours = Math.floor(diffMs / (1000 * 60 * 60));
+        if (hours > longestSobrietyHours) longestSobrietyHours = hours;
+      }
     } catch {
       // ignore
     }
   });
-  const totalSobrietyDays = Math.floor(totalSobrietyHours / 24);
+  const longestSobrietyDays = Math.floor(longestSobrietyHours / 24);
 
   // 5. 4-Week Rolling Consistency Velocity
   const fourWeeks = [3, 2, 1, 0].map((weeksAgo) => {
@@ -1005,12 +1020,12 @@ export const OverallAnalyticsView: React.FC<OverallAnalyticsViewProps> = ({
                 </div>
                 <div>
                   <span className="text-xs font-bold text-ink block">Sobriety Clean Time</span>
-                  <span className="text-[11px] text-stone">Across active quit breaks</span>
+                  <span className="text-[11px] text-stone">Longest continuous clean streak</span>
                 </div>
               </div>
               <div className="text-right">
                 <span className="font-mono text-lg font-black text-ink">
-                  {totalSobrietyDays}d <span className="text-xs font-semibold text-stone">({totalSobrietyHours}h)</span>
+                  {longestSobrietyDays}d <span className="text-xs font-semibold text-stone">({longestSobrietyHours}h)</span>
                 </span>
                 <span className="text-[9px] uppercase tracking-wider text-stone block">Clean Time</span>
               </div>
@@ -1056,9 +1071,7 @@ export const OverallAnalyticsView: React.FC<OverallAnalyticsViewProps> = ({
         <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto p-1">
           {pastYearDays.map((day) => {
             const dateKey = format(day, 'yyyy-MM-dd');
-            const dayCompletions = allLogsArray.filter(
-              (l) => l.date === dateKey && l.status === 'COMPLETED'
-            ).length;
+            const dayCompletions = completionsByDate[dateKey] || 0;
 
             return (
               <div

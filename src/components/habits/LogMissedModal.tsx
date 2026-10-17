@@ -8,6 +8,7 @@ import clsx from 'clsx';
 import confetti from 'canvas-confetti';
 import { getUsedExcusesInMonth } from '../../utils/streakEngine';
 import { MISS_PENALTIES } from '../../constants/gamification';
+import { useTodayKey } from '../../hooks/useTodayKey';
 
 interface LogMissedModalProps {
   isOpen: boolean;
@@ -23,6 +24,11 @@ export const LogMissedModal: React.FC<LogMissedModalProps> = ({
   dateKey,
 }) => {
   const { logMissedHabit, logHabit, logs } = useAppStore();
+
+  const todayKey = useTodayKey();
+  const isPastDate = dateKey < todayKey;
+  const isFutureDate = dateKey > todayKey;
+  const isDateLocked = isPastDate || isFutureDate;
 
   const logKey = `${habit.id}_${dateKey}`;
   const existingLog = logs[logKey];
@@ -49,17 +55,26 @@ export const LogMissedModal: React.FC<LogMissedModalProps> = ({
     if (isOpen) {
       if (existingLog?.missedReasonType) {
         setSelectedReason(existingLog.missedReasonType);
+        setReasonText(existingLog.missedReasonText || existingLog.notes || '');
       } else if (existingLog?.status === 'EXCUSED') {
         setSelectedReason('GENUINE_REASON');
+        setReasonText(existingLog.missedReasonText || existingLog.notes || '');
       } else if (existingLog?.status === 'FAILED') {
         setSelectedReason('INTENTIONAL_MISS');
+        setReasonText(existingLog.missedReasonText || existingLog.notes || '');
+      } else {
+        setSelectedReason(isCapReached ? 'FORGOT_ACCIDENTAL' : 'GENUINE_REASON');
+        setReasonText('');
       }
-      setReasonText(existingLog?.missedReasonText || existingLog?.notes || '');
       setError('');
     }
-  }, [isOpen, existingLog]);
+  }, [isOpen, logKey]);
 
   const handleUnlockAndReset = async () => {
+    if (isDateLocked) {
+      setError(isPastDate ? `Past locked date (${dateKey}) cannot be unlocked.` : `Future date (${dateKey}) cannot be edited.`);
+      return;
+    }
     setIsSubmitting(true);
     try {
       await logHabit(habit.id, dateKey, {
@@ -79,9 +94,14 @@ export const LogMissedModal: React.FC<LogMissedModalProps> = ({
     e.preventDefault();
     setError('');
 
+    if (isDateLocked) {
+      setError(isPastDate ? `Past locked date (${dateKey}) cannot be modified.` : `Future date (${dateKey}) cannot be marked in advance.`);
+      return;
+    }
+
     if (selectedReason === 'GENUINE_REASON') {
       if (isCapReached) {
-        setError('Monthly excuse cap reached (3 of 3 used). Please choose another option.');
+        setError(`Monthly excuse cap reached (${maxExcuses} of ${maxExcuses} used). Please choose another option.`);
         return;
       }
       if (reasonText.trim().length < 5) {
@@ -133,6 +153,17 @@ export const LogMissedModal: React.FC<LogMissedModalProps> = ({
           </div>
         )}
 
+        {isDateLocked && (
+          <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-xl flex items-center gap-2 font-medium">
+            <Lock size={14} className="shrink-0 text-amber-600" />
+            <span>
+              {isPastDate
+                ? `Past date (${dateKey}) is locked. Reasons cannot be logged retroactively.`
+                : `Future date (${dateKey}) cannot be marked in advance.`}
+            </span>
+          </div>
+        )}
+
         {/* 3 REASON OPTIONS */}
         <div className="space-y-2.5">
           {/* OPTION 1: GENUINE REASON (PRESERVE STREAK) */}
@@ -177,7 +208,7 @@ export const LogMissedModal: React.FC<LogMissedModalProps> = ({
                   )}
                 >
                   {isCapReached
-                    ? '🔒 Cap Reached (3/3 Used)'
+                    ? `🔒 Cap Reached (${maxExcuses}/${maxExcuses} Used)`
                     : `🛡️ ${excusesRemaining} of ${maxExcuses} Left`}
                 </span>
               </div>
@@ -300,7 +331,7 @@ export const LogMissedModal: React.FC<LogMissedModalProps> = ({
                 setReasonText(e.target.value);
                 if (error) setError('');
               }}
-              placeholder="e.g. Main bahar tha, supplements pass mein nahi the / fever tha..."
+              placeholder="e.g. Traveling, urgent appointment, fever, or emergency..."
               className="w-full text-xs sm:text-sm p-3 bg-white text-ink border border-blue-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none shadow-2xs"
               autoFocus
             />
@@ -321,9 +352,9 @@ export const LogMissedModal: React.FC<LogMissedModalProps> = ({
               variant="outline"
               size="sm"
               onClick={handleUnlockAndReset}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isDateLocked}
               className="text-primary hover:text-primary-deep gap-1.5"
-              title="Remove missed/excused status and unlock task"
+              title={isDateLocked ? 'Date is locked' : 'Remove missed/excused status and unlock task'}
             >
               <Unlock size={14} /> Unlock Task
             </Button>
@@ -339,7 +370,7 @@ export const LogMissedModal: React.FC<LogMissedModalProps> = ({
               type="submit"
               variant={selectedReason === 'GENUINE_REASON' ? 'primary' : 'danger'}
               size="md"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isDateLocked}
               className="gap-2"
             >
               {isSubmitting ? (

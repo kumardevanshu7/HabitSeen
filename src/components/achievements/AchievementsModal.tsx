@@ -80,10 +80,20 @@ export const AchievementsModal: React.FC<AchievementsModalProps> = ({
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'UNLOCKED' | 'LOCKED'>('ALL');
   const [selectedRarity, setSelectedRarity] = useState<AchievementRarity | 'ALL'>('ALL');
 
-  // Compute all 100 achievements dynamically based on store stats
+  // Sync category when modal opens or initialCategory changes
+  React.useEffect(() => {
+    if (isOpen) {
+      setSelectedCategory(initialCategory);
+    }
+  }, [isOpen, initialCategory]);
+
+  // Compute all 100 achievements dynamically based on store stats (skip when closed)
   const { achievementsWithStatus, unlockedCount, totalCount, percentageUnlocked } = useMemo(() => {
+    if (!isOpen) {
+      return { achievementsWithStatus: [], unlockedCount: 0, totalCount: 100, percentageUnlocked: 0 };
+    }
     return computeUserAchievements({ habits, logs, user, habitBreaks, categories });
-  }, [habits, logs, user, habitBreaks, categories]);
+  }, [isOpen, habits, logs, user, habitBreaks, categories]);
 
   // Filtered achievements
   const filteredAchievements = useMemo(() => {

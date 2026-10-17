@@ -34,6 +34,7 @@ import {
   calculateHeartLossFromXpDrop,
   MIDNIGHT_MISSED_HABIT_XP_PENALTY,
   XP_LOSS_PER_HEART,
+  GAME_RULES,
 } from '../constants/gamification';
 import { hashSecurityAnswer } from '../utils/cryptoUtils';
 import { doc, getDoc } from 'firebase/firestore';
@@ -117,6 +118,7 @@ interface AppState {
       valueChecklistCompletedItemIds?: string[];
       notes?: string;
       forceStatus?: HabitLogStatus;
+      allowUnlock?: boolean;
     }
   ) => Promise<void>;
   skipHabit: (habitId: string, dateKey: string, notes?: string) => Promise<void>;
@@ -585,11 +587,38 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const logKey = `${habitId}_${dateKey}`;
     const existingLog = state.logs[logKey] || {};
 
-    // Safeguard: Once a "Just Tracking" habit is completed for this day, it is locked permanently
+    const todayKey = getTodayKey();
+    const isPastDate = dateKey < todayKey;
+    const isFutureDate = dateKey > todayKey;
+
+    // 1. Strict Future Gate: Future dates cannot be logged or completed
+    if (isFutureDate) {
+      console.warn('Cannot log habits on future dates:', dateKey);
+      return;
+    }
+
+    // 2. Midnight Lock: For standard scheduled habits, past days cannot be retroactively checked off
+    if (isPastDate && habit.frequency?.type !== 'JUST_TRACKING') {
+      if (!data.forceStatus || (data.forceStatus !== 'EXCUSED' && data.forceStatus !== 'MISSED' && data.forceStatus !== 'FAILED')) {
+        console.warn('Cannot retroactively complete locked past habit date:', dateKey);
+        return;
+      }
+    }
+
+    // 3. Safeguard: Once a "Just Tracking" habit is completed for this day, it is locked permanently
     if (
       existingLog.status === 'COMPLETED' &&
       habit.frequency?.type === 'JUST_TRACKING' &&
       (data.valueYesNo === false || (data.forceStatus && data.forceStatus !== 'COMPLETED'))
+    ) {
+      return;
+    }
+
+    // 4. Once COMPLETED, cannot unmark without explicit allowUnlock: true
+    if (
+      existingLog.status === 'COMPLETED' &&
+      (data.valueYesNo === false || (data.forceStatus && data.forceStatus !== 'COMPLETED')) &&
+      !data.allowUnlock
     ) {
       return;
     }
@@ -1332,9 +1361,12 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
     // 90% HEALTH DEDUCTION PUNISHMENT!
     const currentHearts = state.user?.gamification?.hearts ?? 5;
-    const deductedHearts = Number((currentHearts * 0.9).toFixed(2));
-    const remainingHearts = Math.max(0.05, Number((currentHearts - deductedHearts).toFixed(2)));
-    const xpPenalty = 50;
+    const deductedHearts = Number((currentHearts * (GAME_RULES.CHALLENGE_FAIL_HEALTH_DEDUCTION_PCT / 100)).toFixed(2));
+    let remainingHearts = Number((currentHearts - deductedHearts).toFixed(2));
+    if (remainingHearts < 0.5) {
+      remainingHearts = 0; // Trigger Zero Vitality recovery flow
+    }
+    const xpPenalty = GAME_RULES.CHALLENGE_FAIL_XP_PENALTY;
 
     const failedLog: ChallengeDayLog = {
       date: dateKey,
@@ -1424,11 +1456,11 @@ export const useAppStore = create<AppState>()((set, get) => ({
     // Also scan challenges: any challenge that finished all target days or past its endDate is completed
     let challengesUpdated = false;
     const updatedChallenges = state.challenges.map((c) => {
-      if (c.status !== 'COMPLETED' && !c.isArchived) {
+      if (c.status !== 'COMPLETED' && c.status !== 'FAILED' && !c.isArchived) {
         const completedCount = Object.values(c.dayLogs || {}).filter((l) => l.status === 'COMPLETED').length;
         const target = Math.max(1, c.targetDays || 7);
         const hasPassedEnd = c.endDate ? today > c.endDate : false;
-        if (completedCount >= target || hasPassedEnd) {
+        if (completedCount >= target) {
           challengesUpdated = true;
           const finishedC: Challenge = {
             ...c,
@@ -1438,6 +1470,15 @@ export const useAppStore = create<AppState>()((set, get) => ({
           };
           updateChallengeInDb(currentUser.uid, finishedC);
           return finishedC;
+        } else if (hasPassedEnd) {
+          challengesUpdated = true;
+          const failedC: Challenge = {
+            ...c,
+            status: 'FAILED',
+            updatedAt: new Date().toISOString(),
+          };
+          updateChallengeInDb(currentUser.uid, failedC);
+          return failedC;
         }
       }
       return c;
@@ -1572,9 +1613,13 @@ export const useAppStore = create<AppState>()((set, get) => ({
   softResetAccount: async () => {
     const { currentUser, user } = get();
     if (!currentUser || !user) return;
+    // Guard against race conditions: only trigger if hearts <= 0
+    if ((user.gamification?.hearts ?? 5) > 0) return;
+
     const currentXp = user.gamification?.totalXp ?? 0;
-    const xpPenalty = Math.min(100, currentXp);
+    const xpPenalty = Math.min(GAME_RULES.SOFT_RESET_XP_PENALTY, currentXp);
     const newXp = Math.max(0, currentXp - xpPenalty);
+    const lvlInfo = levelFromXp(newXp);
     const maxH = calculateMaxHearts(newXp);
     const updatedUser: UserProfile = {
       ...user,
@@ -1583,6 +1628,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
         hearts: maxH,
         maxHearts: maxH,
         totalXp: newXp,
+        level: lvlInfo.level,
+        levelTitle: lvlInfo.title,
         lastDeathAt: new Date().toISOString(),
       },
     };

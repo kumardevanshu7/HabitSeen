@@ -32,10 +32,14 @@ export const HabitBreakHub: React.FC = () => {
     useAppStore();
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [relapseModalBreak, setRelapseModalBreak] = useState<HabitBreak | null>(null);
+  const [relapseModalBreakId, setRelapseModalBreakId] = useState<string | null>(null);
   const [relapseReason, setRelapseReason] = useState('');
-  const [viewingHistoryBreak, setViewingHistoryBreak] = useState<HabitBreak | null>(null);
+  const [viewingHistoryBreakId, setViewingHistoryBreakId] = useState<string | null>(null);
   const [breakToDelete, setBreakToDelete] = useState<HabitBreak | null>(null);
+  const [isRelapsing, setIsRelapsing] = useState(false);
+
+  const relapseModalBreak = habitBreaks.find((b) => b.id === relapseModalBreakId) || null;
+  const viewingHistoryBreak = habitBreaks.find((b) => b.id === viewingHistoryBreakId) || null;
 
   // Form State
   const [name, setName] = useState('');
@@ -84,9 +88,28 @@ export const HabitBreakHub: React.FC = () => {
       if (startMode === 'custom' && customStartDate) {
         const timePart = customStartTime || '00:00';
         const parsed = new Date(`${customStartDate}T${timePart}:00`);
-        if (!isNaN(parsed.getTime())) {
-          computedStartedAt = parsed.toISOString();
+        const now = new Date();
+        if (isNaN(parsed.getTime())) {
+          setError('Invalid start date and time.');
+          submittingRef.current = false;
+          setIsSubmitting(false);
+          return;
         }
+        if (parsed.getTime() > now.getTime() + 60 * 1000) {
+          setError('Start date cannot be in the future.');
+          submittingRef.current = false;
+          setIsSubmitting(false);
+          return;
+        }
+        const fiveYearsAgo = new Date();
+        fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
+        if (parsed.getTime() < fiveYearsAgo.getTime()) {
+          setError('Start date cannot be more than 5 years in the past.');
+          submittingRef.current = false;
+          setIsSubmitting(false);
+          return;
+        }
+        computedStartedAt = parsed.toISOString();
       }
 
       await addHabitBreak({
@@ -114,10 +137,17 @@ export const HabitBreakHub: React.FC = () => {
   };
 
   const handleConfirmRelapse = async () => {
-    if (!relapseModalBreak) return;
-    await relapseHabitBreak(relapseModalBreak.id, relapseReason.trim());
-    setRelapseReason('');
-    setRelapseModalBreak(null);
+    if (!relapseModalBreakId || isRelapsing) return;
+    setIsRelapsing(true);
+    try {
+      await relapseHabitBreak(relapseModalBreakId, relapseReason.trim());
+      setRelapseReason('');
+      setRelapseModalBreakId(null);
+    } catch (err) {
+      console.error('Failed to log relapse:', err);
+    } finally {
+      setIsRelapsing(false);
+    }
   };
 
   // Format Elapsed Time (Days, Hours, Mins, Secs)
@@ -154,7 +184,7 @@ export const HabitBreakHub: React.FC = () => {
       {/* HEADER BANNER */}
       <div className="p-6 bg-surface-dark text-white rounded-3xl border border-hairline flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="inline-flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full text-xs font-semibold text-primary-pink mb-2">
+          <div className="inline-flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full text-xs font-semibold text-rose-300 mb-2">
             <ShieldAlert size={14} /> Persistent Sobriety / Abstinence Engine
           </div>
           <h2 className="font-display font-bold text-2xl sm:text-3xl tracking-tight">
@@ -173,6 +203,14 @@ export const HabitBreakHub: React.FC = () => {
         >
           <Plus size={18} /> Start New Break Timer
         </Button>
+      </div>
+
+      {/* Medical Safety Disclaimer */}
+      <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-start gap-2.5 text-xs text-amber-900">
+        <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+        <p>
+          <strong className="font-semibold text-amber-950">Medical Notice:</strong> If you are quitting alcohol, benzodiazepines, or substances with dangerous acute withdrawal symptoms, consult a qualified healthcare professional before stopping abruptly. Behavioral tracking is not a substitute for supervised medical care.
+        </p>
       </div>
 
       {/* ACTIVE BREAK TIMERS LIST */}
@@ -198,9 +236,11 @@ export const HabitBreakHub: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {habitBreaks.map((b) => {
             const time = formatElapsedTime(b.startedAt);
+            const liveTotalSecs = time.isScheduledFuture ? 0 : time.totalSeconds;
+            const effectiveBestStreak = Math.max(b.bestStreakSeconds || 0, liveTotalSecs);
             const bestTime = {
-              days: Math.floor(b.bestStreakSeconds / 86400),
-              hours: Math.floor((b.bestStreakSeconds % 86400) / 3600),
+              days: Math.floor(effectiveBestStreak / 86400),
+              hours: Math.floor((effectiveBestStreak % 86400) / 3600),
             };
 
             const IconComp =
@@ -304,7 +344,7 @@ export const HabitBreakHub: React.FC = () => {
                     {/* RELAPSE HISTORY BUTTON */}
                     <button
                       type="button"
-                      onClick={() => setViewingHistoryBreak(b)}
+                      onClick={() => setViewingHistoryBreakId(b.id)}
                       className="flex items-center gap-1 text-primary hover:text-primary-deep font-bold bg-primary/10 hover:bg-primary/20 px-2.5 py-1 rounded-full border border-primary/20 transition-colors"
                     >
                       <History size={13} />
@@ -317,7 +357,7 @@ export const HabitBreakHub: React.FC = () => {
                 <div className="pt-3 border-t border-hairline flex items-center justify-between gap-2">
                   <span className="text-[11px] text-stone">One day, one moment at a time.</span>
                   <button
-                    onClick={() => setRelapseModalBreak(b)}
+                    onClick={() => setRelapseModalBreakId(b.id)}
                     className="text-xs font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-4 py-2 rounded-full border border-red-200 transition-colors flex items-center gap-1.5 active:scale-95"
                   >
                     <RotateCcw size={13} /> I Relapsed
@@ -497,7 +537,7 @@ export const HabitBreakHub: React.FC = () => {
       {/* RELAPSE TRIGGER REFLECTION MODAL */}
       <Modal
         isOpen={Boolean(relapseModalBreak)}
-        onClose={() => setRelapseModalBreak(null)}
+        onClose={() => setRelapseModalBreakId(null)}
         title="Reset & Learn (Relapse Reflection)"
         subtitle="A slip is data, not defeat. Your past streak will be preserved in your Relapse Log."
         maxWidth="md"
@@ -525,11 +565,11 @@ export const HabitBreakHub: React.FC = () => {
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-2 border-t border-hairline">
-            <Button variant="ghost" onClick={() => setRelapseModalBreak(null)}>
+            <Button variant="ghost" onClick={() => setRelapseModalBreakId(null)}>
               Cancel
             </Button>
-            <Button variant="danger" onClick={handleConfirmRelapse}>
-              Log Relapse & Restart Timer
+            <Button variant="danger" onClick={handleConfirmRelapse} disabled={isRelapsing}>
+              {isRelapsing ? 'Logging...' : 'Log Relapse & Restart Timer'}
             </Button>
           </div>
         </div>
@@ -538,13 +578,13 @@ export const HabitBreakHub: React.FC = () => {
       {/* DEDICATED RELAPSE HISTORY & JOURNEY LOG MODAL */}
       <Modal
         isOpen={Boolean(viewingHistoryBreak)}
-        onClose={() => setViewingHistoryBreak(null)}
+        onClose={() => setViewingHistoryBreakId(null)}
         title={`${viewingHistoryBreak?.name || 'Habit Break'} — Relapse Journey Log`}
         subtitle="Full chronological record of past streaks and trigger reflections"
         maxWidth="lg"
       >
         <div className="space-y-4">
-          {viewingHistoryBreak && viewingHistoryBreak.relapseHistory?.length === 0 ? (
+          {viewingHistoryBreak && (viewingHistoryBreak.relapseHistory || []).length === 0 ? (
             <div className="text-center py-10 px-4 bg-surface-card rounded-2xl border border-hairline">
               <div className="w-14 h-14 rounded-full bg-emerald-50 text-badge-success flex items-center justify-center mx-auto mb-3">
                 <CheckCircle2 size={32} />
@@ -556,7 +596,7 @@ export const HabitBreakHub: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-              {viewingHistoryBreak?.relapseHistory
+              {(viewingHistoryBreak?.relapseHistory || [])
                 .slice()
                 .reverse()
                 .map((rel: RelapseRecord, idx: number) => {
@@ -571,7 +611,7 @@ export const HabitBreakHub: React.FC = () => {
                       <div className="flex items-center justify-between gap-2 border-b border-hairline/60 pb-2">
                         <span className="text-xs font-bold text-ink flex items-center gap-1.5">
                           <History size={14} className="text-primary" />
-                          Relapse #{viewingHistoryBreak.relapseHistory.length - idx}
+                          Relapse #{(viewingHistoryBreak?.relapseHistory?.length || 0) - idx}
                         </span>
                         <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full">
                           Lasted {readableDuration}
@@ -598,7 +638,7 @@ export const HabitBreakHub: React.FC = () => {
           )}
 
           <div className="flex justify-end pt-2 border-t border-hairline">
-            <Button variant="dark" onClick={() => setViewingHistoryBreak(null)}>
+            <Button variant="dark" onClick={() => setViewingHistoryBreakId(null)}>
               Close Relapse Log
             </Button>
           </div>

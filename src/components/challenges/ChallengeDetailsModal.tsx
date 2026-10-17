@@ -20,7 +20,7 @@ import {
   TrendingUp,
   Pencil,
 } from 'lucide-react';
-import { addDays, format, parseISO, isSameDay } from 'date-fns';
+import { addDays, format, parseISO, isSameDay, isValid } from 'date-fns';
 import clsx from 'clsx';
 
 interface ChallengeDetailsModalProps {
@@ -89,10 +89,15 @@ export const ChallengeDetailsModal: React.FC<ChallengeDetailsModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={`${challenge.name} — Challenge Analytics`}
-      subtitle={`Hardcore ${targetDays}-Day Challenge • Started ${format(
-        parseISO(challenge.startDate),
-        'dd MMM yyyy'
-      )}`}
+      subtitle={`Hardcore ${targetDays}-Day Challenge • Started ${
+        challenge.startDate && isValid(parseISO(challenge.startDate))
+          ? format(parseISO(challenge.startDate), 'dd MMM yyyy')
+          : 'Recently'
+      }${
+        challenge.endDate && isValid(parseISO(challenge.endDate))
+          ? ` • Ends ${format(parseISO(challenge.endDate), 'dd MMM yyyy')}`
+          : ''
+      }`}
       maxWidth="xl"
     >
       <div className="space-y-5">
@@ -119,6 +124,10 @@ export const ChallengeDetailsModal: React.FC<ChallengeDetailsModalProps> = ({
                 {challenge.status === 'COMPLETED' ? (
                   <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-badge-success text-white">
                     🏆 Conquered
+                  </span>
+                ) : challenge.status === 'FAILED' ? (
+                  <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-red-600 text-white">
+                    ✕ Challenge Expired / Failed
                   </span>
                 ) : (
                   <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200">
@@ -169,11 +178,11 @@ export const ChallengeDetailsModal: React.FC<ChallengeDetailsModalProps> = ({
 
           <div className="p-3.5 bg-surface-card border border-hairline rounded-2xl">
             <span className="text-xs text-charcoal flex items-center gap-1.5">
-              <Target size={14} className="text-primary" /> Days Remaining
+              <Target size={14} className="text-primary" /> Completions Left
             </span>
             <p className="font-mono text-2xl font-black text-ink mt-1">
               {daysRemaining}{' '}
-              <span className="text-xs font-sans text-charcoal">days left</span>
+              <span className="text-xs font-sans text-charcoal">needed</span>
             </p>
           </div>
 
@@ -194,7 +203,7 @@ export const ChallengeDetailsModal: React.FC<ChallengeDetailsModalProps> = ({
               <Zap size={14} className="text-amber-500" /> EXP Earned
             </span>
             <p className="font-mono text-2xl font-black text-amber-600 mt-1">
-              +{challenge.totalXpEarned || completedCount * 50}{' '}
+              +{challenge.totalXpEarned || completedCount * dailyXp}{' '}
               <span className="text-xs font-sans text-charcoal">XP</span>
             </p>
           </div>

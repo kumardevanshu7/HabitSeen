@@ -1,24 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { useAppStore } from '../../stores/useAppStore';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { CustomSelect, SelectOption } from '../ui/CustomSelect';
-import { ShieldCheck, Sparkles, Award, ArrowRight } from 'lucide-react';
+import { ShieldCheck, Sparkles, Award, ArrowRight, AlertTriangle } from 'lucide-react';
 import { UserProfile } from '../../types/habit';
 
 const GENDER_OPTIONS: SelectOption<UserProfile['gender']>[] = [
   { value: 'male', label: 'Male' },
   { value: 'female', label: 'Female' },
   { value: 'non_binary', label: 'Non-binary' },
-  { value: 'other', label: 'Other / Self-describe' },
+  { value: 'other', label: 'Other / Prefer not to say' },
 ];
 
 const RELATION_OPTIONS: SelectOption<UserProfile['relationStatus']>[] = [
+  { value: 'prefer_not_to_say', label: 'Prefer not to say' },
   { value: 'single', label: 'Single' },
   { value: 'in_relationship', label: 'In a Relationship' },
   { value: 'married', label: 'Married' },
-  { value: 'prefer_not_to_say', label: 'Prefer not to say' },
 ];
 
 export const OnboardingModal: React.FC = () => {
@@ -27,11 +27,20 @@ export const OnboardingModal: React.FC = () => {
   const [step, setStep] = useState<1 | 2>(1);
   const [name, setName] = useState(currentUser?.displayName || '');
   const [age, setAge] = useState<number>(24);
-  const [relationStatus, setRelationStatus] = useState<UserProfile['relationStatus']>('single');
+  const [relationStatus, setRelationStatus] = useState<UserProfile['relationStatus']>('prefer_not_to_say');
   const [gender, setGender] = useState<UserProfile['gender']>('male');
   const [loading, setLoading] = useState(false);
 
   const [nameError, setNameError] = useState('');
+  const [ageError, setAgeError] = useState('');
+  const [submitError, setSubmitError] = useState('');
+
+  // Prefill display name when currentUser becomes available
+  useEffect(() => {
+    if (currentUser?.displayName && !name) {
+      setName(currentUser.displayName);
+    }
+  }, [currentUser]);
 
   // Show onboarding ONLY when profileStatus is explicitly confirmed missing on server,
   // or exists but isOnboarded is false. Never show if loading, unknown (offline), or already onboarded.
@@ -45,21 +54,29 @@ export const OnboardingModal: React.FC = () => {
 
   const handleStep1Submit = (e: React.FormEvent) => {
     e.preventDefault();
+    let hasError = false;
+
     const trimmed = name.trim();
     if (!trimmed) {
       setNameError('Please tell us your name');
-      return;
-    }
-    if (trimmed.length < 2) {
+      hasError = true;
+    } else if (trimmed.length < 2) {
       setNameError('Name must be at least 2 characters long');
-      return;
+      hasError = true;
+    } else {
+      setNameError('');
     }
+
     const parsedAge = Number(age);
-    if (!Number.isFinite(parsedAge) || parsedAge < 10 || parsedAge > 120) {
-      setNameError('Please enter a valid age between 10 and 120');
-      return;
+    if (!Number.isFinite(parsedAge) || parsedAge < 13 || parsedAge > 120) {
+      setAgeError('You must be at least 13 years old to use HabitsSeen');
+      hasError = true;
+    } else {
+      setAgeError('');
     }
-    setNameError('');
+
+    if (hasError) return;
+
     setStep(2);
 
     confetti({
@@ -72,6 +89,7 @@ export const OnboardingModal: React.FC = () => {
 
   const handleFinishOnboarding = async () => {
     setLoading(true);
+    setSubmitError('');
     try {
       await completeOnboarding({
         name: name.trim(),
@@ -86,8 +104,9 @@ export const OnboardingModal: React.FC = () => {
         origin: { y: 0.5 },
         colors: ['#ea2804', '#2b9a66', '#ff6a3d'],
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to complete onboarding:', err);
+      setSubmitError(err?.message || 'Failed to complete setup. Please check your network and try again.');
     } finally {
       setLoading(false);
     }
@@ -128,15 +147,19 @@ export const OnboardingModal: React.FC = () => {
                 <Input
                   label="Your Age"
                   type="number"
-                  min={10}
+                  min={13}
                   max={120}
                   value={age}
-                  onChange={(e) => setAge(Number(e.target.value))}
+                  onChange={(e) => {
+                    setAge(Number(e.target.value));
+                    if (ageError) setAgeError('');
+                  }}
+                  error={ageError}
                   required
                 />
 
                 <CustomSelect
-                  label="Gender"
+                  label="Gender (Optional)"
                   value={gender}
                   options={GENDER_OPTIONS}
                   onChange={(val) => setGender(val)}
@@ -144,13 +167,17 @@ export const OnboardingModal: React.FC = () => {
               </div>
 
               <CustomSelect
-                label="Relationship Status"
+                label="Relationship Status (Optional)"
                 value={relationStatus}
                 options={RELATION_OPTIONS}
                 onChange={(val) => setRelationStatus(val)}
               />
 
-              <div className="pt-4">
+              <p className="text-[11px] text-stone text-center pt-1">
+                By continuing, you agree to our Terms and consent to personalized discipline scoring.
+              </p>
+
+              <div className="pt-2">
                 <Button type="submit" variant="primary" className="w-full text-base">
                   Continue to Calibration <ArrowRight size={18} className="ml-2" />
                 </Button>
@@ -160,6 +187,13 @@ export const OnboardingModal: React.FC = () => {
         ) : (
           /* Step 2: Unlocking "Will Habit" Badge */
           <div className="text-center py-4">
+            {submitError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2 text-left">
+                <AlertTriangle size={16} className="shrink-0 text-red-600" />
+                <span>{submitError}</span>
+              </div>
+            )}
+
             {/* Clean Centered Badge Display */}
             <div className="mb-4 flex flex-col items-center justify-center">
               <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-primary to-primary-glow flex items-center justify-center text-white shadow-xl ring-8 ring-primary/20 mb-3">
@@ -177,20 +211,20 @@ export const OnboardingModal: React.FC = () => {
               Will Habit
             </h2>
             <p className="text-primary font-bold text-xs sm:text-sm tracking-widest uppercase mt-1">
-              "The Will Initiate"
+              "Will Habit Initiate"
             </p>
 
             <div className="my-6 p-4 bg-surface-card border border-hairline rounded-2xl text-left text-xs sm:text-sm text-body space-y-2">
               <div className="flex items-start gap-2">
                 <Sparkles size={18} className="text-primary shrink-0 mt-0.5" />
                 <p>
-                  <strong className="text-ink">Daily XP Tracker:</strong> Har din habit complete karne par points (XP) milenge jo tumhari consistency ko level up karenge.
+                  <strong className="text-ink">Daily XP Tracker:</strong> Complete habits daily to earn XP, level up your rank, and crystallize consistency.
                 </p>
               </div>
               <div className="flex items-start gap-2">
                 <Sparkles size={18} className="text-primary shrink-0 mt-0.5" />
                 <p>
-                  <strong className="text-ink">Skip & Streak Rules:</strong> Regular streaks par bonus multipliers milenge, jabki unnecessary skips par points deduct honge.
+                  <strong className="text-ink">Streaks &amp; Health:</strong> Maintain streaks for bonus XP multipliers; unexcused misses deduct Willpower XP and Health Hearts.
                 </p>
               </div>
             </div>

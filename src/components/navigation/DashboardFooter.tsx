@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
-import { computeUserAchievements } from '../../constants/achievements';
+import { computeUserAchievements, ACHIEVEMENTS } from '../../constants/achievements';
 import { APP_CONFIG } from '../../constants/appConfig';
 import { BrandLegalTab } from '../brand/BrandLegalModal';
 import {
@@ -12,6 +12,7 @@ import {
   ShieldAlert,
   ChevronRight,
   Sparkles,
+  CheckCircle2,
 } from 'lucide-react';
 
 interface DashboardFooterProps {
@@ -29,13 +30,20 @@ export const DashboardFooter: React.FC<DashboardFooterProps> = ({
     return computeUserAchievements({ habits, logs, user, habitBreaks, categories });
   }, [habits, logs, user, habitBreaks, categories]);
 
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const a of ACHIEVEMENTS) {
+      counts[a.category] = (counts[a.category] || 0) + 1;
+    }
+    return counts;
+  }, []);
+
   return (
     <footer
-      className="w-full mt-12 border-t border-hairline bg-surface-card/60 backdrop-blur-sm pb-36 sm:pb-40"
-      style={{ paddingBottom: 'calc(8.5rem + env(safe-area-inset-bottom, 0px))' }}
+      className="w-full mt-12 border-t border-hairline bg-surface-card/60 backdrop-blur-sm pb-36 sm:pb-40 md:pb-12"
     >
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 space-y-10">
-        {/* 1. 100 ACHIEVEMENTS SHOWCASE BANNER */}
+        {/* 1. ACHIEVEMENTS SHOWCASE BANNER */}
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-amber-500/10 via-surface-card to-primary/5 border border-amber-200/70 p-6 sm:p-8 shadow-sm">
           <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
             <div className="flex items-start gap-4">
@@ -64,7 +72,7 @@ export const DashboardFooter: React.FC<DashboardFooterProps> = ({
               onClick={onOpenAchievements}
               className="w-full lg:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-ink text-white hover:bg-black font-display font-bold text-sm shadow-md hover:shadow-lg transition-all active:scale-95 shrink-0"
             >
-              <span>View All 100 Achievements</span>
+              <span>View All {totalCount} Achievements</span>
               <ChevronRight size={18} />
             </button>
           </div>
@@ -91,19 +99,25 @@ export const DashboardFooter: React.FC<DashboardFooterProps> = ({
             <div className="flex flex-wrap items-center gap-2 mt-4 text-[11px] text-charcoal">
               <span className="font-bold text-ink">Parameters Tracked:</span>
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-card border border-hairline">
-                <Flame size={12} className="text-orange-500" /> Streaks (15)
+                <Flame size={12} className="text-orange-500" /> Streaks ({categoryCounts['STREAKS'] || 15})
               </span>
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-card border border-hairline">
-                <Award size={12} className="text-blue-500" /> Completions (15)
+                <Award size={12} className="text-blue-500" /> Completions ({categoryCounts['COMPLETIONS'] || 15})
               </span>
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-card border border-hairline">
-                <Zap size={12} className="text-amber-500" /> Willpower XP (15)
+                <Zap size={12} className="text-amber-500" /> Willpower XP ({categoryCounts['WILLPOWER_XP'] || 15})
               </span>
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-card border border-hairline">
-                <Heart size={12} className="text-red-500" /> Vitality & Lives (10)
+                <Heart size={12} className="text-red-500" /> Vitality &amp; Lives ({categoryCounts['VITALITY'] || 10})
               </span>
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-card border border-hairline">
-                <ShieldAlert size={12} className="text-purple-500" /> Habit Breaks (10)
+                <ShieldAlert size={12} className="text-purple-500" /> Habit Breaks ({categoryCounts['HABIT_BREAKS'] || 10})
+              </span>
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-card border border-hairline">
+                <Sparkles size={12} className="text-emerald-500" /> Levels &amp; Perfect Days ({(categoryCounts['LEVELS'] || 10) + (categoryCounts['PERFECT_DAYS'] || 10)})
+              </span>
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-card border border-hairline">
+                <CheckCircle2 size={12} className="text-teal-500" /> Architecture &amp; Custom ({(categoryCounts['HABIT_CREATION'] || 10) + (categoryCounts['CUSTOMIZATION'] || 5)})
               </span>
             </div>
           </div>

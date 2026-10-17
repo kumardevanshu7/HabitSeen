@@ -29,7 +29,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       onClose();
     } catch (err: any) {
       console.error(err);
-      if (err.code !== 'auth/popup-closed-by-user') {
+      if (err.code === 'auth/popup-blocked') {
+        setError('The Google sign-in popup was blocked by your browser. Please allow popups for this site and try again.');
+      } else if (err.code !== 'auth/popup-closed-by-user') {
         setError(err.message || 'Failed to sign in with Google.');
       }
     } finally {
@@ -82,6 +84,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         <p className="text-center text-[11px] text-stone mt-2">
           Fast, safe & 1-click cloud sync with Google Authentication
+        </p>
+
+        <p className="text-center text-[10px] text-stone/80 pt-2 border-t border-hairline/60">
+          By signing in, you agree to our Terms of Service &amp; Privacy Policy. Users must be 13 years or older.
         </p>
       </div>
     </Modal>
