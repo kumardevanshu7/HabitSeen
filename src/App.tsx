@@ -186,19 +186,20 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Splash screen safety timer: if cloud connection exceeds 8s, surface offline/retry controls
+  // Splash screen safety timer: if cloud connection exceeds 4.5s, surface offline/retry controls
   useEffect(() => {
-    if (!currentUser || !profileLoading) {
+    const isConnecting = authLoading || (Boolean(currentUser) && profileLoading);
+    if (!isConnecting) {
       setSplashTimedOut(false);
       return;
     }
 
     const timer = setTimeout(() => {
       setSplashTimedOut(true);
-    }, 8000);
+    }, 4500);
 
     return () => clearTimeout(timer);
-  }, [currentUser, profileLoading]);
+  }, [authLoading, currentUser, profileLoading]);
 
   // 1. Listen to Firebase Authentication State
   useEffect(() => {
@@ -392,6 +393,7 @@ export const App: React.FC = () => {
                 size="sm"
                 className="flex-1 text-xs gap-1.5"
                 onClick={() => {
+                  setAuthLoading(false);
                   setProfileStatus('unknown');
                   setProfileLoading(false);
                 }}

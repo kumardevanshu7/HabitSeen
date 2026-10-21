@@ -3,9 +3,15 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
 import { registerSW } from 'virtual:pwa-register';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
 
-// Register PWA service worker with auto-update
-registerSW({ immediate: true });
+// Register PWA service worker with auto-update and automatic refresh
+const updateSW = registerSW({
+  immediate: true,
+  onNeedRefresh() {
+    updateSW(true);
+  },
+});
 
 // Globally capture beforeinstallprompt event so it is never missed before components mount
 window.addEventListener('beforeinstallprompt', (e) => {
@@ -16,6 +22,8 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    <ErrorBoundary fallbackTitle="HabitsSeen encountered an unexpected issue">
+      <App />
+    </ErrorBoundary>
   </React.StrictMode>
 );

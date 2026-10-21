@@ -1,5 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { AlertCircle, RefreshCw } from 'lucide-react';
+import { AlertCircle, RefreshCw, RotateCcw } from 'lucide-react';
 import { Button } from './Button';
 
 interface Props {
@@ -30,6 +30,23 @@ export class ErrorBoundary extends Component<Props, State> {
     this.setState({ hasError: false, error: null });
   };
 
+  public handleClearCache = async () => {
+    try {
+      if ('caches' in window) {
+        const cacheKeys = await caches.keys();
+        await Promise.all(cacheKeys.map((k) => caches.delete(k)));
+      }
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((r) => r.unregister()));
+      }
+      sessionStorage.clear();
+    } catch {
+      // Ignore cleanup error
+    }
+    window.location.href = '/';
+  };
+
   public render() {
     if (this.state.hasError) {
       return (
@@ -45,12 +62,20 @@ export class ErrorBoundary extends Component<Props, State> {
               {this.state.error?.message || 'An unexpected rendering error occurred. Please try reloading.'}
             </p>
           </div>
-          <div className="flex items-center justify-center gap-2 pt-2">
+          <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
             <Button variant="outline" size="sm" onClick={this.handleReset} className="gap-1.5">
               <RefreshCw size={14} /> Try Again
             </Button>
             <Button variant="primary" size="sm" onClick={() => window.location.reload()} className="gap-1.5">
               Reload App
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={this.handleClearCache}
+              className="gap-1.5 text-red-600 border-red-200 hover:bg-red-50"
+            >
+              <RotateCcw size={13} /> Clear Cache
             </Button>
           </div>
         </div>

@@ -10,7 +10,7 @@ import {
   isDateInThisMonth,
   getTodayKey,
 } from '../../utils/dateMath';
-import { format, parseISO, startOfWeek, addDays } from 'date-fns';
+import { format, parseISO, startOfWeek, addDays, isValid } from 'date-fns';
 import { useTodayKey } from '../../hooks/useTodayKey';
 import { hasSecurityGuard } from '../../utils/cryptoUtils';
 import {
@@ -122,11 +122,16 @@ export const HabitCard: React.FC<HabitCardProps> = ({
 
   // Mini Calendar Strip days for Just Tracking habits (Monday-Sunday of the week)
   const currentWeekDays = useMemo(() => {
-    if (!isJustTracking) return [];
+    if (!isJustTracking || !dateKey || typeof dateKey !== 'string') return [];
     try {
       const parsed = parseISO(dateKey);
+      if (!isValid(parsed)) return [];
       const start = startOfWeek(parsed, { weekStartsOn: 1 });
-      return Array.from({ length: 7 }, (_, i) => addDays(start, i));
+      if (!isValid(start)) return [];
+      return Array.from({ length: 7 }, (_, i) => {
+        const d = addDays(start, i);
+        return isValid(d) ? d : null;
+      }).filter((d): d is Date => d !== null);
     } catch {
       return [];
     }
@@ -1190,8 +1195,9 @@ export const HabitCard: React.FC<HabitCardProps> = ({
             {/* 7-DAY MINI CALENDAR STRIP */}
             <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
               {currentWeekDays.map((day) => {
+                if (!day || !isValid(day)) return null;
                 const dKey = format(day, 'yyyy-MM-dd');
-                const dDayLog = logs[`${habit.id}_${dKey}`];
+                const dDayLog = logs?.[`${habit.id}_${dKey}`];
                 const dIsCompleted = dDayLog?.status === 'COMPLETED';
                 const dIsToday = dKey === todayKey;
                 const dIsSelected = dKey === dateKey;

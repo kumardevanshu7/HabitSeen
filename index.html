@@ -20,6 +20,25 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+      // Auto-recover if a stale PWA service worker cache causes chunk load errors
+      window.addEventListener('vite:preloadError', function () {
+        var lastReload = sessionStorage.getItem('hs_preload_reload');
+        var now = Date.now();
+        if (!lastReload || now - Number(lastReload) > 8000) {
+          sessionStorage.setItem('hs_preload_reload', String(now));
+          if ('caches' in window) {
+            caches.keys().then(function (keys) {
+              return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+            }).finally(function () {
+              window.location.reload();
+            });
+          } else {
+            window.location.reload();
+          }
+        }
+      });
+    </script>
   </head>
   <body class="bg-canvas text-ink antialiased selection:bg-primary selection:text-white min-h-screen">
     <div id="root"></div>

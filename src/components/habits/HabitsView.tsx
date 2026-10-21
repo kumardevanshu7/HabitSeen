@@ -136,8 +136,8 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
         return aDone - bDone;
       }
       // Within the same completion status, sort by priority (100 = highest)
-      const pA = typeof a.schedule.priority === 'number' ? a.schedule.priority : 50;
-      const pB = typeof b.schedule.priority === 'number' ? b.schedule.priority : 50;
+      const pA = typeof a?.schedule?.priority === 'number' ? a.schedule.priority : 50;
+      const pB = typeof b?.schedule?.priority === 'number' ? b.schedule.priority : 50;
       return pB - pA;
     });
   };
