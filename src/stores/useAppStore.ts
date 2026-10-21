@@ -597,13 +597,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
       return;
     }
 
-    // 2. Midnight Lock: For standard scheduled habits, past days cannot be retroactively checked off
-    if (isPastDate && habit.frequency?.type !== 'JUST_TRACKING') {
-      if (!data.forceStatus || (data.forceStatus !== 'EXCUSED' && data.forceStatus !== 'MISSED' && data.forceStatus !== 'FAILED')) {
-        console.warn('Cannot retroactively complete locked past habit date:', dateKey);
-        return;
-      }
-    }
+    // 2. Past dates: Pending past dates CAN be completed or logged.
+    // However, once a task is marked COMPLETED on any date, it cannot be unchecked/reversed without allowUnlock: true.
 
     // 3. Safeguard: Once a "Just Tracking" habit is completed for this day, it is locked permanently
     if (

@@ -10,6 +10,7 @@ import {
   isDateInThisMonth,
   getTodayKey,
 } from '../../utils/dateMath';
+import { format, parseISO, startOfWeek, addDays } from 'date-fns';
 import { useTodayKey } from '../../hooks/useTodayKey';
 import { hasSecurityGuard } from '../../utils/cryptoUtils';
 import {
@@ -34,6 +35,7 @@ import {
   Archive,
   ArchiveRestore,
   Flag,
+  Calendar,
 } from 'lucide-react';
 import clsx from 'clsx';
 import confetti from 'canvas-confetti';
@@ -92,21 +94,18 @@ export const HabitCard: React.FC<HabitCardProps> = ({
   const todayKey = useTodayKey();
   const isPastDate = dateKey < todayKey;
   const isFutureDate = dateKey > todayKey;
-  const isDateLocked = isPastDate || isFutureDate;
+  // Future dates cannot be marked in advance. Past pending dates CAN be logged!
+  const isDateLocked = isFutureDate;
 
   const [lockedNotice, setLockedNotice] = useState<string | null>(null);
 
   const showLockedNotice = () => {
-    setLockedNotice(
-      isPastDate
-        ? `🔒 Past date (${dateKey}) is locked. Only today's tasks can be logged!`
-        : `🔒 Future date (${dateKey}) cannot be marked in advance.`
-    );
+    setLockedNotice(`🔒 Future date (${dateKey}) cannot be marked in advance.`);
     setTimeout(() => setLockedNotice(null), 3500);
   };
 
   const showCompletedLockedNotice = () => {
-    setLockedNotice(`🔒 Task completed for today — cannot be unchecked!`);
+    setLockedNotice(`🔒 Completed task is locked — cannot be unchecked!`);
     setTimeout(() => setLockedNotice(null), 3000);
   };
 
@@ -119,6 +118,19 @@ export const HabitCard: React.FC<HabitCardProps> = ({
   const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
   const [duplicateName, setDuplicateName] = useState('');
   const [isSecurityDeleteOpen, setIsSecurityDeleteOpen] = useState(false);
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
+
+  // Mini Calendar Strip days for Just Tracking habits (Monday-Sunday of the week)
+  const currentWeekDays = useMemo(() => {
+    if (!isJustTracking) return [];
+    try {
+      const parsed = parseISO(dateKey);
+      const start = startOfWeek(parsed, { weekStartsOn: 1 });
+      return Array.from({ length: 7 }, (_, i) => addDays(start, i));
+    } catch {
+      return [];
+    }
+  }, [isJustTracking, dateKey]);
 
   // State for Numeric Value
   const [currentNum, setCurrentNum] = useState<number>(dayLog?.valueNumeric ?? 0);
@@ -458,9 +470,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
     if (hasSecurityGuard(user)) {
       setIsSecurityDeleteOpen(true);
     } else {
-      if (window.confirm(`Are you sure you want to permanently delete "${habit.name}"?`)) {
-        deleteHabit(habit.id);
-      }
+      setIsConfirmDeleteOpen(true);
     }
   };
 
@@ -647,10 +657,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                       handleToggleYesNo();
                     }}
                     className={clsx(
-                      'w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0',
+                      'w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0 group',
                       isCompleted
                         ? 'bg-badge-success border-2 border-badge-success text-white cursor-default ring-2 ring-badge-success/30'
-                        : 'border-2 border-stone-300 dark:border-stone-600 bg-surface-card hover:border-badge-success hover:bg-badge-success/10 text-transparent hover:text-badge-success active:scale-90 cursor-pointer'
+                        : 'border-2 border-stone-300 dark:border-stone-600 bg-surface-bone/50 hover:border-badge-success hover:bg-badge-success/10 active:scale-90 cursor-pointer'
                     )}
                     title={
                       isCompleted
@@ -658,7 +668,14 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                         : 'Tap to mark done'
                     }
                   >
-                    <Check size={18} className={clsx(isCompleted ? 'stroke-[3]' : 'stroke-[2.5]')} />
+                    <Check
+                      size={18}
+                      className={clsx(
+                        isCompleted
+                          ? 'text-white stroke-[3]'
+                          : 'text-stone-400 dark:text-stone-500 stroke-[2.5] group-hover:text-badge-success'
+                      )}
+                    />
                   </button>
                   {isCompleted && (
                     <span className="hidden xs:inline-flex items-center gap-0.5 text-[10px] font-bold text-badge-success bg-badge-success/10 px-1.5 py-0.5 rounded-full border border-badge-success/20">
@@ -718,10 +735,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                       handleToggleNumericComplete();
                     }}
                     className={clsx(
-                      'w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0',
+                      'w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0 group',
                       isCompleted
                         ? 'bg-badge-success border-2 border-badge-success text-white cursor-default ring-2 ring-badge-success/30'
-                        : 'border-2 border-stone-300 dark:border-stone-600 bg-surface-card hover:border-badge-success hover:bg-badge-success/10 text-transparent hover:text-badge-success active:scale-90 cursor-pointer'
+                        : 'border-2 border-stone-300 dark:border-stone-600 bg-surface-bone/50 hover:border-badge-success hover:bg-badge-success/10 active:scale-90 cursor-pointer'
                     )}
                     title={
                       isCompleted
@@ -731,7 +748,11 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                   >
                     <Check
                       size={16}
-                      className={clsx(isCompleted ? 'stroke-[3]' : 'stroke-[2.5]')}
+                      className={clsx(
+                        isCompleted
+                          ? 'text-white stroke-[3]'
+                          : 'text-stone-400 dark:text-stone-500 stroke-[2.5] group-hover:text-badge-success'
+                      )}
                     />
                   </button>
                   {isCompleted && (
@@ -768,10 +789,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                       }
                     }}
                     className={clsx(
-                      'w-8 h-8 rounded-full flex items-center justify-center transition-all shrink-0',
+                      'w-8 h-8 rounded-full flex items-center justify-center transition-all shrink-0 group',
                       isCompleted
                         ? 'bg-badge-success border-2 border-badge-success text-white cursor-default ring-2 ring-badge-success/30'
-                        : 'border-2 border-stone-300 dark:border-stone-600 bg-surface-card hover:border-badge-success hover:bg-badge-success/10 text-transparent hover:text-badge-success active:scale-90 cursor-pointer'
+                        : 'border-2 border-stone-300 dark:border-stone-600 bg-surface-bone/50 hover:border-badge-success hover:bg-badge-success/10 active:scale-90 cursor-pointer'
                     )}
                     title={
                       isCompleted
@@ -779,7 +800,14 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                         : 'Tap to mark complete'
                     }
                   >
-                    <Check size={16} className={clsx(isCompleted ? 'stroke-[3]' : 'stroke-[2.5]')} />
+                    <Check
+                      size={16}
+                      className={clsx(
+                        isCompleted
+                          ? 'text-white stroke-[3]'
+                          : 'text-stone-400 dark:text-stone-500 stroke-[2.5] group-hover:text-badge-success'
+                      )}
+                    />
                   </button>
                   {isCompleted && (
                     <span className="hidden xs:inline-flex items-center gap-0.5 text-[10px] font-bold text-badge-success bg-badge-success/10 px-1.5 py-0.5 rounded-full border border-badge-success/20">
@@ -811,10 +839,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                       handleToggleChecklistComplete();
                     }}
                     className={clsx(
-                      'w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0',
+                      'w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0 group',
                       isCompleted
                         ? 'bg-badge-success border-2 border-badge-success text-white cursor-default ring-2 ring-badge-success/30'
-                        : 'border-2 border-stone-300 dark:border-stone-600 bg-surface-card hover:border-badge-success hover:bg-badge-success/10 text-transparent hover:text-badge-success active:scale-90 cursor-pointer'
+                        : 'border-2 border-stone-300 dark:border-stone-600 bg-surface-bone/50 hover:border-badge-success hover:bg-badge-success/10 active:scale-90 cursor-pointer'
                     )}
                     title={
                       isCompleted
@@ -822,7 +850,14 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                         : 'Tap to mark done'
                     }
                   >
-                    <Check size={16} className={clsx(isCompleted ? 'stroke-[3]' : 'stroke-[2.5]')} />
+                    <Check
+                      size={16}
+                      className={clsx(
+                        isCompleted
+                          ? 'text-white stroke-[3]'
+                          : 'text-stone-400 dark:text-stone-500 stroke-[2.5] group-hover:text-badge-success'
+                      )}
+                    />
                   </button>
                   {isCompleted && (
                     <span className="hidden xs:inline-flex items-center gap-0.5 text-[10px] font-bold text-badge-success bg-badge-success/10 px-1.5 py-0.5 rounded-full border border-badge-success/20">
@@ -995,13 +1030,13 @@ export const HabitCard: React.FC<HabitCardProps> = ({
           </div>
 
           <div className="flex items-center gap-1 shrink-0 ml-auto">
-            {isPastDate && (
+            {isFutureDate && (
               <span
                 className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-surface-bone text-stone text-[9px] font-bold border border-hairline whitespace-nowrap shrink-0"
-                title="Past dates are locked and cannot be edited"
+                title="Future dates cannot be logged in advance"
               >
                 <Lock size={9} />
-                <span>Locked</span>
+                <span>Future</span>
               </span>
             )}
             {isCompleted && (
@@ -1139,6 +1174,117 @@ export const HabitCard: React.FC<HabitCardProps> = ({
           </div>
         )}
 
+        {/* JUST TRACKING MINI CALENDAR STRIP (SMALL-SCALE WEEK CALENDAR MATCHING TOP SCREENSHOT) */}
+        {isJustTracking && currentWeekDays.length > 0 && (
+          <div className="mb-3 pt-2.5 border-t border-hairline/80">
+            <div className="flex items-center justify-between mb-2 px-0.5">
+              <span className="text-[10px] sm:text-[11px] font-bold text-charcoal flex items-center gap-1 uppercase tracking-wider">
+                <Calendar size={11} className="text-primary shrink-0" />
+                <span>Weekly Activity</span>
+              </span>
+              <span className="text-[10px] font-mono font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
+                ✨ {timesCompletedThisWeek}w / {timesCompletedThisMonth}m
+              </span>
+            </div>
+
+            {/* 7-DAY MINI CALENDAR STRIP */}
+            <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
+              {currentWeekDays.map((day) => {
+                const dKey = format(day, 'yyyy-MM-dd');
+                const dDayLog = logs[`${habit.id}_${dKey}`];
+                const dIsCompleted = dDayLog?.status === 'COMPLETED';
+                const dIsToday = dKey === todayKey;
+                const dIsSelected = dKey === dateKey;
+                const dIsFuture = dKey > todayKey;
+
+                return (
+                  <button
+                    key={dKey}
+                    type="button"
+                    disabled={dIsFuture}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (dIsFuture) {
+                        showLockedNotice();
+                        return;
+                      }
+                      if (dIsCompleted) {
+                        showCompletedLockedNotice();
+                        return;
+                      }
+                      confetti({ particleCount: 35, spread: 55, origin: { y: 0.7 } });
+                      logHabit(habit.id, dKey, { valueYesNo: true });
+                    }}
+                    className={clsx(
+                      'flex flex-col items-center justify-between py-1 px-0.5 rounded-xl border transition-all text-center select-none min-h-[50px] sm:min-h-[56px] group',
+                      dIsFuture
+                        ? 'opacity-30 bg-surface-bone/30 border-hairline/40 cursor-not-allowed'
+                        : dIsCompleted
+                        ? 'bg-emerald-50 text-emerald-900 border-emerald-300/80 shadow-2xs'
+                        : dIsSelected
+                        ? 'bg-surface-card border-primary ring-1 ring-primary/40 hover:border-primary cursor-pointer'
+                        : 'bg-surface-card border-hairline hover:border-badge-success hover:bg-surface-bone cursor-pointer'
+                    )}
+                    title={
+                      dIsCompleted
+                        ? `${format(day, 'EEE, d MMM')}: Completed (Locked)`
+                        : dIsFuture
+                        ? `${format(day, 'EEE, d MMM')}: Future Date`
+                        : `${format(day, 'EEE, d MMM')}: Tap to complete`
+                    }
+                  >
+                    {/* Day name (e.g. Wed) */}
+                    <span
+                      className={clsx(
+                        'text-[8px] sm:text-[9px] uppercase font-bold tracking-tight',
+                        dIsCompleted
+                          ? 'text-emerald-700'
+                          : dIsToday
+                          ? 'text-primary font-black'
+                          : 'text-stone'
+                      )}
+                    >
+                      {format(day, 'EEE')}
+                    </span>
+
+                    {/* Day number (e.g. 19) */}
+                    <span
+                      className={clsx(
+                        'font-mono text-xs sm:text-sm font-bold leading-tight',
+                        dIsCompleted
+                          ? 'text-emerald-950 font-black'
+                          : dIsToday
+                          ? 'text-primary font-black'
+                          : 'text-ink'
+                      )}
+                    >
+                      {format(day, 'd')}
+                    </span>
+
+                    {/* Mini Check / Status Circle */}
+                    <div
+                      className={clsx(
+                        'w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center transition-all',
+                        dIsCompleted
+                          ? 'bg-badge-success text-white shadow-2xs'
+                          : dIsFuture
+                          ? 'border border-hairline/60 text-transparent'
+                          : 'border border-stone-300 bg-surface-bone text-stone-400 group-hover:border-badge-success group-hover:text-badge-success'
+                      )}
+                    >
+                      {dIsCompleted ? (
+                        <Check size={11} className="stroke-[3]" />
+                      ) : dIsFuture ? null : (
+                        <Check size={9} className="stroke-[2.5]" />
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* INTERACTION AREA (BASED ON 4 TYPES) */}
         <div className="pt-2 border-t border-hairline/60">
           {isExcused || isMissed ? (
@@ -1174,6 +1320,8 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                       ? '🔒 Locked (Completed for today)'
                       : isSkipped
                       ? 'Skipped for today'
+                      : isJustTracking
+                      ? 'Tap day above or circle to mark complete:'
                       : 'Tap circle to mark complete:'}
                   </span>
                   <div className="flex items-center gap-2">
@@ -1188,17 +1336,17 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                         <span>Missed</span>
                       </button>
                     )}
-                    {/* RED CIRCLE -> GREEN TICK TOGGLE */}
+                    {/* COMPLETE TOGGLE BUTTON */}
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
                         disabled={isCompleted}
                         onClick={handleToggleYesNo}
                         className={clsx(
-                          'w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0',
+                          'w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0 group',
                           isCompleted
                             ? 'bg-badge-success border-2 border-badge-success text-white shadow-md cursor-default ring-2 ring-badge-success/30'
-                            : 'border-2 border-stone-300 dark:border-stone-600 bg-surface-card hover:border-badge-success hover:bg-badge-success/10 text-transparent hover:text-badge-success active:scale-90 cursor-pointer'
+                            : 'border-2 border-stone-300 dark:border-stone-600 bg-surface-bone/50 hover:border-badge-success hover:bg-badge-success/10 active:scale-90 cursor-pointer'
                         )}
                         title={
                           isCompleted
@@ -1206,7 +1354,14 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                             : 'Tap to mark done'
                         }
                       >
-                        <Check size={20} className={clsx(isCompleted ? 'stroke-[3]' : 'stroke-[2.5]')} />
+                        <Check
+                          size={20}
+                          className={clsx(
+                            isCompleted
+                              ? 'text-white stroke-[3]'
+                              : 'text-stone-400 dark:text-stone-500 stroke-[2.5] group-hover:text-badge-success'
+                          )}
+                        />
                       </button>
                       {isCompleted && (
                         <span className="inline-flex items-center gap-1 text-[11px] font-bold text-badge-success bg-badge-success/10 px-2 py-0.5 rounded-full border border-badge-success/20">
@@ -1280,17 +1435,17 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                         </>
                       )}
 
-                      {/* RED CIRCLE -> GREEN TICK TOGGLE */}
+                      {/* NUMERIC COMPLETE TOGGLE */}
                       <div className="flex items-center gap-1.5">
                         <button
                           type="button"
                           disabled={isCompleted}
                           onClick={handleToggleNumericComplete}
                           className={clsx(
-                            'w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0',
+                            'w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0 group',
                             isCompleted
                               ? 'bg-badge-success border-2 border-badge-success text-white shadow-md cursor-default ring-2 ring-badge-success/30'
-                              : 'border-2 border-stone-300 dark:border-stone-600 bg-surface-card hover:border-badge-success hover:bg-badge-success/10 text-transparent hover:text-badge-success active:scale-90 cursor-pointer'
+                              : 'border-2 border-stone-300 dark:border-stone-600 bg-surface-bone/50 hover:border-badge-success hover:bg-badge-success/10 active:scale-90 cursor-pointer'
                           )}
                           title={
                             isCompleted
@@ -1300,7 +1455,11 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                         >
                           <Check
                             size={20}
-                            className={clsx(isCompleted ? 'stroke-[3]' : 'stroke-[2.5]')}
+                            className={clsx(
+                              isCompleted
+                                ? 'text-white stroke-[3]'
+                                : 'text-stone-400 dark:text-stone-500 stroke-[2.5] group-hover:text-badge-success'
+                            )}
                           />
                         </button>
                         {isCompleted && (
@@ -1453,10 +1612,13 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                         <button
                           type="button"
                           onClick={() => handleSaveTimer(undefined, true)}
-                          className="w-10 h-10 rounded-full border-2 border-stone-300 dark:border-stone-600 bg-surface-card hover:border-badge-success hover:bg-badge-success/10 flex items-center justify-center text-transparent hover:text-badge-success shadow-xs hover:shadow-sm transition-all duration-200 active:scale-90 cursor-pointer shrink-0"
+                          className="w-10 h-10 rounded-full border-2 border-stone-300 dark:border-stone-600 bg-surface-bone/50 hover:border-badge-success hover:bg-badge-success/10 flex items-center justify-center shadow-xs hover:shadow-sm transition-all duration-200 active:scale-90 cursor-pointer shrink-0 group"
                           title="Tap to mark complete"
                         >
-                          <Check size={20} className="stroke-[2.5]" />
+                          <Check
+                            size={20}
+                            className="text-stone-400 dark:text-stone-500 stroke-[2.5] group-hover:text-badge-success"
+                          />
                         </button>
                       </div>
                     </div>
@@ -1530,16 +1692,16 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                         </button>
                       )}
 
-                      {/* RED CIRCLE -> GREEN TICK TOGGLE */}
+                      {/* CHECKLIST COMPLETE TOGGLE */}
                       <button
                         type="button"
                         disabled={isCompleted}
                         onClick={handleToggleChecklistComplete}
                         className={clsx(
-                          'w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0',
+                          'w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-xs shrink-0 group',
                           isCompleted
                             ? 'bg-badge-success border-2 border-badge-success text-white shadow-md cursor-default ring-2 ring-badge-success/30'
-                            : 'border-2 border-stone-300 dark:border-stone-600 bg-surface-card hover:border-badge-success hover:bg-badge-success/10 text-transparent hover:text-badge-success active:scale-90 cursor-pointer'
+                            : 'border-2 border-stone-300 dark:border-stone-600 bg-surface-bone/50 hover:border-badge-success hover:bg-badge-success/10 active:scale-90 cursor-pointer'
                         )}
                         title={
                           isCompleted
@@ -1549,7 +1711,11 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                       >
                         <Check
                           size={20}
-                          className={clsx(isCompleted ? 'stroke-[3]' : 'stroke-[2.5]')}
+                          className={clsx(
+                            isCompleted
+                              ? 'text-white stroke-[3]'
+                              : 'text-stone-400 dark:text-stone-500 stroke-[2.5] group-hover:text-badge-success'
+                          )}
                         />
                       </button>
                       {isCompleted && (
@@ -1802,6 +1968,54 @@ export const HabitCard: React.FC<HabitCardProps> = ({
           await deleteHabit(habit.id);
         }}
       />
+
+      {/* CUSTOM CONFIRM DELETE MODAL (Replaces ugly browser window.confirm) */}
+      <Modal
+        isOpen={isConfirmDeleteOpen}
+        onClose={() => setIsConfirmDeleteOpen(false)}
+        title="Delete Habit"
+        subtitle="Permanent action"
+        maxWidth="sm"
+      >
+        <div className="space-y-4 pt-1">
+          <div className="p-3.5 rounded-2xl bg-red-50/80 border border-red-200/80 flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0 mt-0.5">
+              <Trash2 size={20} />
+            </div>
+            <div>
+              <p className="font-bold text-sm text-red-950">
+                Are you sure you want to permanently delete "{habit.name}"?
+              </p>
+              <p className="text-xs text-red-700 mt-1 leading-relaxed">
+                All logs, streaks, and progress records for this habit will be permanently removed. This action cannot be undone.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-hairline">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsConfirmDeleteOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => {
+                deleteHabit(habit.id);
+                setIsConfirmDeleteOpen(false);
+              }}
+              className="bg-red-600 hover:bg-red-700 text-white font-bold"
+            >
+              <Trash2 size={14} />
+              <span>Delete Habit</span>
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </>
   );
 };
