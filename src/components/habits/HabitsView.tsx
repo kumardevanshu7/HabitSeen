@@ -151,10 +151,12 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
       return pB - pA;
     });
 
-  // Active (not archived / ended) habits
-  const activeHabits = habits.filter((h) => !isHabitArchived(h));
+  // Active standard scheduled habits (strictly exclude Just Tracking habits so they never show in Habits section)
+  const activeHabits = habits.filter(
+    (h) => !isHabitArchived(h) && h.frequency?.type !== 'JUST_TRACKING'
+  );
 
-  // Active Just Tracking habits
+  // Active Just Tracking habits (strictly displayed in Tracking tab)
   const justTrackingHabits = habits.filter(
     (h) => !isHabitArchived(h) && h.frequency?.type === 'JUST_TRACKING'
   );

@@ -10,7 +10,19 @@ import {
   isDateInThisMonth,
   getTodayKey,
 } from '../../utils/dateMath';
-import { format, parseISO, startOfWeek, addDays, isValid } from 'date-fns';
+import {
+  format,
+  parseISO,
+  startOfWeek,
+  addDays,
+  isValid,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+  addMonths,
+  subMonths,
+  isSameMonth,
+} from 'date-fns';
 import { useTodayKey } from '../../hooks/useTodayKey';
 import { hasSecurityGuard } from '../../utils/cryptoUtils';
 import {
@@ -21,6 +33,8 @@ import {
   Star,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   BarChart2,
   Lock,
   Unlock,
@@ -120,22 +134,58 @@ export const HabitCard: React.FC<HabitCardProps> = ({
   const [isSecurityDeleteOpen, setIsSecurityDeleteOpen] = useState(false);
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
 
-  // Mini Calendar Strip days for Just Tracking habits (Monday-Sunday of the week)
-  const currentWeekDays = useMemo(() => {
-    if (!isJustTracking || !dateKey || typeof dateKey !== 'string') return [];
+  // Active month for Tracking habits 30/31-day month calendar view (allows navigating previous/next months)
+  const [trackingMonth, setTrackingMonth] = useState<Date>(() => {
     try {
-      const parsed = parseISO(dateKey);
-      if (!isValid(parsed)) return [];
-      const start = startOfWeek(parsed, { weekStartsOn: 1 });
-      if (!isValid(start)) return [];
-      return Array.from({ length: 7 }, (_, i) => {
-        const d = addDays(start, i);
-        return isValid(d) ? d : null;
-      }).filter((d): d is Date => d !== null);
-    } catch {
-      return [];
+      if (dateKey && typeof dateKey === 'string') {
+        const parsed = parseISO(dateKey);
+        if (isValid(parsed)) return parsed;
+      }
+    } catch {}
+    return new Date();
+  });
+
+  // Sync trackingMonth if selected dateKey changes month
+  useEffect(() => {
+    try {
+      if (dateKey && typeof dateKey === 'string') {
+        const parsed = parseISO(dateKey);
+        if (isValid(parsed) && !isSameMonth(parsed, trackingMonth)) {
+          setTrackingMonth(parsed);
+        }
+      }
+    } catch {}
+  }, [dateKey]);
+
+  // Compute 28-31 days of the tracking month + starting day-of-week padding
+  const trackingMonthData = useMemo(() => {
+    if (!isJustTracking) {
+      return { days: [] as Date[], startOffset: 0, totalDays: 0, monthKey: '' };
     }
-  }, [isJustTracking, dateKey]);
+    try {
+      const monthStart = startOfMonth(trackingMonth);
+      const monthEnd = endOfMonth(trackingMonth);
+      const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
+      // Monday = 0, Tuesday = 1, ..., Sunday = 6
+      const startOffset = (monthStart.getDay() + 6) % 7;
+      const monthKey = format(monthStart, 'yyyy-MM');
+      return { days, startOffset, totalDays: days.length, monthKey };
+    } catch {
+      return { days: [] as Date[], startOffset: 0, totalDays: 0, monthKey: '' };
+    }
+  }, [isJustTracking, trackingMonth]);
+
+  // Total check-ins for the currently viewed month
+  const trackingMonthCompletedCount = useMemo(() => {
+    if (!isJustTracking || !trackingMonthData.monthKey) return 0;
+    return Object.values(logs || {}).filter(
+      (l) => l?.habitId === habit.id && l?.status === 'COMPLETED' && l?.date?.startsWith(trackingMonthData.monthKey)
+    ).length;
+  }, [isJustTracking, trackingMonthData.monthKey, logs, habit.id]);
+
+  const isCurrentCalendarMonth = useMemo(() => {
+    return isSameMonth(trackingMonth, new Date());
+  }, [trackingMonth]);
 
   // State for Numeric Value
   const [currentNum, setCurrentNum] = useState<number>(dayLog?.valueNumeric ?? 0);
@@ -1179,28 +1229,101 @@ export const HabitCard: React.FC<HabitCardProps> = ({
           </div>
         )}
 
-        {/* JUST TRACKING MINI CALENDAR STRIP (SMALL-SCALE WEEK CALENDAR MATCHING TOP SCREENSHOT) */}
-        {isJustTracking && currentWeekDays.length > 0 && (
+        {/* JUST TRACKING MINI 30/31-DAY MONTH CALENDAR (INTERACTIVE, MONTH NAVIGATION, MARK PREVIOUS & CURRENT DATES) */}
+        {isJustTracking && trackingMonthData.days.length > 0 && (
           <div className="mb-3 pt-2.5 border-t border-hairline/80">
-            <div className="flex items-center justify-between mb-2 px-0.5">
-              <span className="text-[10px] sm:text-[11px] font-bold text-charcoal flex items-center gap-1 uppercase tracking-wider">
-                <Calendar size={11} className="text-primary shrink-0" />
-                <span>Weekly Activity</span>
-              </span>
-              <span className="text-[10px] font-mono font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
-                ✨ {timesCompletedThisWeek}w / {timesCompletedThisMonth}m
-              </span>
+            {/* 1. MONTH HEADER & NAVIGATION CONTROLS */}
+            <div className="flex items-center justify-between mb-2.5 px-0.5">
+              <div className="flex items-center gap-1 sm:gap-1.5">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setTrackingMonth((prev) => subMonths(prev, 1));
+                  }}
+                  className="w-7 h-7 rounded-xl bg-surface-bone hover:bg-stone/20 text-charcoal flex items-center justify-center border border-hairline transition-all active:scale-90 cursor-pointer shadow-2xs"
+                  title="Previous month"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+
+                <span className="font-display font-bold text-xs sm:text-sm text-ink px-1 min-w-[105px] sm:min-w-[120px] text-center">
+                  {format(trackingMonth, 'MMMM yyyy')}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setTrackingMonth((prev) => addMonths(prev, 1));
+                  }}
+                  className="w-7 h-7 rounded-xl bg-surface-bone hover:bg-stone/20 text-charcoal flex items-center justify-center border border-hairline transition-all active:scale-90 cursor-pointer shadow-2xs"
+                  title="Next month"
+                >
+                  <ChevronRight size={14} />
+                </button>
+
+                {!isCurrentCalendarMonth && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setTrackingMonth(new Date());
+                    }}
+                    className="text-[10px] font-bold text-primary bg-primary/10 hover:bg-primary/20 px-2 py-0.5 rounded-md border border-primary/20 transition-colors ml-0.5 cursor-pointer shadow-2xs"
+                    title="Jump to current month"
+                  >
+                    Today
+                  </button>
+                )}
+              </div>
+
+              {/* MONTH COMPLETION SUMMARY PILL */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] sm:text-[11px] font-mono font-bold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full border border-primary/20 shadow-2xs">
+                  ✨ {trackingMonthCompletedCount}/{trackingMonthData.totalDays}d ({Math.round((trackingMonthCompletedCount / Math.max(1, trackingMonthData.totalDays)) * 100)}%)
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenDetails(habit);
+                  }}
+                  className="text-[10px] font-bold text-charcoal hover:text-ink flex items-center gap-1 bg-surface-bone hover:bg-stone/15 px-2 py-0.5 rounded-full border border-hairline transition-colors cursor-pointer shadow-2xs"
+                  title="View full habit analytics & statistics"
+                >
+                  <BarChart2 size={11} className="text-primary" />
+                  <span className="hidden xs:inline">Stats</span>
+                </button>
+              </div>
             </div>
 
-            {/* 7-DAY MINI CALENDAR STRIP */}
+            {/* 2. WEEKDAY COLUMN HEADERS (M T W T F S S) */}
+            <div className="grid grid-cols-7 gap-1 text-center mb-1 select-none">
+              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((dName) => (
+                <span
+                  key={dName}
+                  className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-charcoal/70"
+                >
+                  {dName}
+                </span>
+              ))}
+            </div>
+
+            {/* 3. FULL 28-31 DAYS MINI CALENDAR GRID */}
             <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
-              {currentWeekDays.map((day) => {
+              {/* Monday-start offset padding for the 1st day of the month */}
+              {Array.from({ length: trackingMonthData.startOffset }, (_, i) => (
+                <div key={`offset-pad-${i}`} className="min-h-[30px] sm:min-h-[34px] rounded-lg opacity-0 pointer-events-none" />
+              ))}
+
+              {/* Days of the Month */}
+              {trackingMonthData.days.map((day) => {
                 if (!day || !isValid(day)) return null;
                 const dKey = format(day, 'yyyy-MM-dd');
                 const dDayLog = logs?.[`${habit.id}_${dKey}`];
                 const dIsCompleted = dDayLog?.status === 'COMPLETED';
                 const dIsToday = dKey === todayKey;
-                const dIsSelected = dKey === dateKey;
                 const dIsFuture = dKey > todayKey;
 
                 return (
@@ -1222,71 +1345,77 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                       logHabit(habit.id, dKey, { valueYesNo: true });
                     }}
                     className={clsx(
-                      'flex flex-col items-center justify-between py-1 px-0.5 rounded-xl border transition-all text-center select-none min-h-[50px] sm:min-h-[56px] group',
+                      'flex flex-col items-center justify-center rounded-xl border transition-all text-center select-none min-h-[30px] sm:min-h-[34px] py-0.5 px-0.5 group relative',
                       dIsFuture
-                        ? 'opacity-30 bg-surface-bone/30 border-hairline/40 cursor-not-allowed'
+                        ? 'opacity-30 bg-surface-bone/20 border-hairline/40 text-stone cursor-not-allowed'
                         : dIsCompleted
-                        ? 'bg-emerald-50 text-emerald-900 border-emerald-300/80 shadow-2xs'
-                        : dIsSelected
-                        ? 'bg-surface-card border-primary ring-1 ring-primary/40 hover:border-primary cursor-pointer'
-                        : 'bg-surface-card border-hairline hover:border-badge-success hover:bg-surface-bone cursor-pointer'
+                        ? 'bg-emerald-500 text-white border-emerald-600 shadow-xs ring-1 ring-emerald-600/30 font-black cursor-default'
+                        : dIsToday
+                        ? 'bg-primary/10 border-2 border-primary text-primary font-black ring-2 ring-primary/20 cursor-pointer shadow-2xs hover:bg-primary/20 active:scale-95'
+                        : 'bg-surface-card border-hairline hover:border-emerald-400 hover:bg-emerald-50/50 text-ink cursor-pointer active:scale-95 shadow-2xs'
                     )}
                     title={
                       dIsCompleted
-                        ? `${format(day, 'EEE, d MMM')}: Completed (Locked)`
+                        ? `${format(day, 'EEE, dd MMM yyyy')}: Completed (Locked)`
                         : dIsFuture
-                        ? `${format(day, 'EEE, d MMM')}: Future Date`
-                        : `${format(day, 'EEE, d MMM')}: Tap to complete`
+                        ? `${format(day, 'EEE, dd MMM yyyy')}: Future Date`
+                        : `${format(day, 'EEE, dd MMM yyyy')}: Tap to complete`
                     }
                   >
-                    {/* Day name (e.g. Wed) */}
                     <span
                       className={clsx(
-                        'text-[8px] sm:text-[9px] uppercase font-bold tracking-tight',
+                        'font-mono text-[11px] sm:text-xs leading-none',
                         dIsCompleted
-                          ? 'text-emerald-700'
+                          ? 'text-white font-black'
                           : dIsToday
                           ? 'text-primary font-black'
-                          : 'text-stone'
-                      )}
-                    >
-                      {format(day, 'EEE')}
-                    </span>
-
-                    {/* Day number (e.g. 19) */}
-                    <span
-                      className={clsx(
-                        'font-mono text-xs sm:text-sm font-bold leading-tight',
-                        dIsCompleted
-                          ? 'text-emerald-950 font-black'
-                          : dIsToday
-                          ? 'text-primary font-black'
-                          : 'text-ink'
+                          : 'text-ink font-medium'
                       )}
                     >
                       {format(day, 'd')}
                     </span>
 
-                    {/* Mini Check / Status Circle */}
-                    <div
-                      className={clsx(
-                        'w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center transition-all',
-                        dIsCompleted
-                          ? 'bg-badge-success text-white shadow-2xs'
-                          : dIsFuture
-                          ? 'border border-hairline/60 text-transparent'
-                          : 'border border-stone-300 bg-surface-bone text-stone-400 group-hover:border-badge-success group-hover:text-badge-success'
-                      )}
-                    >
-                      {dIsCompleted ? (
-                        <Check size={11} className="stroke-[3]" />
-                      ) : dIsFuture ? null : (
-                        <Check size={9} className="stroke-[2.5]" />
-                      )}
-                    </div>
+                    {/* Micro Check / Status indicator */}
+                    {dIsCompleted ? (
+                      <Check size={8} className="stroke-[3] text-white shrink-0 mt-0.5" />
+                    ) : dIsToday ? (
+                      <span className="w-1 h-1 rounded-full bg-primary shrink-0 mt-0.5 animate-pulse" />
+                    ) : null}
                   </button>
                 );
               })}
+            </div>
+
+            {/* 4. QUICK ANALYTICS FOOTER BAR UNDERNEATH CALENDAR */}
+            <div className="mt-2.5 pt-2 border-t border-hairline/60 flex items-center justify-between text-[11px] text-charcoal">
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                <span className="inline-flex items-center gap-1 font-medium" title="Completed this week">
+                  <span className="text-stone">This Week:</span>
+                  <strong className="font-mono text-primary font-bold">{timesCompletedThisWeek}w</strong>
+                </span>
+                <span>•</span>
+                <span className="inline-flex items-center gap-1 font-medium" title="Completed this month">
+                  <span className="text-stone">This Month:</span>
+                  <strong className="font-mono text-primary font-bold">{timesCompletedThisMonth}m</strong>
+                </span>
+                <span>•</span>
+                <span className="inline-flex items-center gap-1 font-medium" title="All-time check-ins">
+                  <span className="text-stone">All-time:</span>
+                  <strong className="font-mono text-emerald-700 dark:text-emerald-400 font-bold">{habitCompletedLogs.length}</strong>
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenDetails(habit);
+                }}
+                className="font-bold text-primary hover:text-primary-deep flex items-center gap-1 hover:underline text-[11px] cursor-pointer shrink-0"
+              >
+                <BarChart2 size={12} />
+                <span>Deep Stats</span>
+              </button>
             </div>
           </div>
         )}
@@ -1327,7 +1456,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                       : isSkipped
                       ? 'Skipped for today'
                       : isJustTracking
-                      ? 'Tap day above or circle to mark complete:'
+                      ? 'Tap any day in calendar or circle to check-in:'
                       : 'Tap circle to mark complete:'}
                   </span>
                   <div className="flex items-center gap-2">
