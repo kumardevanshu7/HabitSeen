@@ -31,6 +31,7 @@ import { isModalHandlingPopState } from './components/ui/Modal';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { Button } from './components/ui/Button';
 import { AlertCircle, RefreshCw, WifiOff } from 'lucide-react';
+import { StartupAnchorSplash } from './components/startup/StartupAnchorSplash';
 
 type AppTab = 'habits' | 'challenges' | 'tracking' | 'breaks' | 'analytics';
 
@@ -67,9 +68,18 @@ export const App: React.FC = () => {
   const [isBrandLegalOpen, setIsBrandLegalOpen] = useState(false);
   const [brandLegalTab, setBrandLegalTab] = useState<BrandLegalTab>('explore');
   const [splashTimedOut, setSplashTimedOut] = useState(false);
+  const [minSplashDone, setMinSplashDone] = useState(false);
   const [showExitToast, setShowExitToast] = useState(false);
   const exitToastTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastBackPressTimeRef = useRef<number>(0);
+
+  // Minimum display timer for 27th Oct Ground Zero splash screen on startup
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMinSplashDone(true);
+    }, 1800);
+    return () => clearTimeout(timer);
+  }, []);
 
   const navStateRef = useRef<{ tab: AppTab; category: string }>({
     tab: 'habits',
@@ -355,55 +365,20 @@ export const App: React.FC = () => {
     };
   }, [currentUser, checkAndEnforceMidnightRollover]);
 
-  // Loading Splash Screen with 8s Timeout & Offline Fallback
-  if (authLoading || (currentUser && profileLoading)) {
+  // Loading Splash Screen with 27th Oct Anchor, Anime Quotes & Timeout/Offline Fallback
+  if (!minSplashDone || authLoading || (currentUser && profileLoading)) {
     return (
-      <div className="min-h-screen bg-canvas flex flex-col items-center justify-center p-6 text-center">
-        <img
-          src="/android-chrome-192x192.png"
-          alt="HabitsSeen Logo"
-          className="w-16 h-16 rounded-2xl object-contain shadow-lg animate-pulse mb-3"
-        />
-        <p className="font-display font-bold text-xl text-ink">HabitsSeen</p>
-        <span className="text-xs text-charcoal mt-1">Connecting...</span>
-
-        {(splashTimedOut || syncError) && (
-          <div className="mt-6 max-w-sm w-full bg-surface-card border border-amber-200/80 p-4 rounded-2xl shadow-sm text-left animate-in fade-in duration-300">
-            <div className="flex items-start gap-2.5 text-amber-700 text-xs">
-              <AlertCircle size={18} className="shrink-0 mt-0.5" />
-              <div>
-                <p className="font-bold text-sm text-ink mb-0.5">Connection taking longer than usual</p>
-                <p className="text-charcoal leading-relaxed">
-                  {syncError || 'Network might be slow or offline. You can proceed with local cached data.'}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 mt-4">
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1 text-xs gap-1.5"
-                onClick={() => window.location.reload()}
-              >
-                <RefreshCw size={13} /> Retry
-              </Button>
-              <Button
-                variant="dark"
-                size="sm"
-                className="flex-1 text-xs gap-1.5"
-                onClick={() => {
-                  setAuthLoading(false);
-                  setProfileStatus('unknown');
-                  setProfileLoading(false);
-                }}
-              >
-                <WifiOff size={13} /> Continue Offline
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
+      <StartupAnchorSplash
+        splashTimedOut={splashTimedOut}
+        syncError={syncError}
+        onContinueOffline={() => {
+          setMinSplashDone(true);
+          setAuthLoading(false);
+          setProfileStatus('unknown');
+          setProfileLoading(false);
+        }}
+        onReload={() => window.location.reload()}
+      />
     );
   }
 

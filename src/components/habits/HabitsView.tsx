@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
 import { HabitCard } from './HabitCard';
 import { DayStrip } from './DayStrip';
+import { StartingPointBanner } from '../startup/StartingPointBanner';
 import { Habit, Category, FrequencyType } from '../../types/habit';
 import { isHabitDueOnDate, getTodayKey } from '../../utils/dateMath';
 import { CATEGORY_ICONS } from '../../constants/iconsAndColors';
@@ -267,6 +268,9 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
 
   return (
     <div className="space-y-4">
+      {/* 0. GROUND ZERO STARTING POINT ANCHOR BANNER */}
+      <StartingPointBanner />
+
       {/* 1. DATE PICKER STRIP */}
       <DayStrip />
 
