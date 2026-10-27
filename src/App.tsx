@@ -68,18 +68,10 @@ export const App: React.FC = () => {
   const [isBrandLegalOpen, setIsBrandLegalOpen] = useState(false);
   const [brandLegalTab, setBrandLegalTab] = useState<BrandLegalTab>('explore');
   const [splashTimedOut, setSplashTimedOut] = useState(false);
-  const [minSplashDone, setMinSplashDone] = useState(false);
+  const [userProceeded, setUserProceeded] = useState(false);
   const [showExitToast, setShowExitToast] = useState(false);
   const exitToastTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastBackPressTimeRef = useRef<number>(0);
-
-  // Minimum display timer for 27th Oct Ground Zero splash screen on startup
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setMinSplashDone(true);
-    }, 1800);
-    return () => clearTimeout(timer);
-  }, []);
 
   const navStateRef = useRef<{ tab: AppTab; category: string }>({
     tab: 'habits',
@@ -365,14 +357,18 @@ export const App: React.FC = () => {
     };
   }, [currentUser, checkAndEnforceMidnightRollover]);
 
-  // Loading Splash Screen with 27th Oct Anchor, Anime Quotes & Timeout/Offline Fallback
-  if (!minSplashDone || authLoading || (currentUser && profileLoading)) {
+  // Startup Splash Screen with 27th Oct Anchor, Anime Quotes & Manual User "Proceed" Button
+  if (!userProceeded || authLoading || (currentUser && profileLoading)) {
     return (
       <StartupAnchorSplash
         splashTimedOut={splashTimedOut}
         syncError={syncError}
+        isReady={!authLoading && (!currentUser || !profileLoading)}
+        onProceed={() => {
+          setUserProceeded(true);
+        }}
         onContinueOffline={() => {
-          setMinSplashDone(true);
+          setUserProceeded(true);
           setAuthLoading(false);
           setProfileStatus('unknown');
           setProfileLoading(false);

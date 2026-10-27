@@ -14,6 +14,8 @@ import {
   WifiOff,
   Quote,
   Compass,
+  ArrowRight,
+  CheckCircle2,
 } from 'lucide-react';
 
 interface StartupAnchorSplashProps {
@@ -21,6 +23,8 @@ interface StartupAnchorSplashProps {
   syncError: string | null;
   onContinueOffline: () => void;
   onReload: () => void;
+  onProceed: () => void;
+  isReady?: boolean;
 }
 
 export const StartupAnchorSplash: React.FC<StartupAnchorSplashProps> = ({
@@ -28,6 +32,8 @@ export const StartupAnchorSplash: React.FC<StartupAnchorSplashProps> = ({
   syncError,
   onContinueOffline,
   onReload,
+  onProceed,
+  isReady = true,
 }) => {
   const [quoteIndex, setQuoteIndex] = useState(() => {
     const daily = getDailyAnimeQuote();
@@ -145,12 +151,30 @@ export const StartupAnchorSplash: React.FC<StartupAnchorSplashProps> = ({
           </div>
         </div>
 
-        {/* LOADING PULSE */}
-        <div className="flex items-center gap-2 pt-2">
-          <span className="w-2 h-2 rounded-full bg-primary animate-ping" />
-          <span className="text-xs font-semibold text-charcoal tracking-wide">
-            Entering Discipline Chamber...
-          </span>
+        {/* PROCEED ACTION BUTTON */}
+        <div className="w-full pt-1 space-y-2">
+          <button
+            type="button"
+            onClick={onProceed}
+            className="w-full py-4 px-6 rounded-2xl bg-ink hover:bg-stone-800 text-white font-display font-black text-sm sm:text-base tracking-wide shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2.5 active:scale-[0.98] cursor-pointer group"
+          >
+            <span>Proceed to Discipline</span>
+            <ArrowRight size={18} className="text-primary group-hover:translate-x-1.5 transition-transform" />
+          </button>
+
+          <div className="flex items-center justify-center gap-2 text-[11px] text-charcoal/80">
+            {isReady ? (
+              <>
+                <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+                <span className="font-medium">Ready • Take your time & tap Proceed</span>
+              </>
+            ) : (
+              <>
+                <span className="w-2 h-2 rounded-full bg-primary animate-ping" />
+                <span className="font-medium">Syncing Discipline Chamber...</span>
+              </>
+            )}
+          </div>
         </div>
       </div>
 

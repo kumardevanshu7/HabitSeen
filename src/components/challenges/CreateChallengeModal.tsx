@@ -25,6 +25,13 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 import { getTodayKey } from '../../utils/dateMath';
+import {
+  parseISO,
+  format,
+  addDays,
+  isValid,
+  differenceInCalendarDays,
+} from 'date-fns';
 
 interface CreateChallengeModalProps {
   isOpen: boolean;
@@ -44,6 +51,7 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
   const [name, setName] = useState('');
   const [selectedIcon, setSelectedIcon] = useState('flame');
   const [selectedColor, setSelectedColor] = useState(CATEGORY_COLORS[0].hex);
+  const [startDate, setStartDate] = useState(getTodayKey());
   const [durationPreset, setDurationPreset] = useState<7 | 9 | 11 | 'custom'>(7);
   const [customDays, setCustomDays] = useState<number>(21);
 
@@ -123,6 +131,7 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
         setName(challengeToEdit.name);
         setSelectedIcon(challengeToEdit.icon || 'flame');
         setSelectedColor(challengeToEdit.color || CATEGORY_COLORS[0].hex);
+        setStartDate(challengeToEdit.startDate || getTodayKey());
         if ([7, 9, 11].includes(challengeToEdit.targetDays as any)) {
           setDurationPreset(challengeToEdit.targetDays as 7 | 9 | 11);
           setCustomDays(21);
@@ -138,6 +147,7 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
         setName('');
         setSelectedIcon('flame');
         setSelectedColor(CATEGORY_COLORS[0].hex);
+        setStartDate(getTodayKey());
         setDurationPreset(7);
         setCustomDays(21);
         setTasks([]);
@@ -148,16 +158,66 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
     }
   }, [isOpen, challengeToEdit]);
 
+  const hasLoggedDays = Boolean(
+    challengeToEdit && Object.keys(challengeToEdit.dayLogs || {}).length > 0
+  );
+
   const isStarted = Boolean(
     challengeToEdit &&
-    (Object.keys(challengeToEdit.dayLogs || {}).length > 0 ||
-      (challengeToEdit.startDate && getTodayKey() >= challengeToEdit.startDate))
+      (hasLoggedDays || (challengeToEdit.startDate && getTodayKey() >= challengeToEdit.startDate))
   );
+
+  const isDateLocked = hasLoggedDays;
 
   const effectiveDays =
     durationPreset === 'custom'
       ? Math.min(365, Math.max(1, Number(customDays) || 7))
       : durationPreset;
+
+  const parsedStartDate = useMemo(() => {
+    try {
+      const p = parseISO(startDate);
+      return isValid(p) ? p : new Date();
+    } catch {
+      return new Date();
+    }
+  }, [startDate]);
+
+  const formattedStartDate = useMemo(() => {
+    try {
+      return format(parsedStartDate, 'dd MMM yyyy');
+    } catch {
+      return startDate;
+    }
+  }, [parsedStartDate, startDate]);
+
+  const computedEndDate = useMemo(() => {
+    try {
+      return format(addDays(parsedStartDate, effectiveDays - 1), 'yyyy-MM-dd');
+    } catch {
+      return '';
+    }
+  }, [parsedStartDate, effectiveDays]);
+
+  const formattedEndDate = useMemo(() => {
+    try {
+      const p = parseISO(computedEndDate);
+      return isValid(p) ? format(p, 'dd MMM yyyy') : computedEndDate;
+    } catch {
+      return computedEndDate;
+    }
+  }, [computedEndDate]);
+
+  const currentDayNumber = useMemo(() => {
+    try {
+      const today = parseISO(getTodayKey());
+      const diff = differenceInCalendarDays(today, parsedStartDate);
+      if (diff < 0) return 0; // Starts in future
+      return Math.min(effectiveDays, diff + 1);
+    } catch {
+      return 1;
+    }
+  }, [parsedStartDate, effectiveDays]);
 
   const vibrantColor = boostVibrancy(selectedColor);
   const SelectedIconComp =
@@ -182,7 +242,7 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
   };
 
   const handleRemoveTask = (id: string) => {
-    if (isStarted) return;
+    if (isDateLocked) return;
     setTasks(tasks.filter((t) => t.id !== id));
   };
 
@@ -216,6 +276,8 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
           icon: selectedIcon,
           color: vibrantColor,
           targetDays: effectiveDays,
+          startDate: isDateLocked ? challengeToEdit.startDate : startDate,
+          endDate: isDateLocked ? (challengeToEdit.endDate || computedEndDate) : computedEndDate,
           tasks: finalTasks,
           updatedAt: new Date().toISOString(),
         };
@@ -252,6 +314,7 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
         icon: selectedIcon,
         color: vibrantColor,
         targetDays: effectiveDays,
+        startDate,
         tasks: finalTasks,
       });
 
@@ -325,7 +388,104 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
                 {name.trim() || 'Your Challenge'}
               </span>
               <span className="font-mono text-[11px] px-2 py-0.5 rounded-full bg-ink text-white shrink-0">
-                {effectiveDays} Days
+                {effectiveDays}D ({format(parsedStartDate, 'dd MMM')} – {formattedEndDate.split(' ')[0]} {formattedEndDate.split(' ')[1]})
+              </span>
+            </div>
+          </div>
+
+          {/* 1.5 CHALLENGE START DATE & TIMELINE */}
+          <div className="p-4 bg-surface-card rounded-2xl border border-hairline space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold uppercase tracking-wider text-charcoal flex items-center gap-1.5">
+                <Calendar size={14} className="text-primary" /> Challenge Start Date
+              </label>
+              <span className="font-mono text-xs font-extrabold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full border border-primary/20">
+                {formattedStartDate}
+              </span>
+            </div>
+
+            {/* If challenge already has recorded logs, dates are locked */}
+            {isDateLocked ? (
+              <div className="p-3 bg-amber-500/10 border border-amber-300/80 rounded-xl space-y-1.5">
+                <div className="flex items-center justify-between text-xs font-bold text-amber-900">
+                  <span className="flex items-center gap-1.5">
+                    🔒 Start Date Locked
+                  </span>
+                  <span className="font-mono text-[11px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full border border-amber-200">
+                    {currentDayNumber > 0 ? `Day ${currentDayNumber} of ${effectiveDays}` : 'Scheduled'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-amber-800 leading-relaxed">
+                  Active logs exist for this challenge. Start date (<strong>{formattedStartDate}</strong>) and target duration (<strong>{effectiveDays} Days</strong>) are preserved for disciplinary commitment.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {/* PRESET START DATE PILLS: Today, Tomorrow, Pick Date */}
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setStartDate(getTodayKey())}
+                    className={clsx(
+                      'py-2 px-2.5 rounded-xl border text-xs font-bold transition-all text-center cursor-pointer',
+                      startDate === getTodayKey()
+                        ? 'border-primary bg-primary text-white shadow-2xs'
+                        : 'border-hairline bg-surface-bone text-charcoal hover:text-ink hover:bg-stone/20'
+                    )}
+                  >
+                    <span>Today</span>
+                    <span className="block text-[10px] font-normal opacity-85">
+                      {format(new Date(), 'dd MMM')}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setStartDate(format(addDays(new Date(), 1), 'yyyy-MM-dd'))}
+                    className={clsx(
+                      'py-2 px-2.5 rounded-xl border text-xs font-bold transition-all text-center cursor-pointer',
+                      startDate === format(addDays(new Date(), 1), 'yyyy-MM-dd')
+                        ? 'border-primary bg-primary text-white shadow-2xs'
+                        : 'border-hairline bg-surface-bone text-charcoal hover:text-ink hover:bg-stone/20'
+                    )}
+                  >
+                    <span>Tomorrow</span>
+                    <span className="block text-[10px] font-normal opacity-85">
+                      {format(addDays(new Date(), 1), 'dd MMM')}
+                    </span>
+                  </button>
+
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => {
+                        if (e.target.value) setStartDate(e.target.value);
+                      }}
+                      className={clsx(
+                        'w-full py-2 px-2 rounded-xl border text-xs font-bold transition-all text-center h-full bg-surface-bone text-charcoal hover:text-ink cursor-pointer',
+                        startDate !== getTodayKey() &&
+                          startDate !== format(addDays(new Date(), 1), 'yyyy-MM-dd')
+                          ? 'border-primary bg-primary/10 text-primary font-black ring-1 ring-primary'
+                          : 'border-hairline'
+                      )}
+                      title="Select custom start date"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TIMELINE SUMMARY CARD */}
+            <div className="p-2.5 bg-surface-bone rounded-xl border border-hairline flex items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <Clock size={13} className="text-primary shrink-0" />
+                <span className="text-charcoal font-medium truncate text-[11px] sm:text-xs">
+                  <strong className="text-ink font-bold">{formattedStartDate}</strong> ➔ <strong className="text-ink font-bold">{formattedEndDate}</strong>
+                </span>
+              </div>
+              <span className="font-mono text-[11px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20 shrink-0">
+                {effectiveDays} Days Total
               </span>
             </div>
           </div>
@@ -341,20 +501,20 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
               </span>
             </div>
 
-            {isStarted && (
+            {isDateLocked && (
               <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 p-2.5 rounded-xl font-medium">
-                🔒 This challenge has already started. Duration and mandatory tasks are locked to preserve disciplinary commitment.
+                🔒 Active logs exist for this challenge. Duration and mandatory tasks are locked to preserve disciplinary commitment.
               </p>
             )}
 
-            <div className={clsx("grid grid-cols-4 gap-2.5", isStarted && "opacity-50 pointer-events-none")}>
+            <div className={clsx("grid grid-cols-4 gap-2.5", isDateLocked && "opacity-50 pointer-events-none")}>
               {([7, 9, 11, 'custom'] as const).map((preset) => {
                 const isSelected = durationPreset === preset;
                 return (
                   <button
                     type="button"
                     key={String(preset)}
-                    disabled={isStarted}
+                    disabled={isDateLocked}
                     onClick={() => setDurationPreset(preset)}
                     className={clsx(
                       'py-3 px-2 rounded-2xl border-2 font-display font-bold text-xs sm:text-sm transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer',
@@ -390,7 +550,7 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
                   onChange={(e) => setCustomDays(Math.min(365, Math.max(1, parseInt(e.target.value, 10) || 1)))}
                   placeholder="e.g. 21, 30, 45, 75"
                   required
-                  disabled={isStarted}
+                  disabled={isDateLocked}
                 />
               </div>
             )}

@@ -24,8 +24,9 @@ import {
   Pencil,
   Archive,
   ArchiveRestore,
+  Calendar,
 } from 'lucide-react';
-import { addDays, format, parseISO } from 'date-fns';
+import { addDays, format, parseISO, isValid } from 'date-fns';
 import clsx from 'clsx';
 
 export const ChallengesView: React.FC = () => {
@@ -477,6 +478,15 @@ export const ChallengesView: React.FC = () => {
                         <h3 className="font-display font-bold text-lg text-ink tracking-tight truncate group-hover:text-primary transition-colors mt-1">
                           {c.name}
                         </h3>
+                        {c.startDate && (
+                          <div className="flex items-center gap-1.5 text-[11px] text-charcoal font-medium mt-0.5">
+                            <Calendar size={11} className="text-primary shrink-0" />
+                            <span>
+                              {isValid(parseISO(c.startDate)) ? format(parseISO(c.startDate), 'dd MMM yyyy') : c.startDate}
+                              {c.endDate && isValid(parseISO(c.endDate)) ? ` – ${format(parseISO(c.endDate), 'dd MMM yyyy')}` : ''}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
