@@ -21,11 +21,19 @@ import {
   Calendar,
   CheckCircle2,
   Zap,
+  Check,
+  Image,
+  Sparkles,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import clsx from 'clsx';
 import confetti from 'canvas-confetti';
 import { SecurityModal } from '../security/SecurityModal';
+import {
+  getTemplateJunkList,
+  getTemplateJunkUrl,
+  TemplateJunk,
+} from '../../utils/templateJunks';
 
 export const HabitBreakHub: React.FC = () => {
   const { habitBreaks, categories, addHabitBreak, relapseHabitBreak, deleteHabitBreak } =
@@ -42,9 +50,12 @@ export const HabitBreakHub: React.FC = () => {
   const viewingHistoryBreak = habitBreaks.find((b) => b.id === viewingHistoryBreakId) || null;
 
   // Form State
+  const templateList = getTemplateJunkList();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState(categories[0]?.id || 'cat-others');
+  const [visualMode, setVisualMode] = useState<'template' | 'icon'>('template');
+  const [selectedTemplate, setSelectedTemplate] = useState<string>(templateList[0]?.id || '');
   const [icon, setIcon] = useState('shield-check');
   const [color, setColor] = useState('#FF5C5C');
   const [startMode, setStartMode] = useState<'now' | 'custom'>('now');
@@ -54,6 +65,15 @@ export const HabitBreakHub: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submittingRef = React.useRef(false);
 
+  // Auto-fill habit name when template image is selected
+  const handleSelectTemplate = (tpl: TemplateJunk) => {
+    setSelectedTemplate(tpl.id);
+    if (!name.trim() || templateList.some((t) => t.name.toLowerCase() === name.trim().toLowerCase())) {
+      setName(tpl.name);
+    }
+    if (error) setError('');
+  };
+
   // Sync default date/time when modal opens
   useEffect(() => {
     if (isAddModalOpen) {
@@ -61,6 +81,10 @@ export const HabitBreakHub: React.FC = () => {
       setCustomStartDate(format(now, 'yyyy-MM-dd'));
       setCustomStartTime(format(now, 'HH:mm'));
       setStartMode('now');
+      setVisualMode('template');
+      if (templateList.length > 0 && !selectedTemplate) {
+        setSelectedTemplate(templateList[0].id);
+      }
     }
   }, [isAddModalOpen]);
 
@@ -118,6 +142,7 @@ export const HabitBreakHub: React.FC = () => {
         categoryId,
         icon,
         color,
+        templateImage: visualMode === 'template' && selectedTemplate ? selectedTemplate : undefined,
         startedAt: computedStartedAt,
       });
 
@@ -125,6 +150,8 @@ export const HabitBreakHub: React.FC = () => {
 
       setName('');
       setDescription('');
+      setSelectedTemplate(templateList[0]?.id || '');
+      setVisualMode('template');
       setStartMode('now');
       setIsAddModalOpen(false);
     } catch (err: any) {
@@ -233,7 +260,7 @@ export const HabitBreakHub: React.FC = () => {
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
           {habitBreaks.map((b) => {
             const time = formatElapsedTime(b.startedAt);
             const liveTotalSecs = time.isScheduledFuture ? 0 : time.totalSeconds;
@@ -246,121 +273,161 @@ export const HabitBreakHub: React.FC = () => {
             const IconComp =
               CATEGORY_ICONS.find((i) => i.id === b.icon)?.icon || CATEGORY_ICONS[0].icon;
             const effectiveColor = b.color || '#FF5C5C';
+            const templateImgUrl = b.templateImage ? getTemplateJunkUrl(b.templateImage) : undefined;
 
             return (
               <div
                 key={b.id}
-                className="bg-surface-card border-2 rounded-3xl p-5 sm:p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
-                style={{ borderColor: `${effectiveColor}40`, borderTopWidth: '6px', borderTopColor: effectiveColor }}
+                className="bg-surface-card border-2 rounded-3xl p-3 sm:p-4 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between relative group"
+                style={{
+                  borderColor: `${effectiveColor}40`,
+                  borderTopWidth: '5px',
+                  borderTopColor: effectiveColor,
+                }}
               >
                 <div>
-                  {/* Card Header */}
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2.5">
-                      <span
-                        className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 shadow-xs"
-                        style={{
-                          backgroundColor: boostVibrancy(effectiveColor),
-                          color: getContrastIconColor(boostVibrancy(effectiveColor)),
-                        }}
+                  {/* 1:1 SQUARE ROUNDED PICTURE / VISUAL */}
+                  <div className="w-full aspect-square rounded-2xl overflow-hidden relative shadow-2xs bg-surface-bone border border-hairline/60">
+                    {templateImgUrl ? (
+                      <img
+                        src={templateImgUrl}
+                        alt={b.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 select-none"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div
+                        className="w-full h-full flex flex-col items-center justify-center p-3"
+                        style={{ backgroundColor: `${effectiveColor}15` }}
                       >
-                        <IconComp size={20} strokeWidth={2.5} />
-                      </span>
-                      <div>
-                        <h3 className="font-display font-bold text-lg sm:text-xl text-ink tracking-tight">
-                          {b.name}
-                        </h3>
-                        {b.description && (
-                          <p className="text-xs text-charcoal line-clamp-1">
-                            {b.description}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => setBreakToDelete(b)}
-                      className="p-1.5 text-stone hover:text-red-500 rounded-full hover:bg-surface-bone transition-colors"
-                      title="Delete break habit"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-
-                  {/* LIVE CHRONOMETER DISPLAY */}
-                  <div className="my-4 p-4 bg-canvas rounded-2xl border border-hairline text-center">
-                    <span className="text-[10px] uppercase font-bold tracking-widest text-primary block mb-1">
-                      {time.isScheduledFuture
-                        ? '⏳ SCHEDULED TO START IN'
-                        : '● TIMER RUNNING — PERSISTENT CLEAN STREAK'}
-                    </span>
-                    <span className="text-[11px] font-mono text-charcoal block mb-2.5">
-                      Started: {format(new Date(b.startedAt), 'dd MMM yyyy, hh:mm a')}
-                    </span>
-
-                    <div className="grid grid-cols-4 gap-2 font-mono">
-                      <div className="p-2 bg-surface-card rounded-xl border border-hairline">
-                        <span className="text-2xl sm:text-3xl font-bold text-ink block">
-                          {time.days}
-                        </span>
-                        <span className="text-[10px] font-sans text-charcoal uppercase">
-                          Days
+                        <span
+                          className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shadow-xs"
+                          style={{
+                            backgroundColor: boostVibrancy(effectiveColor),
+                            color: getContrastIconColor(boostVibrancy(effectiveColor)),
+                          }}
+                        >
+                          <IconComp size={24} strokeWidth={2.5} />
                         </span>
                       </div>
-                      <div className="p-2 bg-surface-card rounded-xl border border-hairline">
-                        <span className="text-2xl sm:text-3xl font-bold text-ink block">
-                          {time.hours.toString().padStart(2, '0')}
-                        </span>
-                        <span className="text-[10px] font-sans text-charcoal uppercase">
-                          Hours
-                        </span>
-                      </div>
-                      <div className="p-2 bg-surface-card rounded-xl border border-hairline">
-                        <span className="text-2xl sm:text-3xl font-bold text-ink block">
-                          {time.mins.toString().padStart(2, '0')}
-                        </span>
-                        <span className="text-[10px] font-sans text-charcoal uppercase">
-                          Mins
-                        </span>
-                      </div>
-                      <div className="p-2 bg-surface-card rounded-xl border border-hairline">
-                        <span className="text-2xl sm:text-3xl font-bold text-primary block">
-                          {time.secs.toString().padStart(2, '0')}
-                        </span>
-                        <span className="text-[10px] font-sans text-charcoal uppercase">
-                          Secs
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                    )}
 
-                  {/* Best Record & Relapses History Button */}
-                  <div className="flex items-center justify-between text-xs text-charcoal px-1 mb-4">
-                    <span className="flex items-center gap-1.5 font-medium">
-                      <Trophy size={14} className="text-amber-500" />
-                      Best Streak: <strong className="text-ink">{bestTime.days}d {bestTime.hours}h</strong>
-                    </span>
-
-                    {/* RELAPSE HISTORY BUTTON */}
+                    {/* TOP RIGHT: DELETE TRASH BUTTON */}
                     <button
                       type="button"
-                      onClick={() => setViewingHistoryBreakId(b.id)}
-                      className="flex items-center gap-1 text-primary hover:text-primary-deep font-bold bg-primary/10 hover:bg-primary/20 px-2.5 py-1 rounded-full border border-primary/20 transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setBreakToDelete(b);
+                      }}
+                      className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/45 hover:bg-red-600 text-white flex items-center justify-center backdrop-blur-xs transition-colors shadow-2xs cursor-pointer z-10 active:scale-90"
+                      title="Delete break timer"
                     >
-                      <History size={13} />
-                      <span>Relapse Log ({b.relapseHistory?.length || 0})</span>
+                      <Trash2 size={13} />
                     </button>
+
+                    {/* STATUS OVERLAY PILL */}
+                    <div className="absolute bottom-2 left-2 z-10">
+                      <span
+                        className={clsx(
+                          'inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full shadow-2xs backdrop-blur-md',
+                          time.isScheduledFuture
+                            ? 'bg-amber-950/80 text-amber-200 border border-amber-500/30'
+                            : 'bg-black/60 text-emerald-300 border border-emerald-500/30'
+                        )}
+                      >
+                        <span
+                          className={clsx(
+                            'w-1.5 h-1.5 rounded-full',
+                            time.isScheduledFuture ? 'bg-amber-400' : 'bg-emerald-400 animate-pulse'
+                          )}
+                        />
+                        <span>{time.isScheduledFuture ? 'Scheduled' : 'Active'}</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* HABIT TITLE & DESCRIPTION */}
+                  <div className="mt-2.5">
+                    <h3
+                      className="font-display font-black text-sm sm:text-base text-ink tracking-tight truncate"
+                      title={b.name}
+                    >
+                      {b.name}
+                    </h3>
+                    {b.description ? (
+                      <p className="text-[11px] text-charcoal truncate mt-0.5" title={b.description}>
+                        {b.description}
+                      </p>
+                    ) : (
+                      <p className="text-[10px] text-charcoal/70 font-mono mt-0.5">
+                        Started {format(new Date(b.startedAt), 'dd MMM yyyy')}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* CUTE TIMER DISPLAY */}
+                  <div className="my-2 p-2 bg-canvas/90 dark:bg-stone-900/60 rounded-2xl border border-hairline/80 text-center shadow-2xs">
+                    {time.isScheduledFuture ? (
+                      <div className="py-1">
+                        <span className="text-[10px] font-mono font-bold text-amber-700 block">
+                          ⏳ Starts in {time.days}d {time.hours}h
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center gap-1 font-mono text-xs sm:text-sm font-black text-ink select-none">
+                        {time.days > 0 && (
+                          <div className="bg-surface-card px-1.5 py-0.5 rounded-lg border border-hairline shadow-2xs">
+                            <span>{time.days}</span>
+                            <span className="text-[9px] font-sans font-normal text-charcoal ml-0.5">d</span>
+                          </div>
+                        )}
+                        <div className="bg-surface-card px-1.5 py-0.5 rounded-lg border border-hairline shadow-2xs">
+                          <span>{time.hours.toString().padStart(2, '0')}</span>
+                          <span className="text-[9px] font-sans font-normal text-charcoal ml-0.5">h</span>
+                        </div>
+                        <span className="text-primary font-bold animate-pulse">:</span>
+                        <div className="bg-surface-card px-1.5 py-0.5 rounded-lg border border-hairline shadow-2xs">
+                          <span>{time.mins.toString().padStart(2, '0')}</span>
+                          <span className="text-[9px] font-sans font-normal text-charcoal ml-0.5">m</span>
+                        </div>
+                        <span className="text-primary font-bold animate-pulse">:</span>
+                        <div className="bg-surface-card px-1.5 py-0.5 rounded-lg border border-hairline text-primary shadow-2xs font-extrabold">
+                          <span>{time.secs.toString().padStart(2, '0')}</span>
+                          <span className="text-[9px] font-sans font-normal text-charcoal ml-0.5">s</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* BEST STREAK MINI PILL */}
+                    <div className="flex items-center justify-center gap-1 text-[10px] text-charcoal font-medium mt-1.5">
+                      <Trophy size={11} className="text-amber-500 shrink-0" />
+                      <span className="truncate">
+                        Best: <strong>{bestTime.days}d {bestTime.hours}h</strong>
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                {/* RELAPSE ACTION */}
-                <div className="pt-3 border-t border-hairline flex items-center justify-between gap-2">
-                  <span className="text-[11px] text-stone">One day, one moment at a time.</span>
+                {/* ACTIONS (RELAPSE & HISTORY) */}
+                <div className="pt-2 border-t border-hairline/80 flex items-center gap-1.5">
                   <button
+                    type="button"
                     onClick={() => setRelapseModalBreakId(b.id)}
-                    className="text-xs font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-4 py-2 rounded-full border border-red-200 transition-colors flex items-center gap-1.5 active:scale-95"
+                    className="flex-1 py-1.5 px-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 transition-all active:scale-95 shadow-2xs cursor-pointer"
+                    title="Reset timer after a slip"
                   >
-                    <RotateCcw size={13} /> I Relapsed
+                    <RotateCcw size={11} className="shrink-0" />
+                    <span className="truncate">Relapse</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setViewingHistoryBreakId(b.id)}
+                    className="py-1.5 px-2 bg-surface-bone hover:bg-stone/20 text-charcoal hover:text-ink rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 border border-hairline shadow-2xs transition-all active:scale-95 cursor-pointer shrink-0"
+                    title="Relapse reflection history"
+                  >
+                    <History size={12} className="shrink-0" />
+                    <span>{b.relapseHistory?.length || 0}</span>
                   </button>
                 </div>
               </div>
@@ -378,6 +445,45 @@ export const HabitBreakHub: React.FC = () => {
         maxWidth="lg"
       >
         <form onSubmit={handleCreate} className="space-y-4">
+          {/* LIVE 1:1 CARD PREVIEW */}
+          <div className="p-3 bg-surface-bone rounded-2xl border border-hairline flex items-center gap-3">
+            <div className="w-16 h-16 aspect-square rounded-2xl overflow-hidden relative shrink-0 shadow-2xs border border-hairline bg-surface-card">
+              {visualMode === 'template' && selectedTemplate ? (
+                <img
+                  src={getTemplateJunkUrl(selectedTemplate)}
+                  alt="Preview"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div
+                  className="w-full h-full flex items-center justify-center"
+                  style={{ backgroundColor: `${color}20` }}
+                >
+                  <span
+                    className="w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-2xs"
+                    style={{ backgroundColor: color }}
+                  >
+                    {(() => {
+                      const Comp = CATEGORY_ICONS.find((i) => i.id === icon)?.icon || CATEGORY_ICONS[0].icon;
+                      return <Comp size={18} />;
+                    })()}
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-charcoal block">
+                Live 2-Col Card Preview (1:1)
+              </span>
+              <p className="font-display font-black text-sm text-ink truncate mt-0.5">
+                {name.trim() || 'Your Habit to Quit'}
+              </p>
+              <p className="text-[10px] font-mono font-bold text-primary mt-0.5">
+                ● Chronometer: 00d : 00h : 00m : 01s
+              </p>
+            </div>
+          </div>
+
           <Input
             label="What habit are you quitting?"
             placeholder="e.g. Cigarettes, Sugar & Sodas, Instagram Scrolling"
@@ -502,13 +608,93 @@ export const HabitBreakHub: React.FC = () => {
             )}
           </div>
 
-          {/* Icon Selector */}
-          <IconPicker
-            selectedIcon={icon}
-            onSelectIcon={(newIcon) => setIcon(newIcon)}
-            label="Select Protective Badge Icon"
-            accentColor={color}
-          />
+          {/* VISUAL APPEARANCE: TEMPLATE JUNK PIC OR ICON */}
+          <div className="p-4 bg-surface-card rounded-2xl border border-hairline space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-charcoal flex items-center gap-1.5">
+                <Image size={14} className="text-primary" /> Visual Appearance
+              </label>
+              <div className="flex items-center bg-surface-bone p-1 rounded-full border border-hairline text-xs font-bold shrink-0 self-start sm:self-auto gap-1">
+                <button
+                  type="button"
+                  onClick={() => setVisualMode('template')}
+                  className={clsx(
+                    'px-3 py-1 rounded-full transition-all flex items-center gap-1 cursor-pointer',
+                    visualMode === 'template'
+                      ? 'bg-primary text-white shadow-2xs'
+                      : 'text-charcoal hover:text-ink'
+                  )}
+                >
+                  <Sparkles size={12} />
+                  <span>Junk Food Templates ({templateList.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVisualMode('icon')}
+                  className={clsx(
+                    'px-3 py-1 rounded-full transition-all flex items-center gap-1 cursor-pointer',
+                    visualMode === 'icon'
+                      ? 'bg-ink text-white shadow-2xs'
+                      : 'text-charcoal hover:text-ink'
+                  )}
+                >
+                  <span>Icon</span>
+                </button>
+              </div>
+            </div>
+
+            {visualMode === 'template' ? (
+              <div className="space-y-2">
+                <p className="text-[11px] text-charcoal">
+                  Pick a 1:1 cute template image (auto-loaded from <code className="font-mono text-[10px] bg-surface-bone px-1 py-0.5 rounded">src/template-junks/</code>):
+                </p>
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 max-h-60 overflow-y-auto no-scrollbar p-1">
+                  {templateList.map((tpl) => {
+                    const isSelected = selectedTemplate === tpl.id;
+                    return (
+                      <div
+                        key={tpl.id}
+                        onClick={() => handleSelectTemplate(tpl)}
+                        className={clsx(
+                          'aspect-square rounded-2xl overflow-hidden border-2 relative cursor-pointer group transition-all select-none',
+                          isSelected
+                            ? 'border-primary ring-2 ring-primary ring-offset-2 scale-[1.02] shadow-sm'
+                            : 'border-hairline hover:border-charcoal/40 bg-surface-bone'
+                        )}
+                        title={tpl.name}
+                      >
+                        <img
+                          src={tpl.url}
+                          alt={tpl.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                          loading="lazy"
+                        />
+                        {isSelected && (
+                          <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-primary text-white flex items-center justify-center shadow-xs">
+                            <Check size={12} strokeWidth={3} />
+                          </div>
+                        )}
+                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-1.5 text-center">
+                          <span className="text-[10px] font-bold text-white leading-tight line-clamp-1">
+                            {tpl.name}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <IconPicker
+                  selectedIcon={icon}
+                  onSelectIcon={(newIcon) => setIcon(newIcon)}
+                  label="Select Protective Badge Icon"
+                  accentColor={color}
+                />
+              </div>
+            )}
+          </div>
 
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-charcoal mb-1.5 ml-1">

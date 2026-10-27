@@ -127,6 +127,7 @@ export interface HabitBreak {
   icon: string;
   color: string;
   description?: string;
+  templateImage?: string;   // Optional image filename from template-junks
   startedAt: string;        // ISO timestamp
   bestStreakSeconds: number;
   unlockedMilestones: number[]; // seconds: [86400 (1d), 604800 (7d), ...]

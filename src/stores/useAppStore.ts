@@ -138,8 +138,10 @@ interface AppState {
     icon: string;
     color: string;
     description?: string;
+    templateImage?: string;
     startedAt?: string;
   }) => Promise<HabitBreak>;
+  updateHabitBreak: (updated: HabitBreak) => Promise<void>;
   relapseHabitBreak: (id: string, reason?: string) => Promise<void>;
   deleteHabitBreak: (id: string) => Promise<void>;
 
@@ -1088,6 +1090,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
       icon: data.icon,
       color: data.color,
       description: data.description,
+      templateImage: data.templateImage,
       startedAt: data.startedAt || new Date().toISOString(),
       bestStreakSeconds: 0,
       unlockedMilestones: [],
@@ -1133,6 +1136,16 @@ export const useAppStore = create<AppState>()((set, get) => ({
     await updateHabitBreakInDb(currentUser.uid, updated);
     set((s) => ({
       habitBreaks: s.habitBreaks.map((b) => (b.id === id ? updated : b)),
+    }));
+  },
+
+  updateHabitBreak: async (updated) => {
+    const { currentUser } = get();
+    if (currentUser) {
+      await updateHabitBreakInDb(currentUser.uid, updated);
+    }
+    set((s) => ({
+      habitBreaks: s.habitBreaks.map((b) => (b.id === updated.id ? updated : b)),
     }));
   },
 
