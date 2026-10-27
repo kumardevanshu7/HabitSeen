@@ -1187,6 +1187,16 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const challenge = state.challenges.find((c) => c.id === challengeId);
     if (!challenge || !state.currentUser) return;
 
+    // Safety guard: cannot log a challenge day before start date or after end date
+    if (challenge.startDate && dateKey < challenge.startDate) {
+      console.warn(`[Challenges] Cannot log before start date: ${dateKey} < ${challenge.startDate}`);
+      return;
+    }
+    if (challenge.endDate && dateKey > challenge.endDate) {
+      console.warn(`[Challenges] Cannot log after end date: ${dateKey} > ${challenge.endDate}`);
+      return;
+    }
+
     const existingLogs = challenge.dayLogs || {};
     const prevLog = existingLogs[dateKey];
     const wasAlreadyCompleted = prevLog?.status === 'COMPLETED';
@@ -1350,6 +1360,16 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const state = get();
     const challenge = state.challenges.find((c) => c.id === challengeId);
     if (!challenge || !state.currentUser) return;
+
+    // Safety guard: cannot fail a challenge day before start date or after end date
+    if (challenge.startDate && dateKey < challenge.startDate) {
+      console.warn(`[Challenges] Cannot fail before start date: ${dateKey} < ${challenge.startDate}`);
+      return;
+    }
+    if (challenge.endDate && dateKey > challenge.endDate) {
+      console.warn(`[Challenges] Cannot fail after end date: ${dateKey} > ${challenge.endDate}`);
+      return;
+    }
 
     const existingLogs = challenge.dayLogs || {};
     if (existingLogs[dateKey]?.status === 'FAILED') return;

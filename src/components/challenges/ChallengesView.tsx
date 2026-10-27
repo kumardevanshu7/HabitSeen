@@ -25,8 +25,10 @@ import {
   Archive,
   ArchiveRestore,
   Calendar,
+  Lock,
+  Clock,
 } from 'lucide-react';
-import { addDays, format, parseISO, isValid } from 'date-fns';
+import { addDays, format, parseISO, isValid, differenceInCalendarDays } from 'date-fns';
 import clsx from 'clsx';
 
 export const ChallengesView: React.FC = () => {
@@ -414,6 +416,12 @@ export const ChallengesView: React.FC = () => {
             const iconColor = getContrastIconColor(vibrantColor);
 
             const isFinished = isChallengeFinished(c);
+            const isNotStartedYet = Boolean(
+              c.startDate && isValid(parseISO(c.startDate)) && activeDateKey < c.startDate
+            );
+            const daysUntilStart = isNotStartedYet
+              ? Math.max(1, differenceInCalendarDays(parseISO(c.startDate), parseISO(activeDateKey)))
+              : 0;
             const dayLogs = c.dayLogs || {};
             const completedDays = Object.values(dayLogs).filter(
               (l) => l.status === 'COMPLETED'
@@ -466,9 +474,16 @@ export const ChallengesView: React.FC = () => {
                           <span className="font-mono text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-ink text-white whitespace-nowrap">
                             {targetDays} Days
                           </span>
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200 whitespace-nowrap">
-                            ⚠️ -90% Stake
-                          </span>
+                          {isNotStartedYet ? (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 whitespace-nowrap flex items-center gap-1 shadow-2xs">
+                              <Lock size={10} className="text-amber-700" />
+                              <span>{daysUntilStart === 1 ? 'Starts Tomorrow' : `Starts in ${daysUntilStart}D`}</span>
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200 whitespace-nowrap">
+                              ⚠️ -90% Stake
+                            </span>
+                          )}
                           {(c.status === 'COMPLETED' || isFinished) && (
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 whitespace-nowrap">
                               🏆 Completed
@@ -540,6 +555,11 @@ export const ChallengesView: React.FC = () => {
                         <strong className="text-ink">
                           {completedDays} / {targetDays} Days
                         </strong>
+                        {isNotStartedYet && (
+                          <span className="text-[11px] font-semibold text-amber-700 ml-1.5 font-sans">
+                            ({daysUntilStart === 1 ? 'Starts tomorrow' : `Starts ${format(parseISO(c.startDate), 'dd MMM')}`})
+                          </span>
+                        )}
                       </span>
                       <span className="font-extrabold text-primary">{pct}%</span>
                     </div>
@@ -556,7 +576,7 @@ export const ChallengesView: React.FC = () => {
                     {dayPills.map((dp) => {
                       const isDone = dp.status === 'COMPLETED';
                       const isFail = dp.status === 'FAILED';
-                      const isSelectedDay = dp.dateKey === activeDateKey;
+                      const isSelectedDay = !isNotStartedYet && dp.dateKey === activeDateKey;
                       return (
                         <div
                           key={dp.dateKey}
@@ -583,10 +603,15 @@ export const ChallengesView: React.FC = () => {
                   {hasSubTasks && (
                     <div className="space-y-1.5 pt-1">
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-charcoal block">
-                          {isFinished
-                            ? `Mandatory Tasks (All Conquered • ${c.tasks.length}/${c.tasks.length}):`
-                            : `Mandatory Daily Tasks (${todayCompletedTaskIds.length}/${c.tasks.length}):`}
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-charcoal flex items-center gap-1.5">
+                          {isNotStartedYet && <Lock size={11} className="text-amber-600" />}
+                          <span>
+                            {isFinished
+                              ? `Mandatory Tasks (All Conquered • ${c.tasks.length}/${c.tasks.length}):`
+                              : isNotStartedYet
+                              ? `Mandatory Tasks (${c.tasks.length} Configured • Locked until Day 1):`
+                              : `Mandatory Daily Tasks (${todayCompletedTaskIds.length}/${c.tasks.length}):`}
+                          </span>
                         </span>
                         {!isFinished && (
                           <button
@@ -601,23 +626,28 @@ export const ChallengesView: React.FC = () => {
                       </div>
                       {c.tasks.map((task) => {
                         const isChecked =
-                          isFinished || isTodayCompleted || todayCompletedTaskIds.includes(task.id);
+                          !isNotStartedYet &&
+                          (isFinished || isTodayCompleted || todayCompletedTaskIds.includes(task.id));
                         return (
                           <div
                             key={task.id}
                             onClick={() => {
-                              if (!isChecked && !isFinished) {
+                              if (!isChecked && !isFinished && !isNotStartedYet) {
                                 handleToggleSubTask(c, activeDateKey, task.id);
                               }
                             }}
                             className={clsx(
                               'flex items-center justify-between p-2.5 rounded-xl border text-xs transition-all select-none',
-                              isChecked || isFinished
+                              isNotStartedYet
+                                ? 'bg-surface-bone/50 border-hairline/80 text-charcoal/80 cursor-not-allowed opacity-90'
+                                : isChecked || isFinished
                                 ? 'bg-emerald-50/70 border-emerald-300 text-charcoal cursor-default'
                                 : 'bg-surface-bone/70 border-hairline text-ink hover:bg-stone/20 cursor-pointer'
                             )}
                             title={
-                              isFinished
+                              isNotStartedYet
+                                ? `Challenge starts ${daysUntilStart === 1 ? 'tomorrow' : `in ${daysUntilStart} days`} (${format(parseISO(c.startDate), 'dd MMM')}). Tasks will unlock on Day 1.`
+                                : isFinished
                                 ? 'Challenge Completed & Archived (Read Only)'
                                 : isChecked
                                 ? 'Task completed'
@@ -628,17 +658,23 @@ export const ChallengesView: React.FC = () => {
                               <div
                                 className={clsx(
                                   'w-4 h-4 rounded-md flex items-center justify-center border transition-all shrink-0',
-                                  isChecked
+                                  isNotStartedYet
+                                    ? 'border-hairline bg-surface-card text-charcoal/40'
+                                    : isChecked
                                     ? 'bg-badge-success border-badge-success text-white'
                                     : 'border-hairline-strong bg-white'
                                 )}
                               >
-                                {isChecked && <Check size={11} strokeWidth={3.5} />}
+                                {isNotStartedYet ? (
+                                  <Lock size={9} className="text-charcoal/50" />
+                                ) : isChecked ? (
+                                  <Check size={11} strokeWidth={3.5} />
+                                ) : null}
                               </div>
                               <span
                                 className={clsx(
                                   'font-medium truncate',
-                                  isChecked && 'line-through text-charcoal/70'
+                                  !isNotStartedYet && (isChecked || isFinished) && 'line-through text-charcoal/70'
                                 )}
                               >
                                 {task.text}
@@ -646,11 +682,15 @@ export const ChallengesView: React.FC = () => {
                             </div>
                             <span
                               className={clsx(
-                                'text-[10px] font-mono shrink-0 ml-2',
-                                isChecked ? 'text-emerald-700 font-semibold' : 'text-stone'
+                                'text-[10px] font-mono shrink-0 ml-2 uppercase',
+                                isNotStartedYet
+                                  ? 'text-amber-800 font-bold'
+                                  : isChecked
+                                  ? 'text-emerald-700 font-semibold'
+                                  : 'text-stone'
                               )}
                             >
-                              {isChecked ? 'Done' : 'Required'}
+                              {isNotStartedYet ? 'Locked' : isChecked ? 'Done' : 'Required'}
                             </span>
                           </div>
                         );
@@ -717,6 +757,34 @@ export const ChallengesView: React.FC = () => {
                       >
                         Analytics
                       </button>
+                    </div>
+                  ) : isNotStartedYet ? (
+                    <div className="flex items-center justify-between w-full p-3 bg-amber-500/10 border border-amber-300/80 rounded-2xl text-xs shadow-2xs">
+                      <div className="flex items-center gap-2 text-amber-900 font-semibold min-w-0">
+                        <Lock size={15} className="text-amber-600 shrink-0" />
+                        <span className="truncate">
+                          {daysUntilStart === 1
+                            ? 'Starts Tomorrow (28 Oct) • Tasks Locked for Today'
+                            : `Starts in ${daysUntilStart} Days (${format(parseISO(c.startDate), 'dd MMM yyyy')}) • Locked`}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setEditingChallenge(c)}
+                          className="px-2.5 py-1 rounded-full bg-surface-card hover:bg-surface-bone text-amber-900 border border-amber-300 font-bold text-[11px] transition-colors cursor-pointer"
+                          title="Change Start Date or Edit Parameters"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setInspectedChallenge(c)}
+                          className="text-[11px] font-bold text-primary hover:underline"
+                        >
+                          Analytics
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <>
