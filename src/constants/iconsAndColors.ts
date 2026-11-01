@@ -259,23 +259,35 @@ export const CATEGORY_ICONS: IconOption[] = [
   { id: 'layout-grid', label: 'General / Miscellaneous', category: 'others', icon: LayoutGrid },
 ];
 
-// Rich, ultra-vibrant, bright colors that pop clearly on screen
+// 20 Curated, Ultra-Distinct, High-Contrast Vibrant Colors (Carefully balanced across the entire color wheel)
 export const CATEGORY_COLORS: { hex: string; name: string }[] = [
-  { hex: '#E11D48', name: 'Bright Rose' },
-  { hex: '#EA580C', name: 'Vibrant Orange' },
-  { hex: '#D97706', name: 'Golden Amber' },
-  { hex: '#059669', name: 'Emerald Green' },
-  { hex: '#0D9488', name: 'Vivid Teal' },
-  { hex: '#0284C7', name: 'Electric Cyan' },
+  // Row 1: Warm Spectrum (Red -> Orange -> Amber -> Yellow -> Lime)
+  { hex: '#EF4444', name: 'Crimson Red' },
+  { hex: '#F97316', name: 'Flame Orange' },
+  { hex: '#F59E0B', name: 'Golden Amber' },
+  { hex: '#EAB308', name: 'Sunflower Yellow' },
+  { hex: '#84CC16', name: 'Lime Chartreuse' },
+
+  // Row 2: Greens & Teals (Lush Green -> Forest Jade -> Sea Teal -> Aqua -> Sky)
+  { hex: '#10B981', name: 'Emerald Green' },
+  { hex: '#047857', name: 'Forest Jade' },
+  { hex: '#14B8A6', name: 'Sea Teal' },
+  { hex: '#06B6D4', name: 'Electric Aqua' },
+  { hex: '#0EA5E9', name: 'Sky Blue' },
+
+  // Row 3: Blues, Purples & Pinks (Royal -> Indigo -> Purple -> Fuchsia -> Pink)
   { hex: '#2563EB', name: 'Royal Blue' },
   { hex: '#4F46E5', name: 'Deep Indigo' },
-  { hex: '#7C3AED', name: 'Vivid Purple' },
-  { hex: '#C026D3', name: 'Neon Fuchsia' },
-  { hex: '#DB2777', name: 'Hot Pink' },
-  { hex: '#65A30D', name: 'Fresh Lime' },
-  { hex: '#DC2626', name: 'Ruby Red' },
-  { hex: '#9333EA', name: 'Electric Violet' },
-  { hex: '#475569', name: 'Slate Gray' },
+  { hex: '#8B5CF6', name: 'Vivid Purple' },
+  { hex: '#D946EF', name: 'Neon Fuchsia' },
+  { hex: '#EC4899', name: 'Hot Pink' },
+
+  // Row 4: Earth, Deep & Contrast Tones (Wine -> Caramel -> Coral Terracotta -> Slate -> Obsidian)
+  { hex: '#9F1239', name: 'Deep Velvet Wine' },
+  { hex: '#92400E', name: 'Caramel Bronze' },
+  { hex: '#E05638', name: 'Coral Terracotta' },
+  { hex: '#64748B', name: 'Steel Slate' },
+  { hex: '#1E293B', name: 'Obsidian Charcoal' },
 ];
 
 export {

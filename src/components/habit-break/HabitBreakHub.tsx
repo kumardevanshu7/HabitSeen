@@ -260,7 +260,7 @@ export const HabitBreakHub: React.FC = () => {
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-4 pb-20 md:pb-8">
           {habitBreaks.map((b) => {
             const time = formatElapsedTime(b.startedAt);
             const liveTotalSecs = time.isScheduledFuture ? 0 : time.totalSeconds;
@@ -278,16 +278,20 @@ export const HabitBreakHub: React.FC = () => {
             return (
               <div
                 key={b.id}
-                className="bg-surface-card border-2 rounded-3xl p-3 sm:p-4 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between relative group"
+                className="bg-surface-card border-2 rounded-2xl sm:rounded-3xl p-2.5 sm:p-3.5 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between relative group overflow-hidden"
                 style={{
                   borderColor: `${effectiveColor}40`,
-                  borderTopWidth: '5px',
-                  borderTopColor: effectiveColor,
                 }}
               >
-                <div>
+                {/* TOP ACCENT LINE */}
+                <div
+                  className="absolute top-0 inset-x-0 h-1 z-10"
+                  style={{ backgroundColor: effectiveColor }}
+                />
+
+                <div className="min-w-0">
                   {/* 1:1 SQUARE ROUNDED PICTURE / VISUAL */}
-                  <div className="w-full aspect-square rounded-2xl overflow-hidden relative shadow-2xs bg-surface-bone border border-hairline/60">
+                  <div className="w-full aspect-square rounded-xl sm:rounded-2xl overflow-hidden relative shadow-2xs bg-surface-bone border border-hairline/60">
                     {templateImgUrl ? (
                       <img
                         src={templateImgUrl}
@@ -319,17 +323,17 @@ export const HabitBreakHub: React.FC = () => {
                         e.stopPropagation();
                         setBreakToDelete(b);
                       }}
-                      className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/45 hover:bg-red-600 text-white flex items-center justify-center backdrop-blur-xs transition-colors shadow-2xs cursor-pointer z-10 active:scale-90"
+                      className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-black/45 hover:bg-red-600 text-white flex items-center justify-center backdrop-blur-xs transition-colors shadow-2xs cursor-pointer z-10 active:scale-90"
                       title="Delete break timer"
                     >
-                      <Trash2 size={13} />
+                      <Trash2 size={12} />
                     </button>
 
                     {/* STATUS OVERLAY PILL */}
-                    <div className="absolute bottom-2 left-2 z-10">
+                    <div className="absolute bottom-1.5 left-1.5 sm:bottom-2 sm:left-2 z-10">
                       <span
                         className={clsx(
-                          'inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full shadow-2xs backdrop-blur-md',
+                          'inline-flex items-center gap-1 text-[9px] sm:text-[10px] font-mono font-bold px-1.5 sm:px-2 py-0.5 rounded-full shadow-2xs backdrop-blur-md',
                           time.isScheduledFuture
                             ? 'bg-amber-950/80 text-amber-200 border border-amber-500/30'
                             : 'bg-black/60 text-emerald-300 border border-emerald-500/30'
@@ -347,73 +351,66 @@ export const HabitBreakHub: React.FC = () => {
                   </div>
 
                   {/* HABIT TITLE & DESCRIPTION */}
-                  <div className="mt-2.5">
+                  <div className="mt-2 min-w-0">
                     <h3
-                      className="font-display font-black text-sm sm:text-base text-ink tracking-tight truncate"
+                      className="font-display font-black text-xs sm:text-sm md:text-base text-ink tracking-tight truncate"
                       title={b.name}
                     >
                       {b.name}
                     </h3>
                     {b.description ? (
-                      <p className="text-[11px] text-charcoal truncate mt-0.5" title={b.description}>
+                      <p className="text-[10px] sm:text-[11px] text-charcoal truncate mt-0.5" title={b.description}>
                         {b.description}
                       </p>
                     ) : (
-                      <p className="text-[10px] text-charcoal/70 font-mono mt-0.5">
+                      <p className="text-[9px] sm:text-[10px] text-charcoal/70 font-mono mt-0.5">
                         Started {format(new Date(b.startedAt), 'dd MMM yyyy')}
                       </p>
                     )}
                   </div>
 
-                  {/* CUTE TIMER DISPLAY */}
-                  <div className="my-2 p-2 bg-canvas/90 dark:bg-stone-900/60 rounded-2xl border border-hairline/80 text-center shadow-2xs">
+                  {/* CUTE COMPACT CHRONOMETER (100% IMMUNE TO MOBILE OVERFLOW) */}
+                  <div className="my-1.5 sm:my-2 p-1.5 sm:p-2 bg-canvas/90 dark:bg-stone-900/60 rounded-xl sm:rounded-2xl border border-hairline/80 text-center shadow-2xs overflow-hidden">
                     {time.isScheduledFuture ? (
-                      <div className="py-1">
-                        <span className="text-[10px] font-mono font-bold text-amber-700 block">
+                      <div className="py-0.5">
+                        <span className="text-[9px] sm:text-[10px] font-mono font-bold text-amber-700 block truncate">
                           ⏳ Starts in {time.days}d {time.hours}h
                         </span>
                       </div>
                     ) : (
-                      <div className="flex items-center justify-center gap-1 font-mono text-xs sm:text-sm font-black text-ink select-none">
+                      <div className="flex items-center justify-center gap-1 font-mono text-[11px] sm:text-xs md:text-sm font-black text-ink select-none tracking-tight">
                         {time.days > 0 && (
-                          <div className="bg-surface-card px-1.5 py-0.5 rounded-lg border border-hairline shadow-2xs">
+                          <div className="bg-surface-card px-1 py-0.5 rounded-md border border-hairline/80 shadow-2xs shrink-0 flex items-center">
                             <span>{time.days}</span>
-                            <span className="text-[9px] font-sans font-normal text-charcoal ml-0.5">d</span>
+                            <span className="text-[8px] sm:text-[9px] font-sans font-normal text-charcoal ml-0.5">d</span>
                           </div>
                         )}
-                        <div className="bg-surface-card px-1.5 py-0.5 rounded-lg border border-hairline shadow-2xs">
+                        <div className="bg-surface-card px-1.5 py-0.5 rounded-md border border-hairline/80 shadow-2xs inline-flex items-center gap-0.5">
                           <span>{time.hours.toString().padStart(2, '0')}</span>
-                          <span className="text-[9px] font-sans font-normal text-charcoal ml-0.5">h</span>
-                        </div>
-                        <span className="text-primary font-bold animate-pulse">:</span>
-                        <div className="bg-surface-card px-1.5 py-0.5 rounded-lg border border-hairline shadow-2xs">
+                          <span className="text-primary font-bold animate-pulse text-[9px]">:</span>
                           <span>{time.mins.toString().padStart(2, '0')}</span>
-                          <span className="text-[9px] font-sans font-normal text-charcoal ml-0.5">m</span>
-                        </div>
-                        <span className="text-primary font-bold animate-pulse">:</span>
-                        <div className="bg-surface-card px-1.5 py-0.5 rounded-lg border border-hairline text-primary shadow-2xs font-extrabold">
-                          <span>{time.secs.toString().padStart(2, '0')}</span>
-                          <span className="text-[9px] font-sans font-normal text-charcoal ml-0.5">s</span>
+                          <span className="text-primary font-bold animate-pulse text-[9px]">:</span>
+                          <span className="text-primary font-extrabold">{time.secs.toString().padStart(2, '0')}</span>
                         </div>
                       </div>
                     )}
 
                     {/* BEST STREAK MINI PILL */}
-                    <div className="flex items-center justify-center gap-1 text-[10px] text-charcoal font-medium mt-1.5">
-                      <Trophy size={11} className="text-amber-500 shrink-0" />
+                    <div className="flex items-center justify-center gap-1 text-[9px] sm:text-[10px] text-charcoal font-medium mt-1 truncate">
+                      <Trophy size={10} className="text-amber-500 shrink-0" />
                       <span className="truncate">
-                        Best: <strong>{bestTime.days}d {bestTime.hours}h</strong>
+                        Best: <strong>{bestTime.days > 0 ? `${bestTime.days}d ` : ''}{bestTime.hours}h</strong>
                       </span>
                     </div>
                   </div>
                 </div>
 
                 {/* ACTIONS (RELAPSE & HISTORY) */}
-                <div className="pt-2 border-t border-hairline/80 flex items-center gap-1.5">
+                <div className="pt-1.5 sm:pt-2 border-t border-hairline/80 flex items-center gap-1 sm:gap-1.5">
                   <button
                     type="button"
                     onClick={() => setRelapseModalBreakId(b.id)}
-                    className="flex-1 py-1.5 px-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 transition-all active:scale-95 shadow-2xs cursor-pointer"
+                    className="flex-1 min-w-0 py-1.5 px-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200/80 rounded-xl text-[10px] sm:text-[11px] font-bold flex items-center justify-center gap-1 transition-all active:scale-95 shadow-2xs cursor-pointer truncate"
                     title="Reset timer after a slip"
                   >
                     <RotateCcw size={11} className="shrink-0" />
@@ -423,10 +420,10 @@ export const HabitBreakHub: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setViewingHistoryBreakId(b.id)}
-                    className="py-1.5 px-2 bg-surface-bone hover:bg-stone/20 text-charcoal hover:text-ink rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 border border-hairline shadow-2xs transition-all active:scale-95 cursor-pointer shrink-0"
+                    className="py-1.5 px-2 bg-surface-bone hover:bg-stone/20 text-charcoal hover:text-ink rounded-xl text-[10px] sm:text-[11px] font-bold flex items-center justify-center gap-1 border border-hairline shadow-2xs transition-all active:scale-95 cursor-pointer shrink-0"
                     title="Relapse reflection history"
                   >
-                    <History size={12} className="shrink-0" />
+                    <History size={11} className="shrink-0" />
                     <span>{b.relapseHistory?.length || 0}</span>
                   </button>
                 </div>
@@ -504,7 +501,11 @@ export const HabitBreakHub: React.FC = () => {
               value: c.id,
               label: c.name,
             }))}
-            onChange={(val) => setCategoryId(val)}
+            onChange={(val) => {
+              setCategoryId(val);
+              const matchedCat = categories.find((c) => c.id === val);
+              if (matchedCat?.color) setColor(matchedCat.color);
+            }}
           />
 
           {/* START DATE & CUSTOM TIME SELECTOR */}

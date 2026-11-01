@@ -168,14 +168,20 @@ export const CreateCategoryModal: React.FC<CreateCategoryModalProps> = ({
           accentColor={vibrantColor}
         />
 
-        {/* 15 Curated Vibrant Colors Selection */}
+        {/* 20 Curated Distinct Vibrant Colors Selection */}
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-charcoal mb-2 ml-1">
-            Choose Category Color (15 Vibrant Tones)
-          </label>
-          <div className="grid grid-cols-5 sm:grid-cols-8 gap-2.5 p-2.5 bg-surface-card rounded-2xl border border-hairline">
+          <div className="flex items-center justify-between mb-2 ml-1">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-charcoal">
+              Choose Category Color (20 Distinct Vibrant Tones)
+            </label>
+            <span className="text-[10px] font-mono font-bold text-charcoal uppercase">
+              {CATEGORY_COLORS.find((c) => c.hex === selectedColor)?.name || 'Custom'}
+            </span>
+          </div>
+          <div className="grid grid-cols-5 sm:grid-cols-10 gap-2 sm:gap-2.5 p-2.5 bg-surface-card rounded-2xl border border-hairline">
             {CATEGORY_COLORS.map((col) => {
               const isSelected = selectedColor === col.hex;
+              const isLightColor = col.hex === '#EAB308' || col.hex === '#84CC16' || col.hex === '#F59E0B';
               return (
                 <button
                   type="button"
@@ -183,14 +189,22 @@ export const CreateCategoryModal: React.FC<CreateCategoryModalProps> = ({
                   title={col.name}
                   onClick={() => setSelectedColor(col.hex)}
                   className={clsx(
-                    'h-11 w-full rounded-xl border border-hairline flex items-center justify-center transition-all',
+                    'h-11 w-full rounded-xl border border-hairline/80 flex items-center justify-center transition-all cursor-pointer shadow-2xs',
                     isSelected
-                      ? 'ring-3 ring-ink ring-offset-2 scale-105 shadow-md'
+                      ? 'ring-3 ring-ink ring-offset-2 scale-105 shadow-md z-10'
                       : 'hover:opacity-90 hover:scale-102'
                   )}
                   style={{ backgroundColor: col.hex }}
                 >
-                  {isSelected && <Check size={18} className="text-white stroke-[3] drop-shadow-sm" />}
+                  {isSelected && (
+                    <Check
+                      size={18}
+                      className={clsx(
+                        'stroke-[3] drop-shadow-sm',
+                        isLightColor ? 'text-ink' : 'text-white'
+                      )}
+                    />
+                  )}
                 </button>
               );
             })}

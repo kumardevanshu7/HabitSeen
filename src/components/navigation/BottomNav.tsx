@@ -44,7 +44,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           )}
         >
           <CheckSquare size={18} />
-          <span className="text-[9px]">Habits</span>
+          <span className="text-[9px] truncate max-w-full">Habits</span>
         </button>
 
         {/* 2. Challenges */}
@@ -59,7 +59,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           )}
         >
           <Flame size={18} className={activeTab === 'challenges' ? 'fill-rose-600/20' : ''} />
-          <span className="text-[9px]">Challenges</span>
+          <span className="text-[9px] truncate max-w-full">Challenges</span>
         </button>
 
         {/* 3. Just Tracking (Directly after Challenges) */}
@@ -74,7 +74,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           )}
         >
           <Sparkles size={18} className={activeTab === 'tracking' ? 'fill-amber-500/20' : ''} />
-          <span className="text-[9px]">Tracking</span>
+          <span className="text-[9px] truncate max-w-full">Tracking</span>
         </button>
 
         {/* 4. CENTER RAISED ACTION BUTTON */}
@@ -103,7 +103,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           )}
         >
           <ShieldAlert size={18} />
-          <span className="text-[9px]">Quit Break</span>
+          <span className="text-[9px] truncate max-w-full">Quit Break</span>
         </button>
 
         {/* 6. Analytics */}
@@ -118,7 +118,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           )}
         >
           <BarChart2 size={18} />
-          <span className="text-[9px]">Analytics</span>
+          <span className="text-[9px] truncate max-w-full">Analytics</span>
         </button>
 
         {/* 7. Profile & Willpower */}
@@ -129,7 +129,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           className="flex flex-col items-center justify-center min-h-[44px] gap-0.5 py-1 rounded-xl transition-colors text-stone hover:text-ink font-medium"
         >
           <User size={18} />
-          <span className="text-[9px]">Profile</span>
+          <span className="text-[9px] truncate max-w-full">Profile</span>
         </button>
       </nav>
 
