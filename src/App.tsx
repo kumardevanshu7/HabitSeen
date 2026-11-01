@@ -357,7 +357,7 @@ export const App: React.FC = () => {
     };
   }, [currentUser, checkAndEnforceMidnightRollover]);
 
-  // Startup Splash Screen with 27th Oct Anchor, Anime Quotes & Manual User "Proceed" Button
+  // Startup Splash Screen with 1st Nov Anchor, Anime Quotes & Manual User "Proceed" Button
   if (!userProceeded || authLoading || (currentUser && profileLoading)) {
     return (
       <StartupAnchorSplash
