@@ -30,10 +30,10 @@ import clsx from 'clsx';
 import confetti from 'canvas-confetti';
 import { SecurityModal } from '../security/SecurityModal';
 import {
-  getTemplateJunkList,
-  getTemplateJunkUrl,
-  TemplateJunk,
-} from '../../utils/templateJunks';
+  getTemplatePicList,
+  getTemplatePicUrl,
+  TemplatePic,
+} from '../../utils/templatePics';
 
 export const HabitBreakHub: React.FC = () => {
   const { habitBreaks, categories, addHabitBreak, relapseHabitBreak, deleteHabitBreak } =
@@ -50,7 +50,7 @@ export const HabitBreakHub: React.FC = () => {
   const viewingHistoryBreak = habitBreaks.find((b) => b.id === viewingHistoryBreakId) || null;
 
   // Form State
-  const templateList = getTemplateJunkList();
+  const templateList = getTemplatePicList();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState(categories[0]?.id || 'cat-others');
@@ -65,10 +65,17 @@ export const HabitBreakHub: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submittingRef = React.useRef(false);
 
-  // Auto-fill habit name when template image is selected
-  const handleSelectTemplate = (tpl: TemplateJunk) => {
+  // Auto-fill habit name with clean short name when template image is selected
+  const handleSelectTemplate = (tpl: TemplatePic) => {
     setSelectedTemplate(tpl.id);
-    if (!name.trim() || templateList.some((t) => t.name.toLowerCase() === name.trim().toLowerCase())) {
+    if (
+      !name.trim() ||
+      templateList.some(
+        (t) =>
+          t.name.toLowerCase() === name.trim().toLowerCase() ||
+          t.fullName.toLowerCase() === name.trim().toLowerCase()
+      )
+    ) {
       setName(tpl.name);
     }
     if (error) setError('');
@@ -273,7 +280,7 @@ export const HabitBreakHub: React.FC = () => {
             const IconComp =
               CATEGORY_ICONS.find((i) => i.id === b.icon)?.icon || CATEGORY_ICONS[0].icon;
             const effectiveColor = b.color || '#FF5C5C';
-            const templateImgUrl = b.templateImage ? getTemplateJunkUrl(b.templateImage) : undefined;
+            const templateImgUrl = b.templateImage ? getTemplatePicUrl(b.templateImage) : undefined;
 
             return (
               <div
@@ -447,7 +454,7 @@ export const HabitBreakHub: React.FC = () => {
             <div className="w-16 h-16 aspect-square rounded-2xl overflow-hidden relative shrink-0 shadow-2xs border border-hairline bg-surface-card">
               {visualMode === 'template' && selectedTemplate ? (
                 <img
-                  src={getTemplateJunkUrl(selectedTemplate)}
+                  src={getTemplatePicUrl(selectedTemplate)}
                   alt="Preview"
                   className="w-full h-full object-cover"
                 />
@@ -627,7 +634,7 @@ export const HabitBreakHub: React.FC = () => {
                   )}
                 >
                   <Sparkles size={12} />
-                  <span>Junk Food Templates ({templateList.length})</span>
+                  <span>Template Pics ({templateList.length})</span>
                 </button>
                 <button
                   type="button"
@@ -647,7 +654,7 @@ export const HabitBreakHub: React.FC = () => {
             {visualMode === 'template' ? (
               <div className="space-y-2">
                 <p className="text-[11px] text-charcoal">
-                  Pick a 1:1 cute template image (auto-loaded from <code className="font-mono text-[10px] bg-surface-bone px-1 py-0.5 rounded">src/template-junks/</code>):
+                  Pick a 1:1 cute template picture (auto-loaded from <code className="font-mono text-[10px] bg-surface-bone px-1 py-0.5 rounded">src/template-pics/</code>):
                 </p>
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 max-h-60 overflow-y-auto no-scrollbar p-1">
                   {templateList.map((tpl) => {
@@ -662,7 +669,7 @@ export const HabitBreakHub: React.FC = () => {
                             ? 'border-primary ring-2 ring-primary ring-offset-2 scale-[1.02] shadow-sm'
                             : 'border-hairline hover:border-charcoal/40 bg-surface-bone'
                         )}
-                        title={tpl.name}
+                        title={`${tpl.name} (${tpl.fullName})`}
                       >
                         <img
                           src={tpl.url}
@@ -671,12 +678,12 @@ export const HabitBreakHub: React.FC = () => {
                           loading="lazy"
                         />
                         {isSelected && (
-                          <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-primary text-white flex items-center justify-center shadow-xs">
+                          <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-primary text-white flex items-center justify-center shadow-xs z-10">
                             <Check size={12} strokeWidth={3} />
                           </div>
                         )}
-                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-1.5 text-center">
-                          <span className="text-[10px] font-bold text-white leading-tight line-clamp-1">
+                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/55 to-transparent p-1.5 text-center">
+                          <span className="text-[10px] font-bold text-white leading-tight line-clamp-1 block px-0.5 truncate drop-shadow-xs">
                             {tpl.name}
                           </span>
                         </div>
