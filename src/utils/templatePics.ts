@@ -21,6 +21,9 @@ import imgPaneerWrap from '../template-pics/Paneer Wraps with Green Chutney.webp
 import imgSteamedMomos from '../template-pics/Steamed Momos with Spicy Chutney.webp';
 import imgTandooriMomos from '../template-pics/Tandoori Momos with Chutneys and Paneer.webp';
 import imgLavaCake from '../template-pics/Molten Chocolate Lava Cake Delight.webp';
+import imgRoti from '../template-pics/Stacked Rotis with Cilantro Garnish.webp';
+import imgChai from '../template-pics/Steaming Chai with Spices and Ginger.webp';
+import imgCoffee from '../template-pics/Steaming Latte with Coffee Beans.webp';
 
 export interface TemplatePic {
   id: string; // filename identifier e.g. "Creamy Malai Chaap Platter.webp"
@@ -53,6 +56,9 @@ const SHORT_NAME_MAP: Record<string, string> = {
   'Steamed Momos with Spicy Chutney': 'Steamed Momos',
   'Tandoori Momos with Chutneys and Paneer': 'Tandoori Momos',
   'Molten Chocolate Lava Cake Delight': 'Choco Lava Cake',
+  'Stacked Rotis with Cilantro Garnish': 'Roti / Chapati',
+  'Steaming Chai with Spices and Ginger': 'Chai / Tea',
+  'Steaming Latte with Coffee Beans': 'Coffee / Latte',
 };
 
 /**
@@ -205,6 +211,27 @@ const STATIC_TEMPLATE_PICS: TemplatePic[] = [
     fullName: 'Molten Chocolate Lava Cake Delight',
     name: 'Choco Lava Cake',
     url: imgLavaCake,
+  },
+  {
+    id: 'Stacked Rotis with Cilantro Garnish.webp',
+    filename: 'Stacked Rotis with Cilantro Garnish.webp',
+    fullName: 'Stacked Rotis with Cilantro Garnish',
+    name: 'Roti / Chapati',
+    url: imgRoti,
+  },
+  {
+    id: 'Steaming Chai with Spices and Ginger.webp',
+    filename: 'Steaming Chai with Spices and Ginger.webp',
+    fullName: 'Steaming Chai with Spices and Ginger',
+    name: 'Chai / Tea',
+    url: imgChai,
+  },
+  {
+    id: 'Steaming Latte with Coffee Beans.webp',
+    filename: 'Steaming Latte with Coffee Beans.webp',
+    fullName: 'Steaming Latte with Coffee Beans',
+    name: 'Coffee / Latte',
+    url: imgCoffee,
   },
 ];
 

@@ -24,6 +24,7 @@ import {
   Check,
   Image,
   Sparkles,
+  Search,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import clsx from 'clsx';
@@ -51,6 +52,7 @@ export const HabitBreakHub: React.FC = () => {
 
   // Form State
   const templateList = getTemplatePicList();
+  const [templateSearch, setTemplateSearch] = useState('');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState(categories[0]?.id || 'cat-others');
@@ -652,45 +654,97 @@ export const HabitBreakHub: React.FC = () => {
             </div>
 
             {visualMode === 'template' ? (
-              <div className="space-y-2">
-                <p className="text-[11px] text-charcoal">
-                  Pick a 1:1 cute template picture (auto-loaded from <code className="font-mono text-[10px] bg-surface-bone px-1 py-0.5 rounded">src/template-pics/</code>):
-                </p>
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 max-h-60 overflow-y-auto no-scrollbar p-1">
-                  {templateList.map((tpl) => {
-                    const isSelected = selectedTemplate === tpl.id;
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] text-charcoal">
+                    Pick a 1:1 cute template picture:
+                  </p>
+                  <span className="text-[10px] font-mono font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
+                    {templateList.length} Options
+                  </span>
+                </div>
+
+                {/* TEMPLATE SEARCH BAR */}
+                <div className="relative">
+                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal/60 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={templateSearch}
+                    onChange={(e) => setTemplateSearch(e.target.value)}
+                    placeholder="Search e.g. chai, roti, coffee, momos, burger..."
+                    className="w-full bg-surface-bone text-ink text-xs pl-8 pr-7 py-2 rounded-xl border border-hairline focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-charcoal/50"
+                  />
+                  {templateSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setTemplateSearch('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-charcoal hover:text-ink text-xs font-bold w-4 h-4 rounded-full flex items-center justify-center bg-stone/20"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+
+                {(() => {
+                  const filtered = templateList.filter(
+                    (tpl) =>
+                      tpl.name.toLowerCase().includes(templateSearch.toLowerCase().trim()) ||
+                      tpl.fullName.toLowerCase().includes(templateSearch.toLowerCase().trim())
+                  );
+
+                  if (filtered.length === 0) {
                     return (
-                      <div
-                        key={tpl.id}
-                        onClick={() => handleSelectTemplate(tpl)}
-                        className={clsx(
-                          'aspect-square rounded-2xl overflow-hidden border-2 relative cursor-pointer group transition-all select-none',
-                          isSelected
-                            ? 'border-primary ring-2 ring-primary ring-offset-2 scale-[1.02] shadow-sm'
-                            : 'border-hairline hover:border-charcoal/40 bg-surface-bone'
-                        )}
-                        title={`${tpl.name} (${tpl.fullName})`}
-                      >
-                        <img
-                          src={tpl.url}
-                          alt={tpl.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                          loading="lazy"
-                        />
-                        {isSelected && (
-                          <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-primary text-white flex items-center justify-center shadow-xs z-10">
-                            <Check size={12} strokeWidth={3} />
-                          </div>
-                        )}
-                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/55 to-transparent p-1.5 text-center">
-                          <span className="text-[10px] font-bold text-white leading-tight line-clamp-1 block px-0.5 truncate drop-shadow-xs">
-                            {tpl.name}
-                          </span>
-                        </div>
+                      <div className="py-8 text-center bg-surface-bone/60 rounded-2xl border border-hairline">
+                        <p className="text-xs text-charcoal">No templates matching "{templateSearch}"</p>
+                        <button
+                          type="button"
+                          onClick={() => setTemplateSearch('')}
+                          className="mt-2 text-[11px] font-bold text-primary hover:underline"
+                        >
+                          Clear search ({templateList.length} available)
+                        </button>
                       </div>
                     );
-                  })}
-                </div>
+                  }
+
+                  return (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 max-h-72 sm:max-h-80 overflow-y-auto p-1">
+                      {filtered.map((tpl) => {
+                        const isSelected = selectedTemplate === tpl.id;
+                        return (
+                          <div
+                            key={tpl.id}
+                            onClick={() => handleSelectTemplate(tpl)}
+                            className={clsx(
+                              'aspect-square rounded-2xl overflow-hidden border-2 relative cursor-pointer group transition-all select-none',
+                              isSelected
+                                ? 'border-primary ring-2 ring-primary ring-offset-2 scale-[1.02] shadow-sm'
+                                : 'border-hairline hover:border-charcoal/40 bg-surface-bone'
+                            )}
+                            title={`${tpl.name} (${tpl.fullName})`}
+                          >
+                            <img
+                              src={tpl.url}
+                              alt={tpl.name}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                              loading="lazy"
+                            />
+                            {isSelected && (
+                              <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-primary text-white flex items-center justify-center shadow-xs z-10">
+                                <Check size={12} strokeWidth={3} />
+                              </div>
+                            )}
+                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/55 to-transparent p-1.5 text-center">
+                              <span className="text-[10px] font-bold text-white leading-tight line-clamp-1 block px-0.5 truncate drop-shadow-xs">
+                                {tpl.name}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
             ) : (
               <div className="space-y-3">
