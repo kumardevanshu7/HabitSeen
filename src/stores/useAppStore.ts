@@ -169,6 +169,7 @@ interface AppState {
 
   // Midnight Rollover and XP/Heart Enforcement (-1 Heart per 350 XP lost)
   checkAndEnforceMidnightRollover: () => Promise<void>;
+  recalculateGamificationAudit: () => Promise<void>;
 
   // Security Question & Fresh Account Reset
   setSecurityQuestion: (question: string, answer: string) => Promise<void>;
@@ -566,18 +567,48 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   deleteHabit: async (id) => {
-    const { currentUser } = get();
+    const { currentUser, habits, logs, user } = get();
+
+    // 1. Calculate XP earned from this habit's logs to deduct
+    const habitLogs = Object.values(logs).filter((l) => l.habitId === id);
+    const xpToDeduct = habitLogs.reduce((sum, l) => sum + (l.xpEarned || 0), 0);
+
+    // 2. Delete habit and its logs from DB
     if (currentUser) {
       await deleteHabitFromDb(currentUser.uid, id);
     }
-    set((s) => {
-      const filteredLogs = Object.fromEntries(
-        Object.entries(s.logs).filter(([_, l]) => l.habitId !== id)
-      );
-      return {
-        habits: s.habits.filter((h) => h.id !== id),
-        logs: filteredLogs,
+
+    const filteredLogs = Object.fromEntries(
+      Object.entries(logs).filter(([_, l]) => l.habitId !== id)
+    );
+
+    // 3. Revert XP and adjust Hearts & Level
+    let updatedUser = user;
+    if (user && currentUser && xpToDeduct > 0) {
+      const newTotalXp = Math.max(0, (user.gamification?.totalXp || 0) - xpToDeduct);
+      const lvlInfo = levelFromXp(newTotalXp);
+      const newMaxHearts = calculateMaxHearts(newTotalXp);
+      const currentHearts = user.gamification?.hearts ?? 5;
+      const newHearts = Math.max(1, Math.min(newMaxHearts, currentHearts));
+
+      updatedUser = {
+        ...user,
+        gamification: {
+          ...user.gamification,
+          totalXp: newTotalXp,
+          level: lvlInfo.level,
+          levelTitle: lvlInfo.title,
+          maxHearts: newMaxHearts,
+          hearts: newHearts,
+        },
       };
+      await saveUserProfileToDb(currentUser.uid, updatedUser);
+    }
+
+    set({
+      habits: habits.filter((h) => h.id !== id),
+      logs: filteredLogs,
+      user: updatedUser,
     });
   },
 
@@ -1446,13 +1477,44 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   deleteChallenge: async (id) => {
-    const { currentUser } = get();
+    const { currentUser, challenges, user } = get();
+    const challengeToDelete = challenges.find((c) => c.id === id);
+
     if (currentUser) {
       await deleteChallengeFromDb(currentUser.uid, id);
     }
-    set((s) => ({
-      challenges: s.challenges.filter((c) => c.id !== id),
-    }));
+
+    let updatedUser = user;
+    if (challengeToDelete && user && currentUser) {
+      const xpToDeduct = challengeToDelete.totalXpEarned || 0;
+      const heartsToDeduct = challengeToDelete.totalHeartsGained || 0;
+
+      if (xpToDeduct > 0 || heartsToDeduct > 0) {
+        const newTotalXp = Math.max(0, (user.gamification?.totalXp || 0) - xpToDeduct);
+        const lvlInfo = levelFromXp(newTotalXp);
+        const newMaxHearts = calculateMaxHearts(newTotalXp);
+        const currentHearts = user.gamification?.hearts ?? 5;
+        const newHearts = Math.max(1, Math.min(newMaxHearts, Number((currentHearts - heartsToDeduct).toFixed(1))));
+
+        updatedUser = {
+          ...user,
+          gamification: {
+            ...user.gamification,
+            totalXp: newTotalXp,
+            level: lvlInfo.level,
+            levelTitle: lvlInfo.title,
+            maxHearts: newMaxHearts,
+            hearts: newHearts,
+          },
+        };
+        await saveUserProfileToDb(currentUser.uid, updatedUser);
+      }
+    }
+
+    set({
+      challenges: challenges.filter((c) => c.id !== id),
+      user: updatedUser,
+    });
   },
 
   toggleArchiveChallenge: async (id, forceArchived) => {
@@ -1619,6 +1681,56 @@ export const useAppStore = create<AppState>()((set, get) => ({
       habits: updatedHabits,
       user: updatedUser,
     });
+  },
+
+  recalculateGamificationAudit: async () => {
+    const { currentUser, user, habits, logs, challenges } = get();
+    if (!currentUser || !user || !user.gamification) return;
+
+    // 1. Valid habit IDs
+    const validHabitIds = new Set(habits.map((h) => h.id));
+
+    // 2. Sum XP from legitimate logs belonging to active habits
+    const validLogs = Object.values(logs).filter((l) => validHabitIds.has(l.habitId));
+    const logsXp = validLogs.reduce((sum, l) => sum + (l.xpEarned || 0), 0);
+
+    // 3. Sum XP and hearts from active/completed challenges
+    const validChallengesXp = challenges.reduce((sum, c) => sum + (c.totalXpEarned || 0), 0);
+
+    // 4. Welcome base XP
+    const baseWelcomeXp = 150;
+
+    // 5. Perfect days bonus
+    const perfectDays = user.gamification?.perfectDaysCompleted || [];
+    const perfectDaysBonusXp = perfectDays.length * 100;
+
+    // Computed total legitimate XP
+    const calculatedLegitXp = Math.max(0, baseWelcomeXp + logsXp + validChallengesXp + perfectDaysBonusXp);
+
+    // If current user totalXp is inflated compared to legitimate XP (orphaned XP from deleted test habits/challenges)
+    if (user.gamification.totalXp > calculatedLegitXp) {
+      const newTotalXp = calculatedLegitXp;
+      const lvlInfo = levelFromXp(newTotalXp);
+      const newMaxHearts = calculateMaxHearts(newTotalXp);
+      const currentHearts = user.gamification.hearts ?? 5;
+      const newHearts = Math.max(1, Math.min(newMaxHearts, currentHearts));
+
+      const updatedUser: UserProfile = {
+        ...user,
+        gamification: {
+          ...user.gamification,
+          totalXp: newTotalXp,
+          level: lvlInfo.level,
+          levelTitle: lvlInfo.title,
+          maxHearts: newMaxHearts,
+          hearts: newHearts,
+        },
+      };
+
+      await saveUserProfileToDb(currentUser.uid, updatedUser);
+      set({ user: updatedUser });
+      console.log(`[Gamification Audit] Successfully synced orphaned XP from ${user.gamification.totalXp} to ${newTotalXp}, hearts to ${newHearts}`);
+    }
   },
 
   setSecurityQuestion: async (question, answer) => {

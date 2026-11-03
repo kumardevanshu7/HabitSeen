@@ -1233,21 +1233,21 @@ export const HabitCard: React.FC<HabitCardProps> = ({
         {isJustTracking && trackingMonthData.days.length > 0 && (
           <div className="mb-3 pt-2.5 border-t border-hairline/80">
             {/* 1. MONTH HEADER & NAVIGATION CONTROLS */}
-            <div className="flex items-center justify-between mb-2.5 px-0.5">
-              <div className="flex items-center gap-1 sm:gap-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-y-2 gap-x-1.5 mb-2.5 px-0.5">
+              <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     setTrackingMonth((prev) => subMonths(prev, 1));
                   }}
-                  className="w-7 h-7 rounded-xl bg-surface-bone hover:bg-stone/20 text-charcoal flex items-center justify-center border border-hairline transition-all active:scale-90 cursor-pointer shadow-2xs"
+                  className="w-7 h-7 rounded-xl bg-surface-bone hover:bg-stone/20 text-charcoal flex items-center justify-center border border-hairline transition-all active:scale-90 cursor-pointer shadow-2xs shrink-0"
                   title="Previous month"
                 >
                   <ChevronLeft size={14} />
                 </button>
 
-                <span className="font-display font-bold text-xs sm:text-sm text-ink px-1 min-w-[105px] sm:min-w-[120px] text-center">
+                <span className="font-display font-bold text-xs sm:text-sm text-ink px-1 min-w-[95px] sm:min-w-[115px] text-center whitespace-nowrap">
                   {format(trackingMonth, 'MMMM yyyy')}
                 </span>
 
@@ -1257,7 +1257,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                     e.stopPropagation();
                     setTrackingMonth((prev) => addMonths(prev, 1));
                   }}
-                  className="w-7 h-7 rounded-xl bg-surface-bone hover:bg-stone/20 text-charcoal flex items-center justify-center border border-hairline transition-all active:scale-90 cursor-pointer shadow-2xs"
+                  className="w-7 h-7 rounded-xl bg-surface-bone hover:bg-stone/20 text-charcoal flex items-center justify-center border border-hairline transition-all active:scale-90 cursor-pointer shadow-2xs shrink-0"
                   title="Next month"
                 >
                   <ChevronRight size={14} />
@@ -1270,7 +1270,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                       e.stopPropagation();
                       setTrackingMonth(new Date());
                     }}
-                    className="text-[10px] font-bold text-primary bg-primary/10 hover:bg-primary/20 px-2 py-0.5 rounded-md border border-primary/20 transition-colors ml-0.5 cursor-pointer shadow-2xs"
+                    className="text-[10px] font-bold text-primary bg-primary/10 hover:bg-primary/20 px-2 py-0.5 rounded-md border border-primary/20 transition-colors ml-0.5 cursor-pointer shadow-2xs shrink-0 whitespace-nowrap"
                     title="Jump to current month"
                   >
                     Today
@@ -1279,8 +1279,8 @@ export const HabitCard: React.FC<HabitCardProps> = ({
               </div>
 
               {/* MONTH COMPLETION SUMMARY PILL */}
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] sm:text-[11px] font-mono font-bold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full border border-primary/20 shadow-2xs">
+              <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+                <span className="text-[10px] sm:text-[11px] font-mono font-bold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full border border-primary/20 shadow-2xs whitespace-nowrap">
                   ✨ {trackingMonthCompletedCount}/{trackingMonthData.totalDays}d ({Math.round((trackingMonthCompletedCount / Math.max(1, trackingMonthData.totalDays)) * 100)}%)
                 </span>
                 <button
@@ -1289,10 +1289,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                     e.stopPropagation();
                     onOpenDetails(habit);
                   }}
-                  className="text-[10px] font-bold text-charcoal hover:text-ink flex items-center gap-1 bg-surface-bone hover:bg-stone/15 px-2 py-0.5 rounded-full border border-hairline transition-colors cursor-pointer shadow-2xs"
+                  className="text-[10px] font-bold text-charcoal hover:text-ink flex items-center gap-1 bg-surface-bone hover:bg-stone/15 px-2 py-0.5 rounded-full border border-hairline transition-colors cursor-pointer shadow-2xs shrink-0"
                   title="View full habit analytics & statistics"
                 >
-                  <BarChart2 size={11} className="text-primary" />
+                  <BarChart2 size={11} className="text-primary shrink-0" />
                   <span className="hidden xs:inline">Stats</span>
                 </button>
               </div>

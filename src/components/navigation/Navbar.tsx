@@ -48,19 +48,25 @@ export const Navbar: React.FC<NavbarProps> = ({
     <>
       <header className="sticky top-0 z-40 bg-canvas/90 backdrop-blur-md border-b border-hairline">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-        {/* LOGO & BRAND */}
-        <div className="flex items-center gap-2.5 shrink-0">
+        {/* LOGO & BRAND (CLICK TO NAVIGATE TO HABITS) */}
+        <button
+          type="button"
+          onClick={() => onSelectTab('habits')}
+          className="flex items-center gap-2.5 shrink-0 text-left hover:opacity-85 active:scale-95 transition-all cursor-pointer group focus:outline-none"
+          title="Go to Habits"
+          aria-label="HabitsSeen - Return to Habits"
+        >
           <img
             src="/android-chrome-192x192.png"
             alt="HabitsSeen Logo"
-            className="w-9 h-9 rounded-xl object-contain shadow-xs"
+            className="w-9 h-9 rounded-xl object-contain shadow-xs group-hover:scale-105 transition-transform"
           />
           <div>
-            <h1 className="font-display font-bold text-xl text-ink tracking-tight flex items-center gap-1.5">
+            <h1 className="font-display font-bold text-xl text-ink tracking-tight flex items-center gap-1.5 group-hover:text-primary transition-colors">
               HabitsSeen
             </h1>
           </div>
-        </div>
+        </button>
 
         {/* DESKTOP NAV TABS - DECONGESTED SINGLE-LINE CAPSULE */}
         <nav aria-label="Main Navigation" className="hidden md:flex items-center gap-1 bg-surface-card p-1 rounded-full border border-hairline shadow-2xs shrink-0">

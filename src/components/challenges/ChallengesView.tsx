@@ -494,11 +494,14 @@ export const ChallengesView: React.FC = () => {
                           {c.name}
                         </h3>
                         {c.startDate && (
-                          <div className="flex items-center gap-1.5 text-[11px] text-charcoal font-medium mt-0.5">
+                          <div className="flex items-center gap-1.5 text-[11px] text-charcoal font-medium mt-0.5 whitespace-nowrap">
                             <Calendar size={11} className="text-primary shrink-0" />
-                            <span>
-                              {isValid(parseISO(c.startDate)) ? format(parseISO(c.startDate), 'dd MMM yyyy') : c.startDate}
-                              {c.endDate && isValid(parseISO(c.endDate)) ? ` – ${format(parseISO(c.endDate), 'dd MMM yyyy')}` : ''}
+                            <span className="truncate">
+                              {isValid(parseISO(c.startDate))
+                                ? (c.endDate && isValid(parseISO(c.endDate)) && parseISO(c.startDate).getFullYear() === parseISO(c.endDate).getFullYear()
+                                    ? `${format(parseISO(c.startDate), 'dd MMM')} – ${format(parseISO(c.endDate), 'dd MMM yyyy')}`
+                                    : `${format(parseISO(c.startDate), 'dd MMM yyyy')}${c.endDate && isValid(parseISO(c.endDate)) ? ` – ${format(parseISO(c.endDate), 'dd MMM yyyy')}` : ''}`)
+                                : c.startDate}
                             </span>
                           </div>
                         )}

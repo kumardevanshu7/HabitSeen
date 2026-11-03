@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
+import clsx from 'clsx';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
-import { Heart, Zap, ShieldAlert, Clock, Sparkles, Trophy, CheckCircle2, ShieldCheck, Skull } from 'lucide-react';
+import { useAppStore } from '../../stores/useAppStore';
+import { Heart, Zap, ShieldAlert, Clock, Sparkles, Trophy, CheckCircle2, ShieldCheck, Skull, RefreshCw } from 'lucide-react';
 import {
   XP_LOSS_PER_HEART,
   MIDNIGHT_MISSED_HABIT_XP_PENALTY,
@@ -17,6 +19,9 @@ export const PointsSystemModal: React.FC<PointsSystemModalProps> = ({
   isOpen,
   onClose,
 }) => {
+  const { recalculateGamificationAudit } = useAppStore();
+  const [isAuditing, setIsAuditing] = useState(false);
+  const [auditSuccess, setAuditSuccess] = useState(false);
   const maxMonthlyExcuses = MISS_PENALTIES.GENUINE_REASON.maxPerMonth;
 
   return (
@@ -161,6 +166,37 @@ export const PointsSystemModal: React.FC<PointsSystemModalProps> = ({
               7, 9, or 11-day hard commitments. Finish all days to win massive XP and archive conquered victories.
             </p>
           </div>
+        </div>
+
+        {/* RECALCULATE & AUDIT POINTS */}
+        <div className="p-3.5 bg-surface-bone rounded-2xl border border-hairline flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h5 className="text-xs font-bold text-ink flex items-center gap-1.5">
+              <RefreshCw size={12} className={clsx('text-primary', isAuditing && 'animate-spin')} />
+              <span>Audit &amp; Re-sync Vitality Points</span>
+            </h5>
+            <p className="text-[11px] text-charcoal mt-0.5 leading-snug">
+              Automatically cleans and reverts XP &amp; Hearts from deleted test habits or challenges.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={isAuditing}
+            onClick={async () => {
+              setIsAuditing(true);
+              try {
+                await recalculateGamificationAudit();
+                setAuditSuccess(true);
+                setTimeout(() => setAuditSuccess(false), 2500);
+              } finally {
+                setIsAuditing(false);
+              }
+            }}
+            className="shrink-0 text-xs font-bold whitespace-nowrap"
+          >
+            {auditSuccess ? '✓ Synced!' : isAuditing ? 'Syncing...' : 'Sync Vitality'}
+          </Button>
         </div>
 
         {/* DISMISS BUTTON */}

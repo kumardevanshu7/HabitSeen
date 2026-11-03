@@ -472,11 +472,11 @@ export const OverallAnalyticsView: React.FC<OverallAnalyticsViewProps> = ({
               Survival rate, EXP rewards, and 90% health penalty ledger across your active &amp; conquered challenges.
             </p>
           </div>
-          <div className="flex items-center gap-2 text-xs font-mono font-bold">
-            <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <div className="flex items-center gap-2 text-xs font-mono font-bold shrink-0 flex-wrap">
+            <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0 whitespace-nowrap">
               {challenges.filter((c) => c.status === 'COMPLETED').length} Conquered
             </span>
-            <span className="px-2.5 py-1 rounded-full bg-rose-50 text-rose-600 border border-rose-200">
+            <span className="px-2.5 py-1 rounded-full bg-rose-50 text-rose-600 border border-rose-200 shrink-0 whitespace-nowrap">
               {challenges.filter((c) => c.status === 'ACTIVE').length} Active
             </span>
           </div>
@@ -602,7 +602,7 @@ export const OverallAnalyticsView: React.FC<OverallAnalyticsViewProps> = ({
               Tap any habit to view in-depth streaks, calendar completion matrix, and metrics.
             </p>
           </div>
-          <span className="font-mono text-xs font-bold text-charcoal bg-surface-bone px-2.5 py-1 rounded-full border border-hairline">
+          <span className="font-mono text-xs font-bold text-charcoal bg-surface-bone px-2.5 py-1 rounded-full border border-hairline shrink-0 whitespace-nowrap">
             {habits.length} Habits Tracked
           </span>
         </div>
@@ -771,12 +771,13 @@ export const OverallAnalyticsView: React.FC<OverallAnalyticsViewProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Circadian Execution Window */}
         <div className="p-5 bg-surface-card border border-hairline rounded-3xl">
-          <div className="flex items-center justify-between mb-1">
-            <h4 className="font-display font-bold text-base text-ink flex items-center gap-2">
-              <Compass size={17} className="text-primary" /> Peak Execution Chrono-Window
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+            <h4 className="font-display font-bold text-base text-ink flex items-center gap-2 min-w-0">
+              <Compass size={17} className="text-primary shrink-0" />
+              <span>Peak Execution Chrono-Window</span>
             </h4>
             {timestampedCount > 0 && (
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 shrink-0 whitespace-nowrap ml-auto">
                 Peak: {peakBucket.key}
               </span>
             )}
@@ -821,13 +822,14 @@ export const OverallAnalyticsView: React.FC<OverallAnalyticsViewProps> = ({
 
         {/* 4-Week Rolling Consistency Velocity */}
         <div className="p-5 bg-surface-card border border-hairline rounded-3xl">
-          <div className="flex items-center justify-between mb-1">
-            <h4 className="font-display font-bold text-base text-ink flex items-center gap-2">
-              <Activity size={17} className="text-primary" /> 4-Week Momentum Velocity
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+            <h4 className="font-display font-bold text-base text-ink flex items-center gap-2 min-w-0">
+              <Activity size={17} className="text-primary shrink-0" />
+              <span>4-Week Momentum Velocity</span>
             </h4>
             <span
               className={clsx(
-                'text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full flex items-center gap-0.5 border',
+                'text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full flex items-center gap-1 border shrink-0 whitespace-nowrap ml-auto',
                 velocityDiff >= 0
                   ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                   : 'bg-rose-50 text-rose-700 border-rose-200'
@@ -835,11 +837,11 @@ export const OverallAnalyticsView: React.FC<OverallAnalyticsViewProps> = ({
             >
               {velocityDiff >= 0 ? (
                 <>
-                  <ArrowUpRight size={12} /> +{velocityDiff}% Momentum
+                  <ArrowUpRight size={12} className="shrink-0" /> +{velocityDiff}% Momentum
                 </>
               ) : (
                 <>
-                  <ArrowDownRight size={12} /> {velocityDiff}% Momentum
+                  <ArrowDownRight size={12} className="shrink-0" /> {velocityDiff}% Momentum
                 </>
               )}
             </span>

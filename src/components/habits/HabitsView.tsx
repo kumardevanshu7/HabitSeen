@@ -29,7 +29,10 @@ import {
   Edit2,
   Trash2,
   Calendar,
+  Film,
+  Play,
 } from 'lucide-react';
+import { MotivationalReelsModal } from '../reels/MotivationalReelsModal';
 import clsx from 'clsx';
 
 interface HabitsViewProps {
@@ -70,6 +73,7 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isChallengeModalOpen, setIsChallengeModalOpen] = useState(false);
+  const [isReelsOpen, setIsReelsOpen] = useState(false);
   const [isReorderMode, setIsReorderMode] = useState(false);
   const [draggedCatId, setDraggedCatId] = useState<string | null>(null);
 
@@ -270,6 +274,43 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
     <div className="space-y-4">
       {/* 0. GROUND ZERO STARTING POINT ANCHOR BANNER */}
       <StartingPointBanner />
+
+      {/* MOTIVATIONAL REELS SECTION (INSTA / YOUTUBE SHORTS FORMAT) */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-ink via-[#2a1715] to-ink border border-primary/20 shadow-xs p-3.5 sm:p-4 text-white">
+        {/* Ambient glow decoration */}
+        <div className="absolute -right-8 -bottom-8 w-32 h-32 rounded-full bg-primary/25 blur-2xl pointer-events-none" />
+        <div className="absolute -left-8 -top-8 w-24 h-24 rounded-full bg-rose-500/20 blur-xl pointer-events-none" />
+
+        <div className="relative z-10 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-rose-500 to-primary flex items-center justify-center shrink-0 shadow-md">
+              <Film size={22} className="text-white" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="font-display font-bold text-sm sm:text-base text-white tracking-tight">
+                  Watch Motivational Reels
+                </span>
+                <span className="text-[10px] font-mono font-bold px-2 py-0.2 rounded-full bg-primary text-white border border-primary-glow/40 shadow-2xs">
+                  47 REELS
+                </span>
+              </div>
+              <p className="text-[11px] sm:text-xs text-white/75 truncate mt-0.5">
+                Full-screen discipline fuel to conquer urges &amp; stay locked in
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsReelsOpen(true)}
+            className="px-3.5 sm:px-4 py-2 rounded-full bg-white hover:bg-white/90 text-ink text-xs font-bold transition-all active:scale-95 shadow-md flex items-center gap-1.5 shrink-0 cursor-pointer hover:shadow-lg"
+          >
+            <Play size={13} className="fill-current text-primary" />
+            <span>Watch</span>
+          </button>
+        </div>
+      </div>
 
       {/* 1. DATE PICKER STRIP */}
       <DayStrip />
@@ -873,6 +914,12 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
           setIsChallengeModalOpen(false);
           onOpenChallengesTab?.();
         }}
+      />
+
+      {/* Fullscreen Motivational Reels Player Modal (Insta / Shorts format) */}
+      <MotivationalReelsModal
+        isOpen={isReelsOpen}
+        onClose={() => setIsReelsOpen(false)}
       />
     </div>
   );

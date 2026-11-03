@@ -21,6 +21,8 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import {
   format,
@@ -458,29 +460,31 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
 
         {/* 4. INTERACTIVE CALENDAR VIEW */}
         <div className="p-4 bg-surface-card border border-hairline rounded-2xl">
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-charcoal ml-1 flex items-center gap-1.5">
-              <CalendarIcon size={14} /> Habit Activity Calendar
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-charcoal flex items-center gap-1.5 shrink-0">
+              <CalendarIcon size={14} className="text-primary" /> Habit Activity Calendar
             </h4>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 bg-surface-bone/60 p-0.5 rounded-full border border-hairline shrink-0 ml-auto">
               <button
                 type="button"
                 aria-label="Previous Month"
                 onClick={() => setCurrentCalendarMonth(subMonths(currentCalendarMonth, 1))}
-                className="px-2.5 py-1 text-xs bg-surface-bone hover:bg-stone/20 rounded-full border border-hairline font-semibold transition-colors cursor-pointer"
+                className="w-6 h-6 rounded-full bg-surface-card hover:bg-stone/20 text-charcoal flex items-center justify-center border border-hairline transition-all active:scale-95 cursor-pointer shadow-2xs"
+                title="Previous Month"
               >
-                Prev
+                <ChevronLeft size={13} />
               </button>
-              <span className="text-xs font-bold text-ink font-mono">
+              <span className="text-xs font-bold text-ink font-mono px-2 text-center whitespace-nowrap min-w-[110px]">
                 {format(currentCalendarMonth, 'MMMM yyyy')}
               </span>
               <button
                 type="button"
                 aria-label="Next Month"
                 onClick={() => setCurrentCalendarMonth(addMonths(currentCalendarMonth, 1))}
-                className="px-2.5 py-1 text-xs bg-surface-bone hover:bg-stone/20 rounded-full border border-hairline font-semibold transition-colors cursor-pointer"
+                className="w-6 h-6 rounded-full bg-surface-card hover:bg-stone/20 text-charcoal flex items-center justify-center border border-hairline transition-all active:scale-95 cursor-pointer shadow-2xs"
+                title="Next Month"
               >
-                Next
+                <ChevronRight size={13} />
               </button>
             </div>
           </div>
@@ -519,7 +523,7 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
                     isSkipped && 'bg-red-100 text-red-600 border-red-200',
                     !dayLog && !isFuture && 'bg-surface-bone text-charcoal border-hairline/60',
                     isFuture && 'opacity-35 bg-surface-bone/50 text-charcoal/50 border-hairline/30',
-                    isToday && 'ring-2 ring-primary ring-offset-1 font-bold'
+                    isToday && 'border-primary ring-1 ring-primary/30 font-bold bg-primary/5 text-primary'
                   )}
                   title={`${dateKey}: ${
                     isCompleted
@@ -570,15 +574,15 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
 
         {/* 5. DETAILED DAILY ACTIVITY LOGS & WORK RECORDED */}
         <div className="p-4 bg-surface-card border border-hairline rounded-2xl space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <History size={16} className="text-primary" />
-              <h4 className="text-xs font-bold uppercase tracking-wider text-ink">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <History size={16} className="text-primary shrink-0" />
+              <h4 className="text-xs font-bold uppercase tracking-wider text-ink truncate">
                 Daily Work &amp; Performance History
               </h4>
             </div>
-            <span className="text-[11px] font-mono font-bold text-charcoal bg-surface-bone px-2 py-0.5 rounded-full border border-hairline">
-              {sortedHabitLogs.length} Records
+            <span className="text-[11px] font-mono font-bold text-charcoal bg-surface-bone px-2.5 py-0.5 rounded-full border border-hairline shrink-0 whitespace-nowrap">
+              {sortedHabitLogs.length} {sortedHabitLogs.length === 1 ? 'Record' : 'Records'}
             </span>
           </div>
 

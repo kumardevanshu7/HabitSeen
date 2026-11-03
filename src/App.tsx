@@ -54,6 +54,10 @@ export const App: React.FC = () => {
     setChallenges,
     resetStore,
     checkAndEnforceMidnightRollover,
+    recalculateGamificationAudit,
+    user,
+    habits,
+    challenges,
     selectedDate,
   } = useAppStore();
 
@@ -356,6 +360,15 @@ export const App: React.FC = () => {
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [currentUser, checkAndEnforceMidnightRollover]);
+
+  // Gamification self-healing audit: removes orphaned XP & Hearts from deleted test habits/challenges
+  useEffect(() => {
+    if (!currentUser || !user) return;
+    const timer = setTimeout(() => {
+      recalculateGamificationAudit();
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [currentUser, habits.length, challenges.length, recalculateGamificationAudit]);
 
   // Startup Splash Screen with 1st Nov Anchor, Anime Quotes & Manual User "Proceed" Button
   if (!userProceeded || authLoading || (currentUser && profileLoading)) {
