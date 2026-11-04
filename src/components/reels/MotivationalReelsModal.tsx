@@ -28,6 +28,7 @@ export const MotivationalReelsModal: React.FC<MotivationalReelsModalProps> = ({
 }) => {
   const [currentIndex, setCurrentIndex] = useState(initialReelIndex);
   const [isPlaying, setIsPlaying] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [isMuted, setIsMuted] = useState(true);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
   const [showHeartBurst, setShowHeartBurst] = useState(false);
@@ -52,6 +53,7 @@ export const MotivationalReelsModal: React.FC<MotivationalReelsModalProps> = ({
   // Go to next reel
   const handleNextReel = useCallback(() => {
     if (currentIndex < totalReels - 1) {
+      setIsLoading(true);
       setCurrentIndex((prev) => prev + 1);
       setProgress(0);
       setIsPlaying(true);
@@ -61,6 +63,7 @@ export const MotivationalReelsModal: React.FC<MotivationalReelsModalProps> = ({
   // Go to prev reel
   const handlePrevReel = useCallback(() => {
     if (currentIndex > 0) {
+      setIsLoading(true);
       setCurrentIndex((prev) => prev - 1);
       setProgress(0);
       setIsPlaying(true);
@@ -172,6 +175,7 @@ export const MotivationalReelsModal: React.FC<MotivationalReelsModalProps> = ({
   // Autoplay video on reel change
   useEffect(() => {
     if (!isOpen || !videoRef.current) return;
+    setIsLoading(true);
     videoRef.current.currentTime = 0;
     setProgress(0);
     setIsPlaying(true);
@@ -212,23 +216,75 @@ export const MotivationalReelsModal: React.FC<MotivationalReelsModalProps> = ({
     >
       {/* 9:16 VERTICAL REEL PLAYER CONTAINER */}
       <div className="relative w-full max-w-[420px] h-full sm:h-[92vh] sm:max-h-[820px] bg-black sm:rounded-3xl overflow-hidden shadow-2xl flex flex-col justify-center items-center">
-        {/* NATIVE VIDEO PLAYER */}
+        {/* AMBIENT BLURRED BACKDROP (INSTAGRAM REELS STYLE FOR LETTERBOX PADDING) */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <video
+            key={`blur-${currentReel.id}`}
+            src={currentReel.url}
+            className="w-full h-full object-cover blur-3xl opacity-35 scale-125"
+            playsInline
+            autoPlay
+            loop
+            muted
+            aria-hidden="true"
+          />
+          <div className="absolute inset-0 bg-black/65" />
+        </div>
+
+        {/* NATIVE VIDEO PLAYER - PRESERVES ORIGINAL ASPECT RATIO (4:5, 1:1, 9:16, ETC.) */}
         <video
           ref={videoRef}
           key={currentReel.id}
           src={currentReel.url}
-          className="w-full h-full object-cover cursor-pointer"
+          className="relative z-10 w-full h-full object-contain cursor-pointer"
           playsInline
           autoPlay
+          preload="auto"
           loop
           muted={isMuted}
           onClick={handleVideoTap}
+          onWaiting={() => setIsLoading(true)}
+          onPlaying={() => setIsLoading(false)}
+          onCanPlay={() => setIsLoading(false)}
+          onLoadedData={() => setIsLoading(false)}
           onTimeUpdate={() => {
             if (videoRef.current && videoRef.current.duration) {
               setProgress((videoRef.current.currentTime / videoRef.current.duration) * 100);
             }
           }}
         />
+
+        {/* LOADING BUFFER SPINNER (WHEN VIDEO IS BUFFERING OR LOADING) */}
+        {isLoading && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center z-25 pointer-events-none bg-black/30 backdrop-blur-2xs">
+            <div className="w-12 h-12 rounded-full border-3 border-white/20 border-t-rose-500 animate-spin shadow-xl" />
+            <span className="text-[11px] font-mono font-bold text-white/90 mt-2.5 drop-shadow-md">
+              Buffering Reel...
+            </span>
+          </div>
+        )}
+
+        {/* BACKGROUND PRELOADERS FOR ADJACENT REELS (ZERO-LAG SWIPING) */}
+        {currentIndex < totalReels - 1 && (
+          <video
+            key={`preload-next-${MOTIVATIONAL_REELS[currentIndex + 1].id}`}
+            src={MOTIVATIONAL_REELS[currentIndex + 1].url}
+            preload="auto"
+            className="hidden"
+            muted
+            aria-hidden="true"
+          />
+        )}
+        {currentIndex > 0 && (
+          <video
+            key={`preload-prev-${MOTIVATIONAL_REELS[currentIndex - 1].id}`}
+            src={MOTIVATIONAL_REELS[currentIndex - 1].url}
+            preload="auto"
+            className="hidden"
+            muted
+            aria-hidden="true"
+          />
+        )}
 
         {/* TOP BAR OVERLAY */}
         <div className="absolute top-0 inset-x-0 p-4 bg-gradient-to-b from-black/80 via-black/30 to-transparent flex items-center justify-between z-20 pointer-events-auto">

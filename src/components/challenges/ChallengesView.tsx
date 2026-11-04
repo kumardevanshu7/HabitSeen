@@ -469,7 +469,7 @@ export const ChallengesView: React.FC = () => {
                       >
                         <IconComp size={22} strokeWidth={2.5} />
                       </span>
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="font-mono text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-ink text-white whitespace-nowrap">
                             {targetDays} Days
@@ -490,7 +490,7 @@ export const ChallengesView: React.FC = () => {
                             </span>
                           )}
                         </div>
-                        <h3 className="font-display font-bold text-lg text-ink tracking-tight truncate group-hover:text-primary transition-colors mt-1">
+                        <h3 className="font-display font-bold text-base sm:text-lg text-ink tracking-tight break-words group-hover:text-primary transition-colors mt-1">
                           {c.name}
                         </h3>
                         {c.startDate && (

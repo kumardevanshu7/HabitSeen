@@ -53,7 +53,7 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
   const [selectedColor, setSelectedColor] = useState(CATEGORY_COLORS[0].hex);
   const [startDate, setStartDate] = useState(getTodayKey());
   const [durationPreset, setDurationPreset] = useState<7 | 9 | 11 | 'custom'>(7);
-  const [customDays, setCustomDays] = useState<number>(21);
+  const [customDays, setCustomDays] = useState<number | string>(21);
 
   // Optional sub-tasks inside the challenge
   const [tasks, setTasks] = useState<ChallengeTask[]>([]);
@@ -171,7 +171,7 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
 
   const effectiveDays =
     durationPreset === 'custom'
-      ? Math.min(365, Math.max(1, Number(customDays) || 7))
+      ? Math.min(365, Math.max(1, typeof customDays === 'number' ? customDays : (parseInt(customDays, 10) || 7)))
       : durationPreset;
 
   const parsedStartDate = useMemo(() => {
@@ -252,7 +252,8 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
       setError('Please enter a challenge name');
       return;
     }
-    if (durationPreset === 'custom' && (!customDays || customDays < 1 || customDays > 365)) {
+    const numericCustomDays = typeof customDays === 'number' ? customDays : parseInt(customDays, 10);
+    if (durationPreset === 'custom' && (!numericCustomDays || numericCustomDays < 1 || numericCustomDays > 365)) {
       setError('Please enter a valid duration between 1 and 365 days');
       return;
     }
@@ -364,14 +365,14 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
           />
 
           {/* LIVE CHALLENGE BADGE PREVIEW */}
-          <div className="p-3.5 bg-surface-card border border-hairline rounded-2xl flex items-center justify-between gap-3 shadow-2xs">
-            <span className="text-xs font-semibold text-charcoal uppercase ml-1">
+          <div className="p-3.5 bg-surface-card border border-hairline rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-2xs">
+            <span className="text-[11px] font-bold text-charcoal uppercase tracking-wider shrink-0">
               Challenge Preview
             </span>
             <div
-              className="flex items-center gap-2.5 px-3.5 py-2 rounded-2xl border-2 text-ink text-xs sm:text-sm font-bold shadow-xs transition-all"
+              className="flex items-center gap-2.5 px-3 py-2 rounded-2xl border-2 text-ink text-xs sm:text-sm font-bold shadow-xs transition-all w-full sm:w-auto min-w-0"
               style={{
-                backgroundColor: `${vibrantColor}20`,
+                backgroundColor: `${vibrantColor}18`,
                 borderColor: vibrantColor,
               }}
             >
@@ -384,10 +385,10 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
               >
                 <SelectedIconComp size={16} strokeWidth={2.5} />
               </span>
-              <span className="truncate max-w-[160px] sm:max-w-[220px]">
+              <span className="truncate font-display font-bold text-ink min-w-0 flex-1 sm:max-w-[200px]">
                 {name.trim() || 'Your Challenge'}
               </span>
-              <span className="font-mono text-[11px] px-2 py-0.5 rounded-full bg-ink text-white shrink-0">
+              <span className="font-mono text-[10px] sm:text-[11px] px-2 py-0.5 rounded-full bg-ink text-white shrink-0 whitespace-nowrap ml-auto">
                 {effectiveDays}D ({format(parsedStartDate, 'dd MMM')} – {formattedEndDate.split(' ')[0]} {formattedEndDate.split(' ')[1]})
               </span>
             </div>
@@ -547,8 +548,23 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
                   min={1}
                   max={365}
                   value={customDays}
-                  onChange={(e) => setCustomDays(Math.min(365, Math.max(1, parseInt(e.target.value, 10) || 1)))}
-                  placeholder="e.g. 21, 30, 45, 75"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '') {
+                      setCustomDays('');
+                      return;
+                    }
+                    const parsed = parseInt(val, 10);
+                    if (!isNaN(parsed)) {
+                      setCustomDays(Math.min(365, parsed));
+                    }
+                  }}
+                  onBlur={() => {
+                    if (customDays === '' || Number(customDays) < 1) {
+                      setCustomDays(1);
+                    }
+                  }}
+                  placeholder="e.g. 5, 21, 30, 45, 75"
                   required
                   disabled={isDateLocked}
                 />
