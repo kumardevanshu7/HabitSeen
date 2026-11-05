@@ -27,7 +27,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({
 
   // Find currently selected option
   const currentOption = useMemo(
-    () => CATEGORY_ICONS.find((i) => i.id === selectedIcon) || CATEGORY_ICONS[0],
+    () => CATEGORY_ICONS.find((i) => i.id === selectedIcon) || null,
     [selectedIcon]
   );
 
@@ -58,7 +58,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({
         </label>
         <div className="flex items-center gap-1.5">
           <span className="text-[11px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md flex items-center gap-1">
-            {currentOption.label}
+            {currentOption ? currentOption.label : 'Custom'}
           </span>
         </div>
       </div>
@@ -72,10 +72,11 @@ export const IconPicker: React.FC<IconPickerProps> = ({
               type="button"
               key={cat.id}
               onClick={() => setActiveCategory(cat.id)}
+              aria-pressed={isActive}
               className={clsx(
                 'px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all shrink-0 flex items-center gap-1 border',
                 isActive
-                  ? 'bg-ink text-white border-ink shadow-2xs scale-102'
+                  ? 'bg-ink text-white border-ink shadow-2xs scale-[1.02]'
                   : 'bg-surface-bone text-charcoal border-hairline hover:bg-stone/20 hover:text-ink'
               )}
             >
@@ -116,7 +117,9 @@ export const IconPicker: React.FC<IconPickerProps> = ({
       <div className="grid grid-cols-6 sm:grid-cols-9 gap-2 max-h-48 overflow-y-auto p-2.5 bg-surface-card rounded-2xl border border-hairline">
         {filteredIcons.length === 0 ? (
           <div className="col-span-full py-6 text-center text-xs text-charcoal">
-            No icons found matching &quot;{searchQuery}&quot;. Try another category!
+            {searchQuery.trim()
+              ? `No icons found matching "${searchQuery}". Try another search or category!`
+              : 'No icons found in this category.'}
           </div>
         ) : (
           filteredIcons.map((opt: IconOption) => {
@@ -127,9 +130,10 @@ export const IconPicker: React.FC<IconPickerProps> = ({
                 type="button"
                 key={opt.id}
                 onClick={() => onSelectIcon(opt.id)}
+                aria-pressed={isSelected}
                 title={`${opt.label} (${opt.category})`}
                 className={clsx(
-                  'p-2.5 rounded-xl transition-all aspect-square flex items-center justify-center relative group',
+                  'p-2.5 rounded-xl transition-all aspect-square flex items-center justify-center relative group cursor-pointer',
                   isSelected
                     ? 'shadow-sm ring-2 ring-primary scale-105 font-bold'
                     : 'hover:bg-surface-bone text-charcoal hover:text-ink hover:scale-105'
@@ -143,7 +147,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({
                       }
                     : isSelected
                     ? {
-                        backgroundColor: '#E63946',
+                        backgroundColor: '#ea2804',
                         color: '#FFFFFF',
                       }
                     : undefined

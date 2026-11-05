@@ -5,6 +5,7 @@ import { DayStrip } from './DayStrip';
 import { StartingPointBanner } from '../startup/StartingPointBanner';
 import { Habit, Category, FrequencyType } from '../../types/habit';
 import { isHabitDueOnDate, getTodayKey } from '../../utils/dateMath';
+import { useTodayKey } from '../../hooks/useTodayKey';
 import { CATEGORY_ICONS } from '../../constants/iconsAndColors';
 import { boostVibrancy, getContrastIconColor } from '../../utils/colorUtils';
 import { CreateCategoryModal } from '../categories/CreateCategoryModal';
@@ -33,6 +34,7 @@ import {
   Play,
 } from 'lucide-react';
 import { MotivationalReelsModal } from '../reels/MotivationalReelsModal';
+import { MOTIVATIONAL_REELS } from '../../utils/motivationalReels';
 import clsx from 'clsx';
 
 interface HabitsViewProps {
@@ -62,6 +64,8 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
     reorderCategories,
     deleteCategory,
   } = useAppStore();
+
+  const todayKey = useTodayKey();
 
   const [internalCatFilter, setInternalCatFilter] = useState<string>('all');
   const selectedCatFilter = selectedCategory ?? internalCatFilter;
@@ -114,16 +118,21 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
 
   // Floating celebratory toast when user achieves 100% completion
   const [showPerfectDayToast, setShowPerfectDayToast] = useState(false);
-  const prevAllCompletedRef = useRef(isAllCompletedToday);
+  const prevCompletedRef = useRef({ date: selectedDate, count: completedDueCount });
 
   useEffect(() => {
-    if (!prevAllCompletedRef.current && isAllCompletedToday) {
+    const isToday = selectedDate === todayKey;
+    const isSameDate = prevCompletedRef.current.date === selectedDate;
+    const countIncreased = completedDueCount > prevCompletedRef.current.count;
+
+    // Only fire celebratory toast for today upon an actual check-in increase
+    if (isToday && isSameDate && countIncreased && isAllCompletedToday) {
       setShowPerfectDayToast(true);
       const timer = setTimeout(() => setShowPerfectDayToast(false), 5000);
       return () => clearTimeout(timer);
     }
-    prevAllCompletedRef.current = isAllCompletedToday;
-  }, [isAllCompletedToday]);
+    prevCompletedRef.current = { date: selectedDate, count: completedDueCount };
+  }, [selectedDate, todayKey, completedDueCount, isAllCompletedToday]);
 
   // Check if a habit is completed/excused on the currently selected date
   const isHabitCompletedOnSelectedDate = (h: Habit): boolean => {
@@ -194,6 +203,9 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
     new Map(categories.map((c) => [c.name.trim().toLowerCase(), c])).values()
   );
 
+  const [dragOrder, setDragOrder] = useState<Category[] | null>(null);
+  const displayCategories = dragOrder || uniqueCategories;
+
   const handleMoveCategory = async (catId: string, direction: 'left' | 'right') => {
     const index = uniqueCategories.findIndex((c) => c.id === catId);
     if (index === -1) return;
@@ -210,24 +222,31 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
 
   const handleDragStart = (catId: string) => {
     setDraggedCatId(catId);
+    setDragOrder(uniqueCategories);
   };
 
   const handleDragOver = (e: React.DragEvent, targetCatId: string) => {
     e.preventDefault();
     if (!draggedCatId || draggedCatId === targetCatId) return;
 
-    const fromIndex = uniqueCategories.findIndex((c) => c.id === draggedCatId);
-    const toIndex = uniqueCategories.findIndex((c) => c.id === targetCatId);
-    if (fromIndex === -1 || toIndex === -1) return;
+    const currentList = dragOrder || uniqueCategories;
+    const fromIndex = currentList.findIndex((c) => c.id === draggedCatId);
+    const toIndex = currentList.findIndex((c) => c.id === targetCatId);
+    if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) return;
 
-    const updated = [...uniqueCategories];
+    const updated = [...currentList];
     const [removed] = updated.splice(fromIndex, 1);
     updated.splice(toIndex, 0, removed);
 
-    reorderCategories(updated);
+    // Update local UI draft immediately (zero Firestore write spam)
+    setDragOrder(updated);
   };
 
-  const handleDragEnd = () => {
+  const handleDragEnd = async () => {
+    if (dragOrder) {
+      await reorderCategories(dragOrder);
+      setDragOrder(null);
+    }
     setDraggedCatId(null);
   };
 
@@ -291,8 +310,8 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
                 <span className="font-display font-bold text-sm sm:text-base text-white tracking-tight">
                   Watch Motivational Reels
                 </span>
-                <span className="text-[10px] font-mono font-bold px-2 py-0.2 rounded-full bg-primary text-white border border-primary-glow/40 shadow-2xs">
-                  47 REELS
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-primary text-white border border-primary-glow/40 shadow-2xs">
+                  {MOTIVATIONAL_REELS.length} REELS
                 </span>
               </div>
               <p className="text-[11px] sm:text-xs text-white/75 truncate mt-0.5">
@@ -357,7 +376,7 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
           All Habits ({activeHabits.length})
         </button>
 
-        {uniqueCategories.map((cat, catIdx) => {
+        {displayCategories.map((cat, catIdx) => {
           const isSelected = selectedCatFilter === cat.id;
           const Icon =
             CATEGORY_ICONS.find((i) => i.id === cat.icon)?.icon ||
@@ -436,7 +455,7 @@ export const HabitsView: React.FC<HabitsViewProps> = ({
                     </button>
                     <button
                       type="button"
-                      disabled={catIdx === uniqueCategories.length - 1}
+                      disabled={catIdx === displayCategories.length - 1}
                       onClick={() => handleMoveCategory(cat.id, 'right')}
                       className="w-4 h-4 rounded-full bg-white hover:bg-stone/20 text-ink flex items-center justify-center disabled:opacity-25 border border-hairline shadow-2xs transition-all active:scale-90"
                       title="Move Right"

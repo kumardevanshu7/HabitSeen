@@ -3,12 +3,19 @@
  * Uses PBKDF2 with SHA-256 and 100,000 iterations with a unique per-user salt.
  */
 
+/**
+ * Standardizes security answers to prevent case sensitivity or leading/trailing whitespace bugs
+ */
+export function normalizeSecurityAnswer(answer: string): string {
+  return (answer || '').trim().toLowerCase();
+}
+
 export async function hashSecurityAnswer(
   answer: string,
   existingSaltHex?: string
 ): Promise<{ hash: string; salt: string }> {
   const enc = new TextEncoder();
-  const normalized = answer.trim().toLowerCase();
+  const normalized = normalizeSecurityAnswer(answer);
 
   let saltBytes: Uint8Array;
   if (existingSaltHex) {

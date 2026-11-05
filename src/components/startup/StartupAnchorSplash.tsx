@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   STARTING_POINT_CONFIG,
   getDaysSinceStartingPoint,
-  getDailyAnimeQuote,
+  getDailyAnimeQuoteIndex,
   ANIME_CONSISTENCY_QUOTES,
 } from '../../constants/startingPoint';
 import { Button } from '../ui/Button';
@@ -35,27 +35,30 @@ export const StartupAnchorSplash: React.FC<StartupAnchorSplashProps> = ({
   onProceed,
   isReady = true,
 }) => {
-  const [quoteIndex, setQuoteIndex] = useState(() => {
-    const daily = getDailyAnimeQuote();
-    const idx = ANIME_CONSISTENCY_QUOTES.findIndex((q) => q.author === daily.author);
-    return idx >= 0 ? idx : 0;
-  });
-
+  const [quoteIndex, setQuoteIndex] = useState(() => getDailyAnimeQuoteIndex());
   const [fadeQuote, setFadeQuote] = useState(false);
+  const fadeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (fadeTimeoutRef.current) clearTimeout(fadeTimeoutRef.current);
+    };
+  }, []);
 
   const daysCount = getDaysSinceStartingPoint();
   const currentQuote = ANIME_CONSISTENCY_QUOTES[quoteIndex] || ANIME_CONSISTENCY_QUOTES[0];
 
   const handleNextQuote = () => {
     setFadeQuote(true);
-    setTimeout(() => {
+    if (fadeTimeoutRef.current) clearTimeout(fadeTimeoutRef.current);
+    fadeTimeoutRef.current = setTimeout(() => {
       setQuoteIndex((prev) => (prev + 1) % ANIME_CONSISTENCY_QUOTES.length);
       setFadeQuote(false);
     }, 150);
   };
 
   return (
-    <div className="min-h-screen bg-canvas text-ink flex flex-col items-center justify-between p-6 sm:p-8 select-none relative overflow-hidden">
+    <div className="min-h-dvh bg-canvas text-ink flex flex-col items-center justify-between p-6 sm:p-8 select-none relative overflow-hidden">
       {/* Subtle Background Glow Accent */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-primary/8 rounded-full blur-3xl pointer-events-none" />
 

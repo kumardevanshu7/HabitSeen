@@ -11,6 +11,7 @@ interface AuthModalProps {
 export const AuthModal: React.FC<AuthModalProps> = ({
   isOpen,
   onClose,
+  defaultMode = 'signup',
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -31,7 +32,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       console.error(err);
       if (err.code === 'auth/popup-blocked') {
         setError('The Google sign-in popup was blocked by your browser. Please allow popups for this site and try again.');
-      } else if (err.code !== 'auth/popup-closed-by-user') {
+      } else if (
+        err.code !== 'auth/popup-closed-by-user' &&
+        err.code !== 'auth/cancelled-popup-request'
+      ) {
         setError(err.message || 'Failed to sign in with Google.');
       }
     } finally {
@@ -43,8 +47,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Welcome to HabitsSeen"
-      subtitle="Continue with your Google account to access your habits, streaks, and analytics."
+      isBusy={loading}
+      title={defaultMode === 'login' ? 'Log In to HabitsSeen' : 'Welcome to HabitsSeen'}
+      subtitle={
+        defaultMode === 'login'
+          ? 'Sign in with your Google account to restore your habits and progress.'
+          : 'Continue with your Google account to access your habits, streaks, and analytics.'
+      }
       maxWidth="sm"
     >
       <div className="space-y-4 pt-2 pb-2">
@@ -59,7 +68,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           type="button"
           onClick={handleGoogleSignIn}
           disabled={loading}
-          className="w-full flex items-center justify-center gap-3 bg-white hover:bg-surface-bone text-ink text-sm font-semibold h-12 px-4 rounded-full border border-hairline-strong shadow-xs transition-all active:scale-98 cursor-pointer disabled:opacity-60"
+          className="w-full flex items-center justify-center gap-3 bg-white hover:bg-surface-bone text-ink text-sm font-semibold h-12 px-4 rounded-full border border-hairline-strong shadow-xs transition-all active:scale-95 cursor-pointer disabled:opacity-60"
         >
           <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
             <path

@@ -8,6 +8,7 @@ import {
   XP_LOSS_PER_HEART,
   MIDNIGHT_MISSED_HABIT_XP_PENALTY,
   MISS_PENALTIES,
+  GAME_RULES,
 } from '../../constants/gamification';
 
 interface PointsSystemModalProps {
@@ -83,10 +84,10 @@ export const PointsSystemModal: React.FC<PointsSystemModalProps> = ({
           </div>
           <div>
             <h4 className="font-bold text-sm text-blue-900 flex items-center gap-1.5">
-              3. Genuine Excuse Shield (3 Freezes / Month) 🛡️
+              3. Genuine Excuse Shield ({maxMonthlyExcuses} Freezes / Month per Habit) 🛡️
             </h4>
             <p className="text-xs text-blue-800/90 mt-0.5 leading-relaxed">
-              Life happens! If you are sick or traveling, you get <strong>{maxMonthlyExcuses} Genuine Excuse shields</strong> per month. Logging a valid reason preserves your streak with <strong>0 XP penalty</strong> and <strong>0 Hearts lost</strong>.
+              Life happens! If you are sick or traveling, you get <strong>{maxMonthlyExcuses} Genuine Excuse shields</strong> per month for each habit. Logging a valid reason preserves your streak with <strong>0 XP penalty</strong> and <strong>0 Hearts lost</strong>.
             </p>
           </div>
         </div>
@@ -122,10 +123,10 @@ export const PointsSystemModal: React.FC<PointsSystemModalProps> = ({
           </div>
           <div>
             <h4 className="font-bold text-sm text-emerald-900 flex items-center gap-1.5">
-              5. Perfect Day Bonus (+100 XP &amp; +1 Heart) 🌟
+              5. Perfect Day Bonus (+{GAME_RULES.PERFECT_DAY_XP_BONUS} XP &amp; +{GAME_RULES.PERFECT_DAY_HEART_HEAL} Heart) 🌟
             </h4>
             <p className="text-xs text-emerald-800/90 mt-0.5 leading-relaxed">
-              Complete <strong>100% of your daily habits</strong> on the same day to earn a massive <strong>+100 Bonus XP</strong> and heal <strong>+1 Heart</strong> back!
+              Complete <strong>100% of your daily habits</strong> on the same day to earn a massive <strong>+{GAME_RULES.PERFECT_DAY_XP_BONUS} Bonus XP</strong> and heal <strong>+{GAME_RULES.PERFECT_DAY_HEART_HEAL} Heart</strong> back!
             </p>
           </div>
         </div>
@@ -140,7 +141,7 @@ export const PointsSystemModal: React.FC<PointsSystemModalProps> = ({
               6. What Happens at 0 Hearts? ⚡
             </h4>
             <p className="text-xs text-charcoal mt-0.5 leading-relaxed">
-              If all hearts are lost, your profile enters <strong>Zero Vitality</strong>. You must complete a discipline recovery check or use the vitality revival protocol to restore your journey!
+              If all hearts are lost, your profile enters <strong>Zero Vitality</strong>. A 10-second revival ceremony can restore 1 Heart with a -{GAME_RULES.SOFT_RESET_XP_PENALTY} XP penalty to continue your journey!
             </p>
           </div>
         </div>
@@ -163,7 +164,7 @@ export const PointsSystemModal: React.FC<PointsSystemModalProps> = ({
               <span>Challenges</span>
             </div>
             <p className="text-[11px] text-charcoal mt-1 leading-relaxed">
-              7, 9, or 11-day hard commitments. Finish all days to win massive XP and archive conquered victories.
+              7, 9, 11, or Custom Days hard commitments. Finish all days to win massive XP and archive conquered victories.
             </p>
           </div>
         </div>

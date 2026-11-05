@@ -47,6 +47,13 @@ export const MotivationalReelsModal: React.FC<MotivationalReelsModalProps> = ({
   const lastWheelTime = useRef<number>(0);
   const lastTapTime = useRef<number>(0);
 
+  // Sync currentIndex when reopening
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentIndex(initialReelIndex);
+    }
+  }, [isOpen, initialReelIndex]);
+
   const totalReels = MOTIVATIONAL_REELS.length;
   const currentReel: MotivationalReel | undefined = MOTIVATIONAL_REELS[currentIndex];
 
@@ -85,7 +92,7 @@ export const MotivationalReelsModal: React.FC<MotivationalReelsModalProps> = ({
   }, [currentReel]);
 
   // Double-tap to heart
-  const handleVideoTap = () => {
+  const handleVideoTap = useCallback(() => {
     const now = Date.now();
     const diff = now - lastTapTime.current;
     lastTapTime.current = now;
@@ -112,7 +119,7 @@ export const MotivationalReelsModal: React.FC<MotivationalReelsModalProps> = ({
       setShowPlayIcon(true);
       setTimeout(() => setShowPlayIcon(false), 600);
     }
-  };
+  }, [currentReel, likedReelIds, handleToggleLike]);
 
   // Keyboard navigation (Arrow keys)
   useEffect(() => {
@@ -137,7 +144,7 @@ export const MotivationalReelsModal: React.FC<MotivationalReelsModalProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, handleNextReel, handlePrevReel, onClose]);
+  }, [isOpen, handleNextReel, handlePrevReel, handleVideoTap, onClose]);
 
   // Touch swipe support (Up / Down)
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -256,8 +263,8 @@ export const MotivationalReelsModal: React.FC<MotivationalReelsModalProps> = ({
 
         {/* LOADING BUFFER SPINNER (WHEN VIDEO IS BUFFERING OR LOADING) */}
         {isLoading && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center z-25 pointer-events-none bg-black/30 backdrop-blur-2xs">
-            <div className="w-12 h-12 rounded-full border-3 border-white/20 border-t-rose-500 animate-spin shadow-xl" />
+          <div className="absolute inset-0 flex flex-col items-center justify-center z-30 pointer-events-none bg-black/30 backdrop-blur-xs">
+            <div className="w-12 h-12 rounded-full border-[3px] border-white/20 border-t-rose-500 animate-spin shadow-xl" />
             <span className="text-[11px] font-mono font-bold text-white/90 mt-2.5 drop-shadow-md">
               Buffering Reel...
             </span>

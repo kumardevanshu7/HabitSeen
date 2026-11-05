@@ -18,7 +18,8 @@ export type BrandLegalTab =
   | 'about'
   | 'privacy'
   | 'terms'
-  | 'disclaimer';
+  | 'disclaimer'
+  | 'contact';
 
 interface BrandLegalModalProps {
   isOpen: boolean;
@@ -26,19 +27,23 @@ interface BrandLegalModalProps {
   initialTab?: BrandLegalTab;
 }
 
+const resolveActiveTab = (tab: BrandLegalTab): Exclude<BrandLegalTab, 'contact'> => {
+  return tab === 'contact' ? 'about' : tab;
+};
+
 export const BrandLegalModal: React.FC<BrandLegalModalProps> = ({
   isOpen,
   onClose,
   initialTab = 'explore',
 }) => {
-  const [activeTab, setActiveTab] = useState<BrandLegalTab>(
-    initialTab === ('contact' as any) ? 'about' : initialTab
+  const [activeTab, setActiveTab] = useState<Exclude<BrandLegalTab, 'contact'>>(() =>
+    resolveActiveTab(initialTab)
   );
 
   // Sync initialTab when modal opens or initialTab changes
   React.useEffect(() => {
     if (isOpen) {
-      setActiveTab(initialTab === ('contact' as any) ? 'about' : initialTab);
+      setActiveTab(resolveActiveTab(initialTab));
     }
   }, [isOpen, initialTab]);
 
@@ -46,7 +51,7 @@ export const BrandLegalModal: React.FC<BrandLegalModalProps> = ({
 
   const founderEmail = APP_CONFIG.supportEmail;
 
-  const tabs: { key: BrandLegalTab; label: string; icon: React.ReactNode }[] = [
+  const tabs: { key: Exclude<BrandLegalTab, 'contact'>; label: string; icon: React.ReactNode }[] = [
     {
       key: 'explore',
       label: 'Explore Arigato Labs',
@@ -388,8 +393,8 @@ export const BrandLegalModal: React.FC<BrandLegalModalProps> = ({
               <div>
                 <h4 className="font-bold text-ink text-sm mb-1">7. Availability</h4>
                 <p>
-                  The service is provided on an "as available" basis. While we strive for 99.9%
-                  uptime, service disruptions or cloud maintenance may occur without liability.
+                  The service is provided on an "as available" basis. While we strive for high
+                  reliability and uninterrupted access, temporary service disruptions or cloud maintenance may occur without liability.
                 </p>
               </div>
 

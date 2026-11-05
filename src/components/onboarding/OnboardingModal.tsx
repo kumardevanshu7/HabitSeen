@@ -6,6 +6,7 @@ import { Input } from '../ui/Input';
 import { CustomSelect, SelectOption } from '../ui/CustomSelect';
 import { ShieldCheck, Sparkles, Award, ArrowRight, AlertTriangle } from 'lucide-react';
 import { UserProfile } from '../../types/habit';
+import { GAME_RULES } from '../../constants/gamification';
 
 const GENDER_OPTIONS: SelectOption<UserProfile['gender']>[] = [
   { value: 'male', label: 'Male' },
@@ -26,9 +27,9 @@ export const OnboardingModal: React.FC = () => {
 
   const [step, setStep] = useState<1 | 2>(1);
   const [name, setName] = useState(currentUser?.displayName || '');
-  const [age, setAge] = useState<number>(24);
+  const [age, setAge] = useState<string>('24');
   const [relationStatus, setRelationStatus] = useState<UserProfile['relationStatus']>('prefer_not_to_say');
-  const [gender, setGender] = useState<UserProfile['gender']>('male');
+  const [gender, setGender] = useState<UserProfile['gender']>('other');
   const [loading, setLoading] = useState(false);
 
   const [nameError, setNameError] = useState('');
@@ -67,9 +68,9 @@ export const OnboardingModal: React.FC = () => {
       setNameError('');
     }
 
-    const parsedAge = Number(age);
-    if (!Number.isFinite(parsedAge) || parsedAge < 13 || parsedAge > 120) {
-      setAgeError('You must be at least 13 years old to use HabitsSeen');
+    const parsedAge = parseInt(age, 10);
+    if (!age.trim() || !Number.isFinite(parsedAge) || parsedAge < 13 || parsedAge > 120) {
+      setAgeError('Please enter a valid age between 13 and 120');
       hasError = true;
     } else {
       setAgeError('');
@@ -91,9 +92,10 @@ export const OnboardingModal: React.FC = () => {
     setLoading(true);
     setSubmitError('');
     try {
+      const parsedAge = parseInt(age, 10);
       await completeOnboarding({
         name: name.trim(),
-        age: Number(age) || 24,
+        age: Number.isFinite(parsedAge) ? parsedAge : 24,
         relationStatus,
         gender,
       });
@@ -151,7 +153,7 @@ export const OnboardingModal: React.FC = () => {
                   max={120}
                   value={age}
                   onChange={(e) => {
-                    setAge(Number(e.target.value));
+                    setAge(e.target.value);
                     if (ageError) setAgeError('');
                   }}
                   error={ageError}
@@ -211,7 +213,7 @@ export const OnboardingModal: React.FC = () => {
               Will Habit
             </h2>
             <p className="text-primary font-bold text-xs sm:text-sm tracking-widest uppercase mt-1">
-              "Will Habit Initiate"
+              "{GAME_RULES.DEFAULT_LEVEL_TITLE}"
             </p>
 
             <div className="my-6 p-4 bg-surface-card border border-hairline rounded-2xl text-left text-xs sm:text-sm text-body space-y-2">

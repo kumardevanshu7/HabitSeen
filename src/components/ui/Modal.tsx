@@ -11,6 +11,8 @@ interface ModalProps {
   children: React.ReactNode;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '4xl';
   zIndex?: string;
+  isBusy?: boolean;
+  closeOnBackdrop?: boolean;
 }
 
 // Global modal counter to prevent multiple modals from clobbering body overflow
@@ -26,6 +28,7 @@ interface ModalStackEntry {
 const openModalStack: ModalStackEntry[] = [];
 let historyModalDepth = 0;
 let programmaticBackCount = 0;
+let programmaticBackTimer: ReturnType<typeof setTimeout> | null = null;
 let syncScheduled = false;
 
 const scheduleModalHistorySync = () => {
@@ -47,6 +50,10 @@ const scheduleModalHistorySync = () => {
       const toPop = historyModalDepth - targetDepth;
       historyModalDepth = targetDepth;
       programmaticBackCount++;
+      if (programmaticBackTimer) clearTimeout(programmaticBackTimer);
+      programmaticBackTimer = setTimeout(() => {
+        programmaticBackCount = 0;
+      }, 350);
       window.history.go(-toPop);
     }
   });
@@ -55,6 +62,7 @@ const scheduleModalHistorySync = () => {
 export const isModalHandlingPopState = (): boolean => {
   if (programmaticBackCount > 0) {
     programmaticBackCount--;
+    if (programmaticBackTimer) clearTimeout(programmaticBackTimer);
     return true;
   }
   if (openModalStack.length > 0) {
@@ -75,10 +83,14 @@ export const Modal: React.FC<ModalProps> = ({
   children,
   maxWidth = 'md',
   zIndex = 'z-50',
+  isBusy = false,
+  closeOnBackdrop = true,
 }) => {
   const titleId = useId();
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  const isBusyRef = useRef(isBusy);
+  isBusyRef.current = isBusy;
 
   // 1. Stack-safe scroll lock + Mobile Back Gesture History Entry
   useEffect(() => {
@@ -92,7 +104,11 @@ export const Modal: React.FC<ModalProps> = ({
 
     const entry: ModalStackEntry = {
       id: titleId,
-      close: () => onCloseRef.current(),
+      close: () => {
+        if (!isBusyRef.current) {
+          onCloseRef.current();
+        }
+      },
       closedByPopState: false,
     };
     openModalStack.push(entry);
@@ -116,12 +132,13 @@ export const Modal: React.FC<ModalProps> = ({
     };
   }, [isOpen, titleId]);
 
-  // 2. Escape key handler (only closes the top-most modal in the stack)
+  // 2. Escape key handler (only closes the top-most modal in the stack if not busy)
   useEffect(() => {
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        if (isBusyRef.current) return;
         const topModal = openModalStack[openModalStack.length - 1];
         if (topModal && topModal.id === titleId) {
           e.stopPropagation();
@@ -145,6 +162,12 @@ export const Modal: React.FC<ModalProps> = ({
     '4xl': 'sm:max-w-6xl',
   };
 
+  const handleBackdropClick = () => {
+    if (!isBusy && closeOnBackdrop) {
+      onClose();
+    }
+  };
+
   const modalContent = (
     <div
       role="dialog"
@@ -158,7 +181,7 @@ export const Modal: React.FC<ModalProps> = ({
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-ink/50 backdrop-blur-sm transition-opacity"
-        onClick={onClose}
+        onClick={handleBackdropClick}
         aria-hidden="true"
       />
 
@@ -171,7 +194,7 @@ export const Modal: React.FC<ModalProps> = ({
         )}
       >
         {/* Header */}
-        {(title || subtitle) && (
+        {(title || subtitle) ? (
           <div className="px-6 pt-6 pb-4 border-b border-hairline flex items-center justify-between bg-[#f9f7f3] shrink-0">
             <div>
               {title && (
@@ -189,16 +212,38 @@ export const Modal: React.FC<ModalProps> = ({
             <button
               type="button"
               onClick={onClose}
+              disabled={isBusy}
               aria-label="Close modal"
-              className="p-2 text-charcoal hover:text-ink hover:bg-surface-bone rounded-full transition-colors"
+              className={clsx(
+                'p-2 text-charcoal rounded-full transition-colors',
+                isBusy
+                  ? 'opacity-40 cursor-not-allowed'
+                  : 'hover:text-ink hover:bg-surface-bone cursor-pointer'
+              )}
             >
               <X size={20} />
             </button>
           </div>
+        ) : (
+          /* Close button fallback when no header is provided */
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isBusy}
+            aria-label="Close modal"
+            className={clsx(
+              'absolute top-4 right-4 z-20 p-2 text-charcoal rounded-full transition-colors',
+              isBusy
+                ? 'opacity-40 cursor-not-allowed'
+                : 'hover:text-ink hover:bg-surface-bone/80 cursor-pointer'
+            )}
+          >
+            <X size={20} />
+          </button>
         )}
 
         {/* Content Body */}
-        <div className="p-6 overflow-y-auto overflow-x-hidden space-y-4">
+        <div className="p-6 overflow-y-auto overflow-x-hidden space-y-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
           {children}
         </div>
       </div>

@@ -11,8 +11,11 @@ export const InstallPromptBanner: React.FC = () => {
   const [showBanner, setShowBanner] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const [showIOSInstructions, setShowIOSInstructions] = useState(false);
+  const [showManualInstructions, setShowManualInstructions] = useState(false);
 
   useEffect(() => {
+    const timerIds: NodeJS.Timeout[] = [];
+
     // 1. Check if already installed / running in standalone mode
     const isStandalone =
       window.matchMedia('(display-mode: standalone)').matches ||
@@ -45,7 +48,7 @@ export const InstallPromptBanner: React.FC = () => {
     const globalPrompt = (window as any).__pwaInstallPrompt;
     if (globalPrompt) {
       setDeferredPrompt(globalPrompt);
-      setTimeout(() => setShowBanner(true), 2000);
+      timerIds.push(setTimeout(() => setShowBanner(true), 2000));
     }
 
     // 4. Listen for Chrome/Edge/Android beforeinstallprompt & custom prompt event
@@ -53,7 +56,7 @@ export const InstallPromptBanner: React.FC = () => {
       e.preventDefault();
       const promptEvent = (e as CustomEvent).detail || e;
       setDeferredPrompt(promptEvent as BeforeInstallPromptEvent);
-      setTimeout(() => setShowBanner(true), 2000);
+      timerIds.push(setTimeout(() => setShowBanner(true), 2000));
     };
 
     window.addEventListener('beforeinstallprompt', handlePromptEvent);
@@ -68,10 +71,11 @@ export const InstallPromptBanner: React.FC = () => {
 
     // If on iOS and not standalone, show banner after delay
     if (isIosDevice && !isStandalone) {
-      setTimeout(() => setShowBanner(true), 2000);
+      timerIds.push(setTimeout(() => setShowBanner(true), 2000));
     }
 
     return () => {
+      timerIds.forEach((id) => clearTimeout(id));
       window.removeEventListener('beforeinstallprompt', handlePromptEvent);
       window.removeEventListener('pwa-prompt-available', handlePromptEvent);
       window.removeEventListener('appinstalled', handleAppInstalled);
@@ -85,15 +89,18 @@ export const InstallPromptBanner: React.FC = () => {
     }
 
     if (!deferredPrompt) {
-      alert('To install, tap the 3 dots in your browser menu and choose "Install App" or "Add to Home Screen".');
+      setShowManualInstructions(true);
       return;
     }
 
     try {
       await deferredPrompt.prompt();
       const choice = await deferredPrompt.userChoice;
-      if (choice.outcome === 'accepted') {
+      if (choice.outcome === 'accepted' || choice.outcome === 'dismissed') {
         setShowBanner(false);
+        try {
+          localStorage.setItem('habitsseen_install_prompt_dismissed', String(Date.now()));
+        } catch {}
       }
       setDeferredPrompt(null);
     } catch (err) {
@@ -190,6 +197,58 @@ export const InstallPromptBanner: React.FC = () => {
 
             <button
               onClick={() => setShowIOSInstructions(false)}
+              className="w-full mt-5 py-2.5 rounded-full bg-ink text-white text-xs font-bold hover:bg-charcoal transition-colors"
+            >
+              Got it!
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ANDROID / DESKTOP MANUAL INSTRUCTIONS MODAL */}
+      {showManualInstructions && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/70 backdrop-blur-sm animate-in fade-in">
+          <div className="relative w-full max-w-sm bg-surface-card border border-hairline rounded-3xl p-6 text-ink shadow-2xl">
+            <button
+              onClick={() => setShowManualInstructions(false)}
+              className="absolute top-4 right-4 p-1.5 text-charcoal hover:text-ink rounded-full"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="text-center mb-4">
+              <div className="w-12 h-12 rounded-full bg-primary/10 text-primary mx-auto flex items-center justify-center mb-2">
+                <Download size={24} />
+              </div>
+              <h3 className="font-display font-bold text-lg text-ink">
+                Install HabitsSeen
+              </h3>
+              <p className="text-xs text-charcoal mt-1">
+                To install manually from your browser:
+              </p>
+            </div>
+
+            <ol className="space-y-3 text-xs text-ink/90 font-medium">
+              <li className="flex items-center gap-2 p-2.5 bg-surface-bone rounded-xl border border-hairline">
+                <span className="w-5 h-5 rounded-full bg-ink text-white font-bold flex items-center justify-center text-[10px] shrink-0">
+                  1
+                </span>
+                <span>
+                  Tap the <strong>three dots (⋮)</strong> menu in your browser top or bottom bar.
+                </span>
+              </li>
+              <li className="flex items-center gap-2 p-2.5 bg-surface-bone rounded-xl border border-hairline">
+                <span className="w-5 h-5 rounded-full bg-ink text-white font-bold flex items-center justify-center text-[10px] shrink-0">
+                  2
+                </span>
+                <span>
+                  Select <strong>Install App</strong> or <strong>Add to Home screen</strong>.
+                </span>
+              </li>
+            </ol>
+
+            <button
+              onClick={() => setShowManualInstructions(false)}
               className="w-full mt-5 py-2.5 rounded-full bg-ink text-white text-xs font-bold hover:bg-charcoal transition-colors"
             >
               Got it!

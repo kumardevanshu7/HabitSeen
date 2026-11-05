@@ -733,7 +733,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                     />
                   </button>
                   {isCompleted && (
-                    <span className="hidden xs:inline-flex items-center gap-0.5 text-[10px] font-bold text-badge-success bg-badge-success/10 px-1.5 py-0.5 rounded-full border border-badge-success/20">
+                    <span className="hidden sm:inline-flex items-center gap-0.5 text-[10px] font-bold text-badge-success bg-badge-success/10 px-1.5 py-0.5 rounded-full border border-badge-success/20">
                       <Lock size={9} /> Locked
                     </span>
                   )}
@@ -811,7 +811,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                     />
                   </button>
                   {isCompleted && (
-                    <span className="hidden xs:inline-flex items-center gap-0.5 text-[10px] font-bold text-badge-success bg-badge-success/10 px-1.5 py-0.5 rounded-full border border-badge-success/20">
+                    <span className="hidden sm:inline-flex items-center gap-0.5 text-[10px] font-bold text-badge-success bg-badge-success/10 px-1.5 py-0.5 rounded-full border border-badge-success/20">
                       <Lock size={9} /> Locked
                     </span>
                   )}
@@ -865,7 +865,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                     />
                   </button>
                   {isCompleted && (
-                    <span className="hidden xs:inline-flex items-center gap-0.5 text-[10px] font-bold text-badge-success bg-badge-success/10 px-1.5 py-0.5 rounded-full border border-badge-success/20">
+                    <span className="hidden sm:inline-flex items-center gap-0.5 text-[10px] font-bold text-badge-success bg-badge-success/10 px-1.5 py-0.5 rounded-full border border-badge-success/20">
                       <Lock size={9} /> Locked
                     </span>
                   )}
@@ -915,7 +915,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                     />
                   </button>
                   {isCompleted && (
-                    <span className="hidden xs:inline-flex items-center gap-0.5 text-[10px] font-bold text-badge-success bg-badge-success/10 px-1.5 py-0.5 rounded-full border border-badge-success/20">
+                    <span className="hidden sm:inline-flex items-center gap-0.5 text-[10px] font-bold text-badge-success bg-badge-success/10 px-1.5 py-0.5 rounded-full border border-badge-success/20">
                       <Lock size={9} /> Locked
                     </span>
                   )}
@@ -1071,7 +1071,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
             >
               <CategoryIcon size={14} strokeWidth={2.5} />
             </span>
-            <span className="text-[11px] font-bold text-charcoal uppercase tracking-wide whitespace-nowrap truncate max-w-[85px] xs:max-w-[120px] sm:max-w-none">
+            <span className="text-[11px] font-bold text-charcoal uppercase tracking-wide whitespace-nowrap truncate max-w-[100px] sm:max-w-none">
               {category?.name || 'Category'}
             </span>
             <span
@@ -1233,7 +1233,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
         {isJustTracking && trackingMonthData.days.length > 0 && (
           <div className="mb-3 pt-2.5 border-t border-hairline/80">
             {/* 1. MONTH HEADER & NAVIGATION CONTROLS */}
-            <div className="flex flex-wrap items-center justify-between gap-y-2 gap-x-1.5 mb-2.5 px-0.5">
+            <div className="flex items-center justify-between gap-1.5 mb-2.5 px-0.5 flex-wrap">
               <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
                 <button
                   type="button"
@@ -1247,7 +1247,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                   <ChevronLeft size={14} />
                 </button>
 
-                <span className="font-display font-bold text-xs sm:text-sm text-ink px-1 min-w-[95px] sm:min-w-[115px] text-center whitespace-nowrap">
+                <span className="font-display font-bold text-xs sm:text-sm text-ink px-1 text-center whitespace-nowrap">
                   {format(trackingMonth, 'MMMM yyyy')}
                 </span>
 
@@ -1280,8 +1280,8 @@ export const HabitCard: React.FC<HabitCardProps> = ({
 
               {/* MONTH COMPLETION SUMMARY PILL */}
               <div className="flex items-center gap-1.5 shrink-0 ml-auto">
-                <span className="text-[10px] sm:text-[11px] font-mono font-bold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full border border-primary/20 shadow-2xs whitespace-nowrap">
-                  ✨ {trackingMonthCompletedCount}/{trackingMonthData.totalDays}d ({Math.round((trackingMonthCompletedCount / Math.max(1, trackingMonthData.totalDays)) * 100)}%)
+                <span className="text-[10px] sm:text-[11px] font-mono font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20 shadow-2xs whitespace-nowrap">
+                  ✨ {trackingMonthCompletedCount}/{trackingMonthData.totalDays}d <span className="hidden sm:inline">({Math.round((trackingMonthCompletedCount / Math.max(1, trackingMonthData.totalDays)) * 100)}%)</span>
                 </span>
                 <button
                   type="button"
@@ -1293,7 +1293,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                   title="View full habit analytics & statistics"
                 >
                   <BarChart2 size={11} className="text-primary shrink-0" />
-                  <span className="hidden xs:inline">Stats</span>
+                  <span className="hidden sm:inline">Stats</span>
                 </button>
               </div>
             </div>

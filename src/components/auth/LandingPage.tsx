@@ -3,17 +3,13 @@ import { Button } from '../ui/Button';
 import { AuthModal } from './AuthModal';
 import { InstallPromptBanner } from '../pwa/InstallPromptBanner';
 import { BrandLegalModal, BrandLegalTab } from '../brand/BrandLegalModal';
+import { GAME_RULES } from '../../constants/gamification';
 import {
   ShieldAlert,
   Award,
-  CheckCircle2,
-  Clock,
   ArrowRight,
   Sparkles,
-  Zap,
   Target,
-  BarChart3,
-  Calendar,
   Flame,
 } from 'lucide-react';
 
@@ -141,7 +137,7 @@ export const LandingPage: React.FC = () => {
               Hardcore Challenges
             </h3>
             <p className="text-charcoal text-xs sm:text-sm mt-2 leading-relaxed">
-              Lock in high-stakes 7, 9, 11, or 21-day sprints. Miss a day, and face the strict <strong>-90% health penalty</strong>. Survive all required completions to earn permanent trophies and massive XP bonuses.
+              Lock in high-stakes 7, 9, 11, or Custom Days sprints. Miss a day, and face the strict <strong>-90% health penalty</strong>. Survive all required completions to earn permanent trophies and massive XP bonuses.
             </p>
           </div>
 
@@ -154,7 +150,7 @@ export const LandingPage: React.FC = () => {
               "Will Habit" Gamification
             </h3>
             <p className="text-charcoal text-xs sm:text-sm mt-2 leading-relaxed">
-              Earn XP points based on difficulty, priority, and streak multipliers. Level up from <em>Will Habit Initiate</em> to <em>Legendary Monk</em> with Duolingo-style hearts vitality protection.
+              Earn XP points based on difficulty, priority, and streak multipliers. Level up from <em>{GAME_RULES.DEFAULT_LEVEL_TITLE}</em> to <em>Legendary Monk</em> with Duolingo-style hearts vitality protection.
             </p>
           </div>
 

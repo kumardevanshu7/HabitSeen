@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 import { getTodayKey } from '../../utils/dateMath';
+import { GAME_RULES } from '../../constants/gamification';
 import {
   parseISO,
   format,
@@ -242,7 +243,10 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
   };
 
   const handleRemoveTask = (id: string) => {
-    if (isDateLocked) return;
+    if (isDateLocked) {
+      setError('Tasks are locked while this challenge is in progress');
+      return;
+    }
     setTasks(tasks.filter((t) => t.id !== id));
   };
 
@@ -257,6 +261,17 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
       setError('Please enter a valid duration between 1 and 365 days');
       return;
     }
+
+    const today = getTodayKey();
+    if (!challengeToEdit && startDate < today) {
+      setError('Start date cannot be in the past');
+      return;
+    }
+    if (challengeToEdit && !isDateLocked && startDate < today && startDate !== challengeToEdit.startDate) {
+      setError('Start date cannot be moved to a past date');
+      return;
+    }
+
     setError('');
 
     // If EDITING an existing challenge, save directly without re-triggering rules disclaimer
@@ -264,7 +279,9 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
       if (isSubmitting) return;
       setIsSubmitting(true);
       try {
-        const finalTasks = [...tasks];
+        const finalTasks = tasks
+          .map((t) => ({ ...t, text: t.text.trim() }))
+          .filter((t) => t.text.length > 0);
         if (newTaskText.trim()) {
           finalTasks.push({
             id: `ctask-${Date.now()}`,
@@ -275,7 +292,7 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
           ...challengeToEdit,
           name: name.trim(),
           icon: selectedIcon,
-          color: vibrantColor,
+          color: selectedColor,
           targetDays: effectiveDays,
           startDate: isDateLocked ? challengeToEdit.startDate : startDate,
           endDate: isDateLocked ? (challengeToEdit.endDate || computedEndDate) : computedEndDate,
@@ -301,8 +318,10 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      // Auto-include any typed task still in the input box
-      const finalTasks = [...tasks];
+      // Auto-include any typed task still in the input box and clean empty items
+      const finalTasks = tasks
+        .map((t) => ({ ...t, text: t.text.trim() }))
+        .filter((t) => t.text.length > 0);
       if (newTaskText.trim()) {
         finalTasks.push({
           id: `ctask-${Date.now()}`,
@@ -313,7 +332,7 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
       await addChallenge({
         name: name.trim(),
         icon: selectedIcon,
-        color: vibrantColor,
+        color: selectedColor,
         targetDays: effectiveDays,
         startDate,
         tasks: finalTasks,
@@ -332,8 +351,10 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
   };
 
   const currentHearts = user?.gamification?.hearts ?? 5;
-  const penaltyPreview = Number((currentHearts * 0.9).toFixed(1));
-  const victoryXpPreview = effectiveDays * 50 + effectiveDays * 30;
+  const penaltyPreview = Number((currentHearts * (GAME_RULES.CHALLENGE_FAIL_HEALTH_DEDUCTION_PCT / 100)).toFixed(1));
+  const victoryXpPreview =
+    effectiveDays * GAME_RULES.CHALLENGE_DAILY_XP +
+    effectiveDays * GAME_RULES.CHALLENGE_VICTORY_BONUS_MULTIPLIER;
 
   return (
     <>
@@ -348,6 +369,7 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
             : 'Configure name, icon, color, and duration (7, 9, 11, or Custom days)'
         }
         maxWidth="lg"
+        isBusy={isSubmitting}
       >
         <form onSubmit={handleProceedToRules} className="space-y-5">
           {/* 1. CHALLENGE NAME */}
@@ -459,6 +481,7 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
                   <div className="relative">
                     <input
                       type="date"
+                      min={getTodayKey()}
                       value={startDate}
                       onChange={(e) => {
                         if (e.target.value) setStartDate(e.target.value);
@@ -604,7 +627,7 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
                       'h-10 w-full rounded-xl border border-hairline/80 flex items-center justify-center transition-all cursor-pointer shadow-2xs',
                       isSelected
                         ? 'ring-3 ring-ink ring-offset-2 scale-105 shadow-md z-10'
-                        : 'hover:opacity-90 hover:scale-102'
+                        : 'hover:opacity-90 hover:scale-105'
                     )}
                     style={{ backgroundColor: col.hex }}
                   >
@@ -761,6 +784,7 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
         title="⚠️ Challenge Rules & Disclaimer"
         subtitle={`Read carefully before launching "${name.trim()}" (${effectiveDays} Days)`}
         maxWidth="md"
+        isBusy={isSubmitting}
       >
         <div className="space-y-4 pt-1">
           {/* HIGH STAKES WARNING BANNER */}
@@ -802,8 +826,8 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
                   Rule 2: 90% Health Deduction Punishment (-90% ❤️)
                 </h4>
                 <p className="text-xs text-red-800 mt-0.5 leading-relaxed">
-                  Agar aapne ek bhi task complete nahi kiya, toh aapke current Health (Hearts) mein se{' '}
-                  <strong>90% Health turant deduct kar diya jayega</strong> (currently{' '}
+                  If you fail to complete all mandatory tasks on any day,{' '}
+                  <strong>90% of your current Health (Hearts) will be immediately deducted</strong> (currently{' '}
                   <strong>-{penaltyPreview} ❤️</strong> loss)!
                 </p>
               </div>
@@ -816,11 +840,11 @@ export const CreateChallengeModal: React.FC<CreateChallengeModalProps> = ({
               </div>
               <div>
                 <h4 className="font-display font-bold text-sm text-amber-950">
-                  Rule 3: Zero Excuses — Koi Reason Nahi Chahiye!
+                  Rule 3: Zero Excuses — Absolute Discipline
                 </h4>
                 <p className="text-xs text-amber-900 mt-0.5 leading-relaxed">
-                  Ismien koi reason ya excuse nahi maanga jayega ki aapne kyun nahi kiya.{' '}
-                  <strong>Aapko har haal mein karna hi hai!</strong> No shields, no excuses.
+                  No excuses, freezes, or reasons are permitted in hardcore challenges.{' '}
+                  <strong>You must conquer every day unconditionally.</strong> No shields, zero tolerance.
                 </p>
               </div>
             </div>

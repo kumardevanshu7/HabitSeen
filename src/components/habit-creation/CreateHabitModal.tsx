@@ -327,6 +327,11 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
       setNameError('Please enter a habit name');
       return;
     }
+    if (endDate && startDate && endDate < startDate) {
+      setWizardStep(2);
+      setNameError('End date cannot be earlier than start date');
+      return;
+    }
     setNameError('');
     submittingRef.current = true;
     setIsSubmitting(true);
@@ -480,6 +485,7 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
             : 'Configure your behavioral habit, cadence, and priority order'
         }
         maxWidth="xl"
+        isBusy={isSubmitting}
       >
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* 3-STEP WIZARD PROGRESS BAR (CLEAN, NO DUPLICATE NUMBERS) */}
@@ -1252,7 +1258,13 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
                       label={frequencyType === 'JUST_TRACKING' ? 'Start Date (Optional / Past Date Allowed)' : 'Start Date'}
                       type="date"
                       value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
+                      onChange={(e) => {
+                        const newStart = e.target.value;
+                        setStartDate(newStart);
+                        if (endDate && newStart && endDate < newStart) {
+                          setEndDate('');
+                        }
+                      }}
                       required={frequencyType !== 'JUST_TRACKING'}
                     />
                     {startDate && startDate < getTodayKey() && (
@@ -1293,6 +1305,7 @@ export const CreateHabitModal: React.FC<CreateHabitModalProps> = ({
                     <Input
                       label="End Date (Optional)"
                       type="date"
+                      min={startDate || getTodayKey()}
                       value={endDate}
                       onChange={(e) => setEndDate(e.target.value)}
                     />

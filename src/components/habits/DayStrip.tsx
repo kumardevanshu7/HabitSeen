@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
-import { isHabitDueOnDate } from '../../utils/dateMath';
+import { isHabitDueOnDate, getDueHabitsForDate } from '../../utils/dateMath';
 import { useTodayKey } from '../../hooks/useTodayKey';
 import {
   format,
@@ -87,7 +87,7 @@ export const DayStrip: React.FC = () => {
 
   // Month Statistics for modal header/footer (only count days up to today or with logs)
   const allDaysInMonth = eachDayOfInterval({ start: mStart, end: mEnd });
-  const todayStart = startOfDay(new Date());
+  const todayStart = startOfDay(parseISO(todayKey));
   let monthPerfectDaysCount = 0;
   let monthTotalDueHabits = 0;
   let monthTotalCompletedHabits = 0;
@@ -96,13 +96,7 @@ export const DayStrip: React.FC = () => {
     const dKey = format(d, 'yyyy-MM-dd');
     const isPastOrToday = !isAfter(startOfDay(d), todayStart);
     if (isPastOrToday) {
-      const due = activeHabits.filter((h) => {
-        if (h.frequency?.type === 'JUST_TRACKING') {
-          const l = logs[`${h.id}_${dKey}`];
-          return l?.status === 'COMPLETED' || l?.status === 'EXCUSED';
-        }
-        return isHabitDueOnDate(h, d, logs);
-      });
+      const due = getDueHabitsForDate(activeHabits, d, logs);
       if (due.length > 0) {
         monthTotalDueHabits += due.length;
         const completed = due.filter((h) => {
@@ -132,7 +126,7 @@ export const DayStrip: React.FC = () => {
         <button
           type="button"
           onClick={openMonthModal}
-          className="flex items-center gap-2 group text-left cursor-pointer transition-transform active:scale-98"
+          className="flex items-center gap-2 group text-left cursor-pointer transition-transform active:scale-95"
           title="Click to view full month calendar grid"
         >
           <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
@@ -194,13 +188,7 @@ export const DayStrip: React.FC = () => {
           const isToday = key === todayKey;
 
           // Compute habits scheduled & completed on this date
-          const dueHabits = activeHabits.filter((h) => {
-            if (h.frequency?.type === 'JUST_TRACKING') {
-              const l = logs[`${h.id}_${key}`];
-              return l?.status === 'COMPLETED' || l?.status === 'EXCUSED';
-            }
-            return isHabitDueOnDate(h, day, logs);
-          });
+          const dueHabits = getDueHabitsForDate(activeHabits, day, logs);
           const completedHabits = dueHabits.filter((h) => {
             const l = logs[`${h.id}_${key}`];
             return l?.status === 'COMPLETED' || l?.status === 'EXCUSED';
@@ -221,7 +209,7 @@ export const DayStrip: React.FC = () => {
               className={clsx(
                 'flex flex-col items-center justify-center min-w-[58px] sm:min-w-[64px] py-2 px-1.5 rounded-2xl border transition-all select-none shrink-0 gap-0.5',
                 isSelected
-                  ? 'bg-ink text-white border-ink ring-2 ring-primary shadow-sm scale-102'
+                  ? 'bg-ink text-white border-ink ring-2 ring-primary shadow-sm scale-105'
                   : 'bg-canvas text-charcoal border-hairline hover:bg-surface-bone hover:text-ink'
               )}
             >
@@ -230,7 +218,7 @@ export const DayStrip: React.FC = () => {
                 <span
                   className={clsx(
                     'text-[10px] uppercase font-bold tracking-wider',
-                    isSelected ? 'text-primary-pink' : 'text-stone'
+                    isSelected ? 'text-primary' : 'text-stone'
                   )}
                 >
                   {format(day, 'EEE')}
@@ -380,13 +368,7 @@ export const DayStrip: React.FC = () => {
               const isToday = dKey === todayKey;
               const isFuture = isAfter(startOfDay(day), todayStart);
 
-              const dueHabits = activeHabits.filter((h) => {
-                if (h.frequency?.type === 'JUST_TRACKING') {
-                  const l = logs[`${h.id}_${dKey}`];
-                  return l?.status === 'COMPLETED' || l?.status === 'EXCUSED';
-                }
-                return isHabitDueOnDate(h, day, logs);
-              });
+              const dueHabits = getDueHabitsForDate(activeHabits, day, logs);
               const completedHabits = dueHabits.filter((h) => {
                 const l = logs[`${h.id}_${dKey}`];
                 return l?.status === 'COMPLETED' || l?.status === 'EXCUSED';

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Habit, HabitLog } from '../../types/habit';
@@ -159,6 +159,12 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
     ? streakInfo.unlockedChallenges
     : (habit.stats?.unlockedChallenges || []);
 
+  const unlockedBadgesCount = useMemo(() => {
+    return STREAK_CHALLENGES.filter(
+      (challenge) => bestStreak >= challenge.days || unlockedBadges.includes(challenge.days)
+    ).length;
+  }, [bestStreak, unlockedBadges]);
+
   const timesCompletedThisWeek = habitLogs.filter((l) => l.status === 'COMPLETED' && l.date && isDateInThisWeek(l.date)).length;
   const timesCompletedThisMonth = habitLogs.filter((l) => l.status === 'COMPLETED' && l.date && isDateInThisMonth(l.date)).length;
   const timesCompletedAllTime = completedLogs.length || habit.stats?.timesCompletedAllTime || 0;
@@ -236,7 +242,7 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
                 onClick={handleRequestEdit}
                 className="gap-1 text-xs py-1.5 px-2.5 h-8"
               >
-                <Edit2 size={13} /> <span className="hidden xs:inline">Edit</span>
+                <Edit2 size={13} /> <span className="hidden sm:inline">Edit</span>
               </Button>
             )}
             <Button
@@ -245,7 +251,7 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
               onClick={handleRequestDelete}
               className="gap-1 text-xs py-1.5 px-2.5 h-8"
             >
-              <Trash2 size={13} /> <span className="hidden xs:inline">Delete</span>
+              <Trash2 size={13} /> <span className="hidden sm:inline">Delete</span>
             </Button>
           </div>
         </div>
@@ -419,7 +425,7 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
               Streak Challenge Badges (10 Milestones)
             </h4>
             <span className="text-xs text-primary font-semibold flex items-center gap-1">
-              <Sparkles size={13} /> {unlockedBadges.length} / 10 Unlocked
+              <Sparkles size={13} /> {unlockedBadgesCount} / {STREAK_CHALLENGES.length} Unlocked
             </span>
           </div>
 
@@ -548,6 +554,7 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
                   )}
                   {isExcused && <span className="text-[8px] leading-none">🛡️</span>}
                   {isMissed && <span className="text-[8px] leading-none">!</span>}
+                  {isSkipped && <span className="text-[8px] leading-none">⏭️</span>}
                 </div>
               );
             })}
@@ -564,6 +571,9 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" /> Missed
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-rose-400 shrink-0" /> Skipped
               </span>
             </div>
             <span className="text-stone">
@@ -598,6 +608,7 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
                   const isDone = log.status === 'COMPLETED';
                   const isExc = log.status === 'EXCUSED';
                   const isMis = log.status === 'MISSED' || log.status === 'FAILED';
+                  const isSkip = log.status === 'SKIPPED';
                   return (
                     <div
                       key={log.date}
@@ -620,6 +631,11 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
                         {isMis && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
                             ⚠️ Missed
+                          </span>
+                        )}
+                        {isSkip && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                            ⏭️ Skipped
                           </span>
                         )}
                       </div>
@@ -655,6 +671,7 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
                       const isDone = log.status === 'COMPLETED';
                       const isExc = log.status === 'EXCUSED';
                       const isMis = log.status === 'MISSED' || log.status === 'FAILED';
+                      const isSkip = log.status === 'SKIPPED';
                       return (
                         <tr key={log.date} className="hover:bg-surface-bone/40 transition-colors">
                           <td className="py-2.5 px-3.5 font-mono font-bold text-ink whitespace-nowrap">
@@ -674,6 +691,11 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
                             {isMis && (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 whitespace-nowrap">
                                 ⚠️ Missed
+                              </span>
+                            )}
+                            {isSkip && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200 whitespace-nowrap">
+                                ⏭️ Skipped
                               </span>
                             )}
                           </td>

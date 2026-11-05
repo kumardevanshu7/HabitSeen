@@ -133,11 +133,13 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         </button>
       </nav>
 
-      {/* Profile Modal Fallback */}
-      <ProfileModal
-        isOpen={isProfileModalOpen}
-        onClose={() => setIsProfileModalOpen(false)}
-      />
+      {/* Profile Modal Fallback (Only when no parent onOpenProfile handler is provided) */}
+      {!onOpenProfile && (
+        <ProfileModal
+          isOpen={isProfileModalOpen}
+          onClose={() => setIsProfileModalOpen(false)}
+        />
+      )}
     </>
   );
 };

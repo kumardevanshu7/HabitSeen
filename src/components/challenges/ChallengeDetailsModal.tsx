@@ -4,7 +4,8 @@ import { Button } from '../ui/Button';
 import { Challenge } from '../../types/habit';
 import { CATEGORY_ICONS } from '../../constants/iconsAndColors';
 import { boostVibrancy, getContrastIconColor } from '../../utils/colorUtils';
-import { getChallengeReward } from '../../constants/gamification';
+import { getChallengeReward, GAME_RULES } from '../../constants/gamification';
+import { safeFormat } from '../../utils/challengeState';
 import {
   Flame,
   Trophy,
@@ -58,8 +59,12 @@ export const ChallengeDetailsModal: React.FC<ChallengeDetailsModalProps> = ({
   let bestStreak = 0;
   let running = 0;
 
+  const parsedStartDate = challenge.startDate && isValid(parseISO(challenge.startDate))
+    ? parseISO(challenge.startDate)
+    : new Date();
+
   const challengeDays = Array.from({ length: targetDays }).map((_, i) => {
-    const d = addDays(parseISO(challenge.startDate), i);
+    const d = addDays(parsedStartDate, i);
     const key = format(d, 'yyyy-MM-dd');
     const log = dayLogs[key];
     if (log?.status === 'COMPLETED') {
@@ -279,13 +284,13 @@ export const ChallengeDetailsModal: React.FC<ChallengeDetailsModalProps> = ({
               <span>
                 Start:{' '}
                 <strong className="text-ink font-mono font-bold">
-                  {format(parseISO(challenge.startDate), 'dd MMM yyyy')}
+                  {safeFormat(challenge.startDate, 'dd MMM yyyy')}
                 </strong>
               </span>
               <span>
                 Target End:{' '}
                 <strong className="text-ink font-mono font-bold">
-                  {format(parseISO(challenge.endDate), 'dd MMM yyyy')}
+                  {safeFormat(challenge.endDate, 'dd MMM yyyy')}
                 </strong>
               </span>
             </div>
@@ -301,7 +306,7 @@ export const ChallengeDetailsModal: React.FC<ChallengeDetailsModalProps> = ({
               <span>
                 {failedCount === 0
                   ? '🔥 Unbroken Zero-Excuse Record!'
-                  : `⚠️ ${failedCount} day(s) penalized (-90% HP each)`}
+                  : `⚠️ ${failedCount} day(s) penalized (-${GAME_RULES.CHALLENGE_FAIL_HEALTH_DEDUCTION_PCT}% HP each)`}
               </span>
             </div>
           </div>
@@ -353,9 +358,9 @@ export const ChallengeDetailsModal: React.FC<ChallengeDetailsModalProps> = ({
                   </span>
                   <span className="text-[10px] mt-0.5">
                     {isDone
-                      ? '✓ +50 XP'
+                      ? `✓ +${GAME_RULES.CHALLENGE_DAILY_XP} XP`
                       : isFailed
-                      ? '✕ -90% ❤️'
+                      ? `✕ -${GAME_RULES.CHALLENGE_FAIL_HEALTH_DEDUCTION_PCT}% ❤️`
                       : isToday
                       ? '● Today'
                       : '○ Pending'}
@@ -372,7 +377,7 @@ export const ChallengeDetailsModal: React.FC<ChallengeDetailsModalProps> = ({
           <div>
             <strong className="block">Active Hardcore Rules Contract:</strong>
             <span>
-              1. Mandatory daily completion • 2. Missing even 1 task deducts 90% of your
+              1. Mandatory daily completion • 2. Missing even 1 task deducts {GAME_RULES.CHALLENGE_FAIL_HEALTH_DEDUCTION_PCT}% of your
               Health (Hearts) • 3. Zero excuses or reasons accepted.
             </span>
           </div>

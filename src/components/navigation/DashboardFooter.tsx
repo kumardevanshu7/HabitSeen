@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
-import { computeUserAchievements, ACHIEVEMENTS } from '../../constants/achievements';
+import { computeUserAchievements, ACHIEVEMENTS, CATEGORY_LABELS, AchievementCategory } from '../../constants/achievements';
 import { APP_CONFIG } from '../../constants/appConfig';
 import { BrandLegalTab } from '../brand/BrandLegalModal';
 import {
@@ -98,27 +98,18 @@ export const DashboardFooter: React.FC<DashboardFooterProps> = ({
             {/* Category Quick Badges */}
             <div className="flex flex-wrap items-center gap-2 mt-4 text-[11px] text-charcoal">
               <span className="font-bold text-ink">Parameters Tracked:</span>
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-card border border-hairline">
-                <Flame size={12} className="text-orange-500" /> Streaks ({categoryCounts['STREAKS'] || 15})
-              </span>
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-card border border-hairline">
-                <Award size={12} className="text-blue-500" /> Completions ({categoryCounts['COMPLETIONS'] || 15})
-              </span>
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-card border border-hairline">
-                <Zap size={12} className="text-amber-500" /> Willpower XP ({categoryCounts['WILLPOWER_XP'] || 15})
-              </span>
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-card border border-hairline">
-                <Heart size={12} className="text-red-500" /> Vitality &amp; Lives ({categoryCounts['VITALITY'] || 10})
-              </span>
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-card border border-hairline">
-                <ShieldAlert size={12} className="text-purple-500" /> Habit Breaks ({categoryCounts['HABIT_BREAKS'] || 10})
-              </span>
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-card border border-hairline">
-                <Sparkles size={12} className="text-emerald-500" /> Levels &amp; Perfect Days ({(categoryCounts['LEVELS'] || 10) + (categoryCounts['PERFECT_DAYS'] || 10)})
-              </span>
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-card border border-hairline">
-                <CheckCircle2 size={12} className="text-teal-500" /> Architecture &amp; Custom ({(categoryCounts['HABIT_CREATION'] || 10) + (categoryCounts['CUSTOMIZATION'] || 5)})
-              </span>
+              {(Object.keys(CATEGORY_LABELS) as AchievementCategory[]).map((catKey) => {
+                const info = CATEGORY_LABELS[catKey];
+                const count = categoryCounts[catKey] || 0;
+                return (
+                  <span
+                    key={catKey}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-card border border-hairline"
+                  >
+                    <span className="font-semibold text-ink">{info.title}</span> ({count})
+                  </span>
+                );
+              })}
             </div>
           </div>
         </div>

@@ -624,14 +624,19 @@ export const useAppStore = create<AppState>()((set, get) => ({
     const isPastDate = dateKey < todayKey;
     const isFutureDate = dateKey > todayKey;
 
+    const isJustTracking = habit.frequency?.type === 'JUST_TRACKING';
+
     // 1. Strict Future Gate: Future dates cannot be logged or completed
     if (isFutureDate) {
       console.warn('Cannot log habits on future dates:', dateKey);
       return;
     }
 
-    // 2. Past dates: Pending past dates CAN be completed or logged.
-    // However, once a task is marked COMPLETED on any date, it cannot be unchecked/reversed without allowUnlock: true.
+    // 2. Strict Past Gate: Standard habits lock at midnight. Only JUST_TRACKING allows retroactive logging.
+    if (isPastDate && !isJustTracking) {
+      console.warn('Past dates are locked permanently at midnight for standard habits:', dateKey);
+      return;
+    }
 
     // 3. Safeguard: Once a "Just Tracking" habit is completed for this day, it is locked permanently
     if (
@@ -1192,7 +1197,10 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
   addChallenge: async (data) => {
     const { currentUser } = get();
-    const startDate = data.startDate || getTodayKey();
+    const todayKey = getTodayKey();
+    const requestedStartDate = data.startDate || todayKey;
+    // Defense-in-depth: clamp past start date to today to prevent immediate mass penalties
+    const startDate = requestedStartDate < todayKey ? todayKey : requestedStartDate;
     const daysCount = Math.max(1, Number(data.targetDays) || 7);
     const endDate = format(addDays(parseISO(startDate), daysCount - 1), 'yyyy-MM-dd');
 
@@ -1738,16 +1746,25 @@ export const useAppStore = create<AppState>()((set, get) => ({
     if (!currentUser || !user) return;
     const normalizedAnswer = answer.trim().toLowerCase();
     const { hash, salt } = await hashSecurityAnswer(normalizedAnswer);
-    const updatedUser: UserProfile = {
-      ...user,
+    await saveUserProfileToDb(currentUser.uid, {
       security: {
         question: question.trim(),
         answerHash: hash,
         salt,
       },
-    };
-    await saveUserProfileToDb(currentUser.uid, updatedUser);
-    set({ user: updatedUser });
+    });
+    set((state) => ({
+      user: state.user
+        ? {
+            ...state.user,
+            security: {
+              question: question.trim(),
+              answerHash: hash,
+              salt,
+            },
+          }
+        : null,
+    }));
   },
 
   softResetAccount: async () => {

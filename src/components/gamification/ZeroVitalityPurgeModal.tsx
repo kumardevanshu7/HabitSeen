@@ -172,7 +172,7 @@ export const ZeroVitalityPurgeModal: React.FC = () => {
             type="button"
             onClick={handleSoftReset}
             disabled={isProcessing}
-            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-bold text-sm h-12 px-6 rounded-full shadow-lg transition-all active:scale-98 disabled:opacity-50 cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-bold text-sm h-12 px-6 rounded-full shadow-lg transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
           >
             {isProcessing ? (
               <>

@@ -5,7 +5,7 @@ import { Input } from '../ui/Input';
 import { useAppStore } from '../../stores/useAppStore';
 import { ShieldCheck, ShieldAlert, Lock, AlertTriangle, KeyRound, Info } from 'lucide-react';
 import clsx from 'clsx';
-import { verifySecurityAnswer, hashSecurityAnswer, hasSecurityGuard } from '../../utils/cryptoUtils';
+import { verifySecurityAnswer, hashSecurityAnswer, hasSecurityGuard, normalizeSecurityAnswer } from '../../utils/cryptoUtils';
 import { saveUserProfileToDb } from '../../services/firestoreService';
 
 interface SecurityModalProps {
@@ -31,12 +31,14 @@ export const SecurityModal: React.FC<SecurityModalProps> = ({
 }) => {
   const { user, currentUser } = useAppStore();
   const [answer, setAnswer] = useState('');
+  const [typedConfirm, setTypedConfirm] = useState('');
   const [error, setError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       setAnswer('');
+      setTypedConfirm('');
       setError('');
       setIsVerifying(false);
     }
@@ -52,20 +54,11 @@ export const SecurityModal: React.FC<SecurityModalProps> = ({
     setError('');
 
     if (!hasSecurityQuestion) {
-      setIsVerifying(true);
-      try {
-        await onSuccess();
-        onClose();
-      } catch (err: any) {
-        console.error('Action failed:', err);
-        setError(err?.message || 'Action failed');
-      } finally {
-        setIsVerifying(false);
-      }
+      await handleProceedWithoutGuard();
       return;
     }
 
-    const trimmedInput = answer.trim().toLowerCase();
+    const trimmedInput = answer.trim();
     if (!trimmedInput) {
       setError('Please enter your security answer');
       return;
@@ -79,12 +72,12 @@ export const SecurityModal: React.FC<SecurityModalProps> = ({
         isMatch = await verifySecurityAnswer(trimmedInput, security.answerHash, security.salt);
       } else if (security?.answer) {
         // Legacy plain text verification + auto migration to PBKDF2 hash
-        isMatch = trimmedInput === security.answer.trim().toLowerCase();
-        if (isMatch && currentUser && user) {
+        isMatch = normalizeSecurityAnswer(trimmedInput) === normalizeSecurityAnswer(security.answer);
+        if (isMatch && currentUser) {
           try {
             const { hash, salt } = await hashSecurityAnswer(trimmedInput);
+            // Partial merge update protects user gamification / streak stats from overwrite
             await saveUserProfileToDb(currentUser.uid, {
-              ...user,
               security: {
                 question: security.question,
                 answerHash: hash,
@@ -114,6 +107,11 @@ export const SecurityModal: React.FC<SecurityModalProps> = ({
   };
 
   const handleProceedWithoutGuard = async () => {
+    if (isDanger && typedConfirm.trim().toUpperCase() !== 'CONFIRM') {
+      setError('Please type "CONFIRM" in the box below to authorize this destructive action.');
+      return;
+    }
+
     setIsVerifying(true);
     setError('');
     try {
@@ -135,6 +133,7 @@ export const SecurityModal: React.FC<SecurityModalProps> = ({
       subtitle="Accidental-Action Guard: Protects your account against unintended actions"
       maxWidth="md"
       zIndex={zIndex}
+      isBusy={isVerifying}
     >
       <form onSubmit={handleVerify} className="space-y-4 pt-1">
         {/* ACTION SUMMARY BADGE */}
@@ -239,6 +238,24 @@ export const SecurityModal: React.FC<SecurityModalProps> = ({
               </p>
             </div>
 
+            {isDanger && (
+              <div className="p-3 bg-red-50/80 border border-red-200 rounded-xl space-y-2">
+                <span className="text-xs font-bold text-red-950 block">
+                  Destructive Confirmation Required:
+                </span>
+                <Input
+                  label='Type "CONFIRM" to proceed with this action'
+                  placeholder="CONFIRM"
+                  value={typedConfirm}
+                  onChange={(e) => {
+                    setTypedConfirm(e.target.value);
+                    if (error) setError('');
+                  }}
+                  required
+                />
+              </div>
+            )}
+
             {error && (
               <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2 animate-in fade-in">
                 <ShieldAlert size={15} className="shrink-0" />
@@ -269,7 +286,7 @@ export const SecurityModal: React.FC<SecurityModalProps> = ({
                 type="button"
                 variant={isDanger ? 'danger' : 'primary'}
                 size="md"
-                disabled={isVerifying}
+                disabled={isVerifying || (isDanger && typedConfirm.trim().toUpperCase() !== 'CONFIRM')}
                 onClick={handleProceedWithoutGuard}
               >
                 {isVerifying ? 'Processing...' : 'Proceed Without Guard'}

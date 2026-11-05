@@ -33,6 +33,35 @@ export function calculateDaysBetween(startDateStr?: string, endDateStr?: string)
   }
 }
 
+/**
+ * Evaluates whether a habit is permanently archived or past its scheduled end date
+ */
+export function isHabitArchived(habit: Habit, targetDateKey?: string): boolean {
+  if (habit.isArchived) return true;
+  if (targetDateKey && habit.schedule?.endDate && targetDateKey > habit.schedule.endDate) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Returns all active, non-archived habits scheduled/due on a given date.
+ * Excludes JUST_TRACKING habits (which are flexible and never count toward mandatory perfect days or streak penalties).
+ */
+export function getDueHabitsForDate(
+  habits: Habit[],
+  targetDate: Date,
+  allLogs?: Record<string, HabitLog>
+): Habit[] {
+  const targetKey = format(targetDate, 'yyyy-MM-dd');
+  return habits.filter(
+    (h) =>
+      !isHabitArchived(h, targetKey) &&
+      h.frequency?.type !== 'JUST_TRACKING' &&
+      isHabitDueOnDate(h, targetDate, allLogs)
+  );
+}
+
 export function isHabitDueOnDate(
   habit: Habit,
   targetDate: Date,

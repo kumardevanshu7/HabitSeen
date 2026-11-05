@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   STARTING_POINT_CONFIG,
   getDaysSinceStartingPoint,
-  getDailyAnimeQuote,
+  getDailyAnimeQuoteIndex,
   ANIME_CONSISTENCY_QUOTES,
 } from '../../constants/startingPoint';
 import { Compass, Flame, Sparkles, ChevronDown, ChevronUp, Quote } from 'lucide-react';
@@ -10,11 +10,7 @@ import clsx from 'clsx';
 
 export const StartingPointBanner: React.FC = () => {
   const [isExpanded, setIsExpanded] = useState(true);
-  const [quoteIndex, setQuoteIndex] = useState(() => {
-    const daily = getDailyAnimeQuote();
-    const idx = ANIME_CONSISTENCY_QUOTES.findIndex((q) => q.author === daily.author);
-    return idx >= 0 ? idx : 0;
-  });
+  const [quoteIndex, setQuoteIndex] = useState(() => getDailyAnimeQuoteIndex());
 
   const daysCount = getDaysSinceStartingPoint();
   const currentQuote = ANIME_CONSISTENCY_QUOTES[quoteIndex] || ANIME_CONSISTENCY_QUOTES[0];
@@ -57,7 +53,7 @@ export const StartingPointBanner: React.FC = () => {
             title="Next inspiring anime quote"
           >
             <Sparkles size={11} />
-            <span className="hidden xs:inline">Inspire</span>
+            <span className="hidden sm:inline">Inspire</span>
           </button>
           <button
             type="button"

@@ -6,6 +6,8 @@ import { Plus, Award, LogOut, Heart, Zap, Flame, CheckSquare, Clock, BarChart2, 
 import clsx from 'clsx';
 import { PointsSystemModal } from './PointsSystemModal';
 import { ProfileModal } from '../profile/ProfileModal';
+import { GAME_RULES } from '../../constants/gamification';
+import { isChallengeActive } from '../../utils/challengeState';
 
 interface NavbarProps {
   activeTab: 'habits' | 'challenges' | 'tracking' | 'breaks' | 'analytics';
@@ -41,8 +43,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   const hearts = user?.gamification?.hearts ?? 5;
   const maxHearts = user?.gamification?.maxHearts ?? 5;
   const totalXp = user?.gamification?.totalXp ?? 0;
-  const levelTitle = user?.gamification?.levelTitle ?? 'Discipline Initiate';
-  const activeChallengesCount = challenges.filter((c) => c.status === 'ACTIVE').length;
+  const levelTitle = user?.gamification?.levelTitle ?? GAME_RULES.DEFAULT_LEVEL_TITLE;
+  const activeChallengesCount = challenges.filter((c) => isChallengeActive(c)).length;
 
   return (
     <>
@@ -100,7 +102,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             {activeChallengesCount > 0 && (
               <span
                 className={clsx(
-                  'px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold',
+                  'px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold',
                   activeTab === 'challenges'
                     ? 'bg-white text-rose-600'
                     : 'bg-rose-100 text-rose-600'

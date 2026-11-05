@@ -30,6 +30,14 @@ import {
 } from 'lucide-react';
 import { addDays, format, parseISO, isValid, differenceInCalendarDays } from 'date-fns';
 import clsx from 'clsx';
+import {
+  isChallengeConquered,
+  isChallengeExpired,
+  isChallengeFinished,
+  isChallengeActive,
+  safeFormat,
+} from '../../utils/challengeState';
+import { GAME_RULES } from '../../constants/gamification';
 
 export const ChallengesView: React.FC = () => {
   const {
@@ -52,56 +60,14 @@ export const ChallengesView: React.FC = () => {
 
   const activeDateKey = getTodayKey();
 
-  // Helper: Evaluates whether a challenge is conquered (completedDays >= targetDays)
-  const isChallengeConquered = (c: Challenge) => {
-    if (c.status === 'COMPLETED') return true;
-    const targetDays = Math.max(1, c.targetDays || 7);
-    const dayLogs = c.dayLogs || {};
-    const completedDays = Object.values(dayLogs).filter(
-      (l) => l.status === 'COMPLETED'
-    ).length;
-    return completedDays >= targetDays;
-  };
-
-  // Helper: Evaluates whether a challenge has passed its end date without conquering
-  const isChallengeExpired = (c: Challenge) => {
-    if (isChallengeConquered(c)) return false;
-    const today = getTodayKey();
-    return Boolean(c.endDate && today > c.endDate);
-  };
-
-  const isChallengeFinished = (c: Challenge) => {
-    return c.isArchived || isChallengeConquered(c) || isChallengeExpired(c);
-  };
-
-  // Auto-sync: Conquer if target days achieved, Fail if endDate elapsed without target days
-  useEffect(() => {
-    for (const c of challenges) {
-      if (c.isArchived) continue;
-      if (c.status !== 'COMPLETED' && isChallengeConquered(c)) {
-        updateChallenge({
-          ...c,
-          status: 'COMPLETED',
-          completedAt: c.completedAt || new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
-      } else if (c.status !== 'FAILED' && c.status !== 'COMPLETED' && isChallengeExpired(c)) {
-        updateChallenge({
-          ...c,
-          status: 'FAILED',
-          updatedAt: new Date().toISOString(),
-        });
-      }
-    }
-  }, [challenges, updateChallenge]);
-
-  // Auto-enforce Rule 2 (-90% Health Deduction) on any past day (startDate <= d < today) left incomplete/PARTIAL
+  // 1. Auto-enforce Rule 2 (-90% Health Deduction) on any past elapsed day left uncompleted/PARTIAL
+  // Runs before marking an expired challenge FAILED so missed final days are always strictly penalized
   useEffect(() => {
     const today = getTodayKey();
     let penaltyEnforcedThisCycle = false;
 
     for (const c of challenges) {
-      if (c.status === 'COMPLETED' || c.status === 'FAILED' || isChallengeFinished(c)) continue;
+      if (c.status === 'COMPLETED') continue;
       const targetDays = Math.max(1, c.targetDays || 7);
       for (let idx = 0; idx < targetDays; idx++) {
         const dKey = format(addDays(parseISO(c.startDate), idx), 'yyyy-MM-dd');
@@ -132,7 +98,42 @@ export const ChallengesView: React.FC = () => {
     }
   }, [challenges, failChallengeDay]);
 
-  const activeChallenges = challenges.filter((c) => !isChallengeFinished(c));
+  // 2. Auto-sync: Conquer if target days achieved, Fail if endDate elapsed without target days
+  // (only transition to FAILED after all elapsed days have been logged or penalized)
+  useEffect(() => {
+    const today = getTodayKey();
+    for (const c of challenges) {
+      if (c.isArchived) continue;
+      if (c.status !== 'COMPLETED' && isChallengeConquered(c)) {
+        updateChallenge({
+          ...c,
+          status: 'COMPLETED',
+          completedAt: c.completedAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      } else if (c.status !== 'FAILED' && c.status !== 'COMPLETED' && isChallengeExpired(c, today)) {
+        // Confirm all elapsed days have a record before finalizing status
+        const targetDays = Math.max(1, c.targetDays || 7);
+        let hasUnloggedElapsedDay = false;
+        for (let idx = 0; idx < targetDays; idx++) {
+          const dKey = format(addDays(parseISO(c.startDate), idx), 'yyyy-MM-dd');
+          if (dKey < today && (!c.dayLogs?.[dKey] || c.dayLogs[dKey].status === 'PARTIAL')) {
+            hasUnloggedElapsedDay = true;
+            break;
+          }
+        }
+        if (!hasUnloggedElapsedDay) {
+          updateChallenge({
+            ...c,
+            status: 'FAILED',
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      }
+    }
+  }, [challenges, updateChallenge]);
+
+  const activeChallenges = challenges.filter((c) => isChallengeActive(c));
   const archivedChallenges = challenges.filter((c) => isChallengeFinished(c));
   const completedChallenges = challenges.filter((c) => isChallengeConquered(c));
 
@@ -299,7 +300,7 @@ export const ChallengesView: React.FC = () => {
             <span>Active Challenges</span>
             <span
               className={clsx(
-                'px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold',
+                'px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold',
                 challengesTab === 'active' ? 'bg-white/20 text-white' : 'bg-surface-bone text-charcoal'
               )}
             >
@@ -321,7 +322,7 @@ export const ChallengesView: React.FC = () => {
             <span>Archived Challenges</span>
             <span
               className={clsx(
-                'px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold',
+                'px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold',
                 challengesTab === 'archived' ? 'bg-white/20 text-white' : 'bg-surface-bone text-charcoal'
               )}
             >
@@ -443,12 +444,16 @@ export const ChallengesView: React.FC = () => {
               return { dayNum: idx + 1, dateKey: k, status: l?.status };
             });
 
+            const isConquered = isChallengeConquered(c);
+            const isExpiredOrFailed = !isConquered && (c.status === 'FAILED' || isChallengeExpired(c));
+            const isManuallyArchived = Boolean(c.isArchived) && !isConquered && !isExpiredOrFailed;
+
             return (
               <div
                 key={c.id}
                 className={clsx(
                   'bg-surface-card border-2 rounded-3xl p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between',
-                  (c.status === 'COMPLETED' || isFinished) && 'ring-2 ring-badge-success/40'
+                  isConquered && 'ring-2 ring-badge-success/40'
                 )}
                 style={{
                   borderColor: `${vibrantColor}45`,
@@ -457,46 +462,98 @@ export const ChallengesView: React.FC = () => {
                 }}
               >
                 <div className="space-y-4">
-                  {/* TOP HEADER */}
-                  <div className="flex items-start justify-between gap-2">
+                  {/* TOP HEADER: BADGES + ACTIONS ROW */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-mono text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-ink text-white whitespace-nowrap">
+                          {targetDays} Days
+                        </span>
+                        {isNotStartedYet ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 whitespace-nowrap flex items-center gap-1 shadow-2xs">
+                            <Lock size={10} className="text-amber-700" />
+                            <span>{daysUntilStart === 1 ? 'Starts Tomorrow' : `Starts in ${daysUntilStart}D`}</span>
+                          </span>
+                        ) : isConquered ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 whitespace-nowrap">
+                            🏆 Conquered
+                          </span>
+                        ) : isExpiredOrFailed ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-800 border border-red-300 whitespace-nowrap">
+                            ✕ Expired / Failed
+                          </span>
+                        ) : isManuallyArchived ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-stone/20 text-charcoal border border-hairline whitespace-nowrap">
+                            📦 Archived
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200 whitespace-nowrap">
+                            ⚠️ -90% Stake
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0 ml-auto">
+                        <button
+                          type="button"
+                          onClick={() => toggleArchiveChallenge(c.id)}
+                          className="p-1.5 text-charcoal hover:text-amber-500 hover:bg-surface-bone rounded-full transition-colors cursor-pointer"
+                          title={c.isArchived || isFinished ? 'Unarchive Challenge' : 'Move to Archive'}
+                        >
+                          {c.isArchived || isFinished ? (
+                            <ArchiveRestore size={16} />
+                          ) : (
+                            <Archive size={16} />
+                          )}
+                        </button>
+                        {!isFinished && (
+                          <button
+                            type="button"
+                            onClick={() => setEditingChallenge(c)}
+                            className="p-1.5 text-charcoal hover:text-primary hover:bg-surface-bone rounded-full transition-colors cursor-pointer"
+                            title="Edit Challenge & Rename Tasks"
+                          >
+                            <Pencil size={16} />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setInspectedChallenge(c)}
+                          className="p-1.5 text-charcoal hover:text-ink hover:bg-surface-bone rounded-full transition-colors"
+                          title="View Challenge Analytics"
+                        >
+                          <BarChart2 size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setChallengeToDelete(c)}
+                          className="p-1.5 text-stone hover:text-red-500 hover:bg-surface-bone rounded-full transition-colors"
+                          title="Delete Challenge"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* MAIN TITLE & DATES: ICON + FULL NAME (NO TRUNCATION) + DATES */}
                     <div
                       onClick={() => setInspectedChallenge(c)}
-                      className="flex items-center gap-3 cursor-pointer group min-w-0"
+                      className="flex items-start gap-3 cursor-pointer group min-w-0 pt-1"
                     >
                       <span
-                        className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-xs"
+                        className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-xs mt-0.5"
                         style={{ backgroundColor: vibrantColor, color: iconColor }}
                       >
                         <IconComp size={22} strokeWidth={2.5} />
                       </span>
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-mono text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-ink text-white whitespace-nowrap">
-                            {targetDays} Days
-                          </span>
-                          {isNotStartedYet ? (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 whitespace-nowrap flex items-center gap-1 shadow-2xs">
-                              <Lock size={10} className="text-amber-700" />
-                              <span>{daysUntilStart === 1 ? 'Starts Tomorrow' : `Starts in ${daysUntilStart}D`}</span>
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200 whitespace-nowrap">
-                              ⚠️ -90% Stake
-                            </span>
-                          )}
-                          {(c.status === 'COMPLETED' || isFinished) && (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 whitespace-nowrap">
-                              🏆 Completed
-                            </span>
-                          )}
-                        </div>
-                        <h3 className="font-display font-bold text-base sm:text-lg text-ink tracking-tight break-words group-hover:text-primary transition-colors mt-1">
+                        <h3 className="font-display font-bold text-base sm:text-lg text-ink tracking-tight break-words group-hover:text-primary transition-colors leading-snug">
                           {c.name}
                         </h3>
                         {c.startDate && (
-                          <div className="flex items-center gap-1.5 text-[11px] text-charcoal font-medium mt-0.5 whitespace-nowrap">
-                            <Calendar size={11} className="text-primary shrink-0" />
-                            <span className="truncate">
+                          <div className="flex items-center gap-1.5 text-[11px] text-charcoal font-medium mt-1">
+                            <Calendar size={12} className="text-primary shrink-0" />
+                            <span>
                               {isValid(parseISO(c.startDate))
                                 ? (c.endDate && isValid(parseISO(c.endDate)) && parseISO(c.startDate).getFullYear() === parseISO(c.endDate).getFullYear()
                                     ? `${format(parseISO(c.startDate), 'dd MMM')} – ${format(parseISO(c.endDate), 'dd MMM yyyy')}`
@@ -506,47 +563,6 @@ export const ChallengesView: React.FC = () => {
                           </div>
                         )}
                       </div>
-                    </div>
-
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => toggleArchiveChallenge(c.id)}
-                        className="p-1.5 text-charcoal hover:text-amber-500 hover:bg-surface-bone rounded-full transition-colors cursor-pointer"
-                        title={c.isArchived || isFinished ? 'Unarchive Challenge' : 'Move to Archive'}
-                      >
-                        {c.isArchived || isFinished ? (
-                          <ArchiveRestore size={16} />
-                        ) : (
-                          <Archive size={16} />
-                        )}
-                      </button>
-                      {!isFinished && (
-                        <button
-                          type="button"
-                          onClick={() => setEditingChallenge(c)}
-                          className="p-1.5 text-charcoal hover:text-primary hover:bg-surface-bone rounded-full transition-colors cursor-pointer"
-                          title="Edit Challenge & Rename Tasks"
-                        >
-                          <Pencil size={16} />
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setInspectedChallenge(c)}
-                        className="p-1.5 text-charcoal hover:text-ink hover:bg-surface-bone rounded-full transition-colors"
-                        title="View Challenge Analytics"
-                      >
-                        <BarChart2 size={16} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setChallengeToDelete(c)}
-                        className="p-1.5 text-stone hover:text-red-500 hover:bg-surface-bone rounded-full transition-colors"
-                        title="Delete Challenge"
-                      >
-                        <Trash2 size={16} />
-                      </button>
                     </div>
                   </div>
 
@@ -609,8 +625,10 @@ export const ChallengesView: React.FC = () => {
                         <span className="text-[11px] font-bold uppercase tracking-wider text-charcoal flex items-center gap-1.5">
                           {isNotStartedYet && <Lock size={11} className="text-amber-600" />}
                           <span>
-                            {isFinished
+                            {isConquered
                               ? `Mandatory Tasks (All Conquered • ${c.tasks.length}/${c.tasks.length}):`
+                              : isExpiredOrFailed || isFinished
+                              ? `Mandatory Tasks (${c.tasks.length} Configured • Challenge Concluded):`
                               : isNotStartedYet
                               ? `Mandatory Tasks (${c.tasks.length} Configured • Locked until Day 1):`
                               : `Mandatory Daily Tasks (${todayCompletedTaskIds.length}/${c.tasks.length}):`}
@@ -630,7 +648,7 @@ export const ChallengesView: React.FC = () => {
                       {c.tasks.map((task) => {
                         const isChecked =
                           !isNotStartedYet &&
-                          (isFinished || isTodayCompleted || todayCompletedTaskIds.includes(task.id));
+                          (isTodayCompleted || todayCompletedTaskIds.includes(task.id));
                         return (
                           <div
                             key={task.id}
@@ -643,15 +661,17 @@ export const ChallengesView: React.FC = () => {
                               'flex items-center justify-between p-2.5 rounded-xl border text-xs transition-all select-none',
                               isNotStartedYet
                                 ? 'bg-surface-bone/50 border-hairline/80 text-charcoal/80 cursor-not-allowed opacity-90'
-                                : isChecked || isFinished
+                                : isChecked
                                 ? 'bg-emerald-50/70 border-emerald-300 text-charcoal cursor-default'
+                                : isFinished
+                                ? 'bg-surface-bone/50 border-hairline/80 text-charcoal/70 cursor-default'
                                 : 'bg-surface-bone/70 border-hairline text-ink hover:bg-stone/20 cursor-pointer'
                             )}
                             title={
                               isNotStartedYet
                                 ? `Challenge starts ${daysUntilStart === 1 ? 'tomorrow' : `in ${daysUntilStart} days`} (${format(parseISO(c.startDate), 'dd MMM')}). Tasks will unlock on Day 1.`
                                 : isFinished
-                                ? 'Challenge Completed & Archived (Read Only)'
+                                ? 'Challenge Concluded (Read Only)'
                                 : isChecked
                                 ? 'Task completed'
                                 : 'Click to complete task'
@@ -677,7 +697,7 @@ export const ChallengesView: React.FC = () => {
                               <span
                                 className={clsx(
                                   'font-medium truncate',
-                                  !isNotStartedYet && (isChecked || isFinished) && 'line-through text-charcoal/70'
+                                  !isNotStartedYet && isChecked && 'line-through text-charcoal/70'
                                 )}
                               >
                                 {task.text}
@@ -767,8 +787,8 @@ export const ChallengesView: React.FC = () => {
                         <Lock size={15} className="text-amber-600 shrink-0" />
                         <span className="truncate">
                           {daysUntilStart === 1
-                            ? 'Starts Tomorrow (28 Oct) • Tasks Locked for Today'
-                            : `Starts in ${daysUntilStart} Days (${format(parseISO(c.startDate), 'dd MMM yyyy')}) • Locked`}
+                            ? `Starts Tomorrow (${safeFormat(c.startDate, 'dd MMM')}) • Tasks Locked for Today`
+                            : `Starts in ${daysUntilStart} Days (${safeFormat(c.startDate, 'dd MMM yyyy')}) • Locked`}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
@@ -808,15 +828,21 @@ export const ChallengesView: React.FC = () => {
                       {/* COMPLETE TODAY BUTTON */}
                       <button
                         type="button"
-                        onClick={() =>
-                          logChallengeDay(c.id, activeDateKey, undefined, true)
-                        }
+                        onClick={async () => {
+                          if (hasSubTasks && todayCompletedTaskIds.length < c.tasks.length) {
+                            const confirmed = window.confirm(
+                              `All ${c.tasks.length} tasks are mandatory. Check off all remaining tasks and complete today?`
+                            );
+                            if (!confirmed) return;
+                          }
+                          await logChallengeDay(c.id, activeDateKey, undefined, true);
+                        }}
                         className="px-3.5 sm:px-4 py-2 rounded-full bg-badge-success hover:bg-emerald-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer whitespace-nowrap flex-1 min-w-0"
                       >
                         <Check size={15} className="stroke-[3] shrink-0" />
                         <span className="truncate">Complete Day</span>
                         <span className="hidden sm:inline-flex items-center text-[10px] font-mono font-black px-1.5 py-0.5 rounded-full bg-white/20 text-white shrink-0">
-                          +50 XP
+                          +{GAME_RULES.CHALLENGE_DAILY_XP} XP
                         </span>
                       </button>
                     </>

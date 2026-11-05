@@ -3,6 +3,7 @@ import { useAppStore } from '../../stores/useAppStore';
 import { WILL_HABIT_TIERS, CATEGORY_ICONS } from '../../constants/iconsAndColors';
 import { levelFromXp, GAME_RULES } from '../../constants/gamification';
 import { boostVibrancy, getContrastIconColor } from '../../utils/colorUtils';
+import { isChallengeActive } from '../../utils/challengeState';
 import {
   Award,
   Flame,
@@ -72,7 +73,7 @@ export const OverallAnalyticsView: React.FC<OverallAnalyticsViewProps> = ({
   const allLogsArray = Object.values(logs);
   const totalCompletedLogs = allLogsArray.filter((l) => l.status === 'COMPLETED').length;
   const bestOverallStreak = habits.reduce(
-    (max, h) => Math.max(max, h.stats.bestStreak),
+    (max, h) => Math.max(max, h.stats?.bestStreak ?? 0),
     0
   );
 
@@ -190,16 +191,22 @@ export const OverallAnalyticsView: React.FC<OverallAnalyticsViewProps> = ({
   const past30dPerfectDays = perfectDaysList.filter((k) => k >= thirtyDaysAgoKey).length;
   const perfectDaysXpGenerated = totalPerfectDays * GAME_RULES.PERFECT_DAY_XP_BONUS;
 
-  // 3. Habit Streak Health Quadrants
-  const activeHabitsList = habits.filter((h) => !h.isArchived);
-  const masteryHabitsCount = activeHabitsList.filter((h) => h.stats.currentStreak >= 30).length;
-  const momentumHabitsCount = activeHabitsList.filter(
-    (h) => h.stats.currentStreak >= 7 && h.stats.currentStreak < 30
+  // 3. Habit Streak Health Quadrants (Strictly for scheduled streak habits, excludes Just Tracking)
+  const streakHabitsList = habits.filter(
+    (h) => !h.isArchived && h.frequency?.type !== 'JUST_TRACKING'
+  );
+  const masteryHabitsCount = streakHabitsList.filter(
+    (h) => (h.stats?.currentStreak ?? 0) >= 30
   ).length;
-  const formingHabitsCount = activeHabitsList.filter(
-    (h) => h.stats.currentStreak >= 1 && h.stats.currentStreak < 7
+  const momentumHabitsCount = streakHabitsList.filter(
+    (h) => (h.stats?.currentStreak ?? 0) >= 7 && (h.stats?.currentStreak ?? 0) < 30
   ).length;
-  const atRiskHabitsCount = activeHabitsList.filter((h) => h.stats.currentStreak === 0).length;
+  const formingHabitsCount = streakHabitsList.filter(
+    (h) => (h.stats?.currentStreak ?? 0) >= 1 && (h.stats?.currentStreak ?? 0) < 7
+  ).length;
+  const atRiskHabitsCount = streakHabitsList.filter(
+    (h) => (h.stats?.currentStreak ?? 0) === 0
+  ).length;
   const excusedShieldCount = allLogsArray.filter((l) => l.status === 'EXCUSED').length;
 
   // 4. Focus Hours & Sobriety Ledger
@@ -477,7 +484,7 @@ export const OverallAnalyticsView: React.FC<OverallAnalyticsViewProps> = ({
               {challenges.filter((c) => c.status === 'COMPLETED').length} Conquered
             </span>
             <span className="px-2.5 py-1 rounded-full bg-rose-50 text-rose-600 border border-rose-200 shrink-0 whitespace-nowrap">
-              {challenges.filter((c) => c.status === 'ACTIVE').length} Active
+              {challenges.filter((c) => isChallengeActive(c)).length} Active
             </span>
           </div>
         </div>
@@ -866,7 +873,7 @@ export const OverallAnalyticsView: React.FC<OverallAnalyticsViewProps> = ({
                   <span
                     className={clsx(
                       'text-[10px] font-bold uppercase tracking-wider',
-                      isCurrent ? 'text-primary-pink' : 'text-stone'
+                      isCurrent ? 'text-primary' : 'text-stone'
                     )}
                   >
                     {w.label}
@@ -929,7 +936,7 @@ export const OverallAnalyticsView: React.FC<OverallAnalyticsViewProps> = ({
               <ShieldCheck size={17} className="text-primary" /> Habit Longevity Quadrant
             </h4>
             <span className="text-[10px] font-bold text-stone">
-              {activeHabitsList.length} Active Habits
+              {streakHabitsList.length} Active Habits
             </span>
           </div>
           <p className="text-xs text-charcoal mb-4">

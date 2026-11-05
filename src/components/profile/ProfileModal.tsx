@@ -20,8 +20,8 @@ import {
   Skull,
 } from 'lucide-react';
 import { SecurityModal } from '../security/SecurityModal';
-import { getNextHeartsUpgrade } from '../../constants/gamification';
-import { verifySecurityAnswer } from '../../utils/cryptoUtils';
+import { getNextHeartsUpgrade, GAME_RULES } from '../../constants/gamification';
+import { verifySecurityAnswer, normalizeSecurityAnswer } from '../../utils/cryptoUtils';
 import clsx from 'clsx';
 
 import { Trophy, ChevronRight } from 'lucide-react';
@@ -86,16 +86,17 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         return;
       }
       let isValid = false;
+      const normalizedPreviousInput = normalizeSecurityAnswer(previousAnswerInput);
       if (user.security.answerHash && user.security.salt) {
         isValid = await verifySecurityAnswer(
-          previousAnswerInput.trim(),
+          normalizedPreviousInput,
           user.security.answerHash,
           user.security.salt
         );
       } else if (user.security.answer) {
         isValid =
-          previousAnswerInput.trim().toLowerCase() ===
-          user.security.answer.trim().toLowerCase();
+          normalizedPreviousInput ===
+          normalizeSecurityAnswer(user.security.answer);
       }
 
       if (!isValid) {
@@ -123,7 +124,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
     setIsSavingSecurity(true);
     try {
-      await setSecurityQuestion(finalQuestion, answerInput.trim());
+      await setSecurityQuestion(finalQuestion, normalizeSecurityAnswer(answerInput));
       setSecuritySuccessMsg('Security question & password updated successfully!');
       setIsEditingSecurity(false);
       setPreviousAnswerInput('');
@@ -146,7 +147,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const maxHearts = user.gamification?.maxHearts ?? 5;
   const totalXp = user.gamification?.totalXp ?? 0;
   const heartsUpgrade = getNextHeartsUpgrade(totalXp);
-  const levelTitle = user.gamification?.levelTitle ?? 'Discipline Initiate';
+  const levelTitle = user.gamification?.levelTitle ?? GAME_RULES.DEFAULT_LEVEL_TITLE;
   const existingSecurity = user.security;
 
   return (

@@ -81,9 +81,16 @@ export function getDaysSinceStartingPoint(targetDateStr = STARTING_POINT_CONFIG.
 }
 
 /**
- * Returns quote of the day or random quote
+ * Returns index for the quote of the day
+ */
+export function getDailyAnimeQuoteIndex(): number {
+  return Math.floor(Date.now() / (1000 * 60 * 60 * 24)) % ANIME_CONSISTENCY_QUOTES.length;
+}
+
+/**
+ * Returns quote of the day
  */
 export function getDailyAnimeQuote(): AnimeQuote {
-  const dayIndex = Math.floor(Date.now() / (1000 * 60 * 60 * 24)) % ANIME_CONSISTENCY_QUOTES.length;
+  const dayIndex = getDailyAnimeQuoteIndex();
   return ANIME_CONSISTENCY_QUOTES[dayIndex] || ANIME_CONSISTENCY_QUOTES[0];
 }

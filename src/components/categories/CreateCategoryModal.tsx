@@ -192,7 +192,7 @@ export const CreateCategoryModal: React.FC<CreateCategoryModalProps> = ({
                     'h-11 w-full rounded-xl border border-hairline/80 flex items-center justify-center transition-all cursor-pointer shadow-2xs',
                     isSelected
                       ? 'ring-3 ring-ink ring-offset-2 scale-105 shadow-md z-10'
-                      : 'hover:opacity-90 hover:scale-102'
+                      : 'hover:opacity-90 hover:scale-105'
                   )}
                   style={{ backgroundColor: col.hex }}
                 >

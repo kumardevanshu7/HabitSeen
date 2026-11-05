@@ -43,6 +43,7 @@ export const HabitBreakHub: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [relapseModalBreakId, setRelapseModalBreakId] = useState<string | null>(null);
   const [relapseReason, setRelapseReason] = useState('');
+  const [relapseError, setRelapseError] = useState('');
   const [viewingHistoryBreakId, setViewingHistoryBreakId] = useState<string | null>(null);
   const [breakToDelete, setBreakToDelete] = useState<HabitBreak | null>(null);
   const [isRelapsing, setIsRelapsing] = useState(false);
@@ -91,11 +92,13 @@ export const HabitBreakHub: React.FC = () => {
       setCustomStartTime(format(now, 'HH:mm'));
       setStartMode('now');
       setVisualMode('template');
+      setCategoryId(categories[0]?.id || 'cat-others');
+      setError('');
       if (templateList.length > 0 && !selectedTemplate) {
         setSelectedTemplate(templateList[0].id);
       }
     }
-  }, [isAddModalOpen]);
+  }, [isAddModalOpen, categories]);
 
   // Global ticker for live elapsed timers (updates every 1s)
   const [, setTick] = useState(0);
@@ -175,12 +178,14 @@ export const HabitBreakHub: React.FC = () => {
   const handleConfirmRelapse = async () => {
     if (!relapseModalBreakId || isRelapsing) return;
     setIsRelapsing(true);
+    setRelapseError('');
     try {
       await relapseHabitBreak(relapseModalBreakId, relapseReason.trim());
       setRelapseReason('');
       setRelapseModalBreakId(null);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to log relapse:', err);
+      setRelapseError(err?.message || 'Failed to record relapse. Please try again.');
     } finally {
       setIsRelapsing(false);
     }
@@ -446,6 +451,7 @@ export const HabitBreakHub: React.FC = () => {
       <Modal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
+        isBusy={isSubmitting}
         title="Start Habit Break Timer"
         subtitle="Specify what you want to quit and launch your continuous abstinence chronometer"
         maxWidth="lg"
@@ -786,11 +792,17 @@ export const HabitBreakHub: React.FC = () => {
       <Modal
         isOpen={Boolean(relapseModalBreak)}
         onClose={() => setRelapseModalBreakId(null)}
+        isBusy={isRelapsing}
         title="Reset & Learn (Relapse Reflection)"
         subtitle="A slip is data, not defeat. Your past streak will be preserved in your Relapse Log."
         maxWidth="md"
       >
         <div className="space-y-4">
+          {relapseError && (
+            <div className="p-3 bg-red-100 border border-red-300 rounded-xl text-xs text-red-800 font-medium">
+              {relapseError}
+            </div>
+          )}
           <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-2.5 text-xs text-red-800">
             <AlertTriangle size={18} className="shrink-0 mt-0.5 text-red-600" />
             <p>

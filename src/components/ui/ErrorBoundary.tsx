@@ -42,7 +42,9 @@ export class ErrorBoundary extends Component<Props, State> {
               {this.props.fallbackTitle || 'Something went wrong rendering this view'}
             </h3>
             <p className="text-xs sm:text-sm text-charcoal mt-1 leading-relaxed">
-              {this.state.error?.message || 'An unexpected rendering error occurred. Please try reloading.'}
+              {import.meta.env.DEV && this.state.error?.message
+                ? this.state.error.message
+                : 'An unexpected error occurred while displaying this section. Please reload or try again.'}
             </p>
           </div>
           <div className="flex items-center justify-center gap-2 pt-2">
