@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Habit, HabitLog } from '../../types/habit';
@@ -99,7 +99,7 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
     switch (habit.type) {
       case 'TIMER': {
         const secs = log.valueTimerSeconds ?? 0;
-        const targetSecs = habit.config.timer?.targetSeconds ?? 0;
+        const targetSecs = habit.config?.timer?.targetSeconds ?? 0;
         return (
           <span className="font-mono text-xs font-bold text-ink">
             {formatSecondsReadable(secs)} <span className="text-stone text-[10px] font-normal">/ {formatSecondsReadable(targetSecs)}</span>
@@ -108,8 +108,8 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
       }
       case 'NUMERIC': {
         const num = log.valueNumeric ?? 0;
-        const goal = habit.config.numeric?.goal ?? 1;
-        const unit = habit.config.numeric?.unit ? ` ${habit.config.numeric.unit}` : '';
+        const goal = habit.config?.numeric?.goal ?? 1;
+        const unit = habit.config?.numeric?.unit ? ` ${habit.config.numeric.unit}` : '';
         return (
           <span className="font-mono text-xs font-bold text-ink">
             {num} <span className="text-stone text-[10px] font-normal">/ {goal}{unit}</span>
@@ -118,7 +118,7 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
       }
       case 'CHECKLIST': {
         const done = log.valueChecklistCompletedItemIds?.length ?? 0;
-        const total = habit.config.checklist?.items?.length ?? 0;
+        const total = habit.config?.checklist?.items?.length ?? 0;
         return (
           <span className="font-mono text-xs font-bold text-ink">
             {done} <span className="text-stone text-[10px] font-normal">/ {total} items done</span>
@@ -159,11 +159,9 @@ export const HabitDetailsModal: React.FC<HabitDetailsModalProps> = ({
     ? streakInfo.unlockedChallenges
     : (habit.stats?.unlockedChallenges || []);
 
-  const unlockedBadgesCount = useMemo(() => {
-    return STREAK_CHALLENGES.filter(
-      (challenge) => bestStreak >= challenge.days || unlockedBadges.includes(challenge.days)
-    ).length;
-  }, [bestStreak, unlockedBadges]);
+  const unlockedBadgesCount = STREAK_CHALLENGES.filter(
+    (challenge) => bestStreak >= challenge.days || unlockedBadges.includes(challenge.days)
+  ).length;
 
   const timesCompletedThisWeek = habitLogs.filter((l) => l.status === 'COMPLETED' && l.date && isDateInThisWeek(l.date)).length;
   const timesCompletedThisMonth = habitLogs.filter((l) => l.status === 'COMPLETED' && l.date && isDateInThisMonth(l.date)).length;

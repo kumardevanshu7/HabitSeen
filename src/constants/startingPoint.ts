@@ -8,8 +8,8 @@ export interface AnimeQuote {
 }
 
 export const STARTING_POINT_CONFIG = {
-  dateStr: '2026-11-01',
-  displayDate: '1st November, 2026',
+  dateStr: '2026-11-11',
+  displayDate: '11th November, 2026',
   tagline: 'Ground Zero • No More Restarts',
   subtext: 'Small daily choices compound into an unbreakable spirit.',
 };
@@ -40,7 +40,7 @@ export const ANIME_CONSISTENCY_QUOTES: AnimeQuote[] = [
     translation: 'Apni limits ko piche chhodo. Consistency roz chupchap aane ka naam hai.',
   },
   {
-    quote: 'Even the tallest mountain begins with small grains of dust. Stand firm. 1st November is your permanent line in the sand.',
+    quote: 'Even the tallest mountain begins with small grains of dust. Stand firm. 11th November is your permanent line in the sand.',
     author: 'Jiraiya',
     anime: 'Naruto',
     translation: 'Badi manzil chote chote kankad jod kar banti hai. Ab dobara restart nahi karna.',
@@ -66,8 +66,8 @@ export const ANIME_CONSISTENCY_QUOTES: AnimeQuote[] = [
 ];
 
 /**
- * Calculates how many days have passed since the anchor starting point (1st November, 2026).
- * Day 1 is on 2026-11-01.
+ * Calculates how many days have passed since the anchor starting point (11th November, 2026).
+ * Day 1 is on 2026-11-11.
  */
 export function getDaysSinceStartingPoint(targetDateStr = STARTING_POINT_CONFIG.dateStr): number {
   try {
